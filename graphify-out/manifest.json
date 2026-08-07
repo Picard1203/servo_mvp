@@ -190,7 +190,7 @@
     "semantic_hash": ""
   },
   "python/main.py": {
-    "mtime": 1786139928.0,
+    "mtime": 1786140335.0,
     "ast_hash": "9b219753485f77cd7bf08c4439b3f447",
     "semantic_hash": ""
   },
@@ -200,7 +200,7 @@
     "semantic_hash": "12406d28aec8d097fed06de20b60cce7"
   },
   "python/static/app.js": {
-    "mtime": 1786140054.0,
+    "mtime": 1786140335.0,
     "ast_hash": "380a04459bd02ff62656544765bc022c",
     "semantic_hash": ""
   },
@@ -210,7 +210,7 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/tests/conftest.py": {
-    "mtime": 1786139938.0,
+    "mtime": 1786140335.0,
     "ast_hash": "9bac3f5fc1233f9a2d71741cc137bccf",
     "semantic_hash": ""
   },
@@ -330,7 +330,7 @@
     "semantic_hash": "99c535ee75fad68ec695db4383bc99fd"
   },
   "python/tests/unit/test_telemetry_service.py": {
-    "mtime": 1786139900.0,
+    "mtime": 1786140335.0,
     "ast_hash": "aded8cc9a8be51ac8bba31586ed16767",
     "semantic_hash": ""
   },
@@ -475,8 +475,8 @@
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1786139543.0,
-    "ast_hash": "19a701a305ac1d3838733e14a7c354b8",
+    "mtime": 1786141852.0,
+    "ast_hash": "f3b0e6926c198c573f8df09d4862963a",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -530,8 +530,8 @@
     "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
   },
   "docs/BACKLOG.md": {
-    "mtime": 1786140096.0,
-    "ast_hash": "9f2965551542a67a0f2f95c57e974462",
+    "mtime": 1786141998.0,
+    "ast_hash": "6e2ce7b96656e28ff0ee92463ed31bd8",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -2365,8 +2365,18 @@
     "semantic_hash": ""
   },
   "docs/adr/0008-a-failed-read-is-reported-as-unknown.md": {
-    "mtime": 1786139543.0,
-    "ast_hash": "4c8864dbc08168aafeeeb01bab641d2f",
+    "mtime": 1786141842.0,
+    "ast_hash": "931a9952dfae2a8dd2e506f3d1466878",
+    "semantic_hash": ""
+  },
+  "tools/soak_report.py": {
+    "mtime": 1786141782.0,
+    "ast_hash": "99433d6191a9e8a95132147e33ef78ee",
+    "semantic_hash": ""
+  },
+  "tools/synthetic_operator.py": {
+    "mtime": 1786141719.0,
+    "ast_hash": "15689ab107ed059726ef54d05aebb5d0",
     "semantic_hash": ""
   }
 }

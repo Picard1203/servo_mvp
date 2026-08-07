@@ -194,6 +194,24 @@ than the chaos of before."
 reproducing has not been proved absent. Close it after a long run under
 multi-operator load, which is also R1's measurement.
 
+**Tooling for that run exists** (7 August 2026), so the soak is two commands:
+
+```bash
+python3 tools/synthetic_operator.py --host <board> --minutes 120 \
+    --operators 3 --report soak.json     # drives it like people do
+python3 tools/soak_report.py --since 2026-08-08T09:00   # what the board saw
+```
+
+The first simulates operators — polling once a second like the UI, moving,
+waiting for the move to arrive, thinking, locking, occasionally pulling an
+export — with randomised think time so they do not act in lockstep. The second
+pulls the database and log over `adb` and states a verdict: gaps in the 9–13 s
+stall band, positions the servo cannot have reported, logged failures, and the
+growth rates T9 needs.
+
+Run it supervised rather than overnight. An unattended failure at 03:00 is just
+a gap in a log; a watched one is an observation.
+
 **Remaining, separate:** the UI declares a disconnection on a *single* failed
 poll — see D11.
 
@@ -471,6 +489,47 @@ sustained one is unmistakable. The threshold is written down here once chosen.
 
 ---
 
+### D13 — Requests arriving faster than slots free up are refused
+**Status:** open · **Severity:** high · **Measured 7 August 2026**
+
+**This is the "first press does nothing, press it again" symptom**, and it now
+reproduces on demand. Identical requests, from one machine, differing only in
+spacing:
+
+| pattern | requests | failures |
+|---|---|---|
+| back to back, new connection each | 10 | **5** |
+| paced at 1 s, as the UI polls | 10 | **0** |
+
+**The ceiling, measured:** `kMaxRelaySockets = 6` slots, each held for about
+five seconds after use by uvicorn's `timeout_keep_alive=5` (`main.py:142`, set
+deliberately so idle sockets do not park a slot). That is a sustained ceiling of
+roughly **one new connection per second**, with a burst tolerance of six.
+
+A browser hides this while it is only polling, because it reuses one socket. It
+surfaces the moment an action needs a *new* connection and every slot is busy —
+the request is refused, the operator sees nothing happen, and pressing again
+works because a slot has freed by then.
+
+**This is what R1 has to be measured against.** The target is roughly three
+remote operators plus one local session. A single browser may open up to six
+connections to one host on its own, so the slot budget can be spent by one
+person before the second connects.
+
+Not a race, and not fixed by the W5500 mutex: the relay is refusing politely and
+correctly (`Poll()` calls `fresh.stop()` and increments `rejected_total_`). The
+question is whether six is enough, and what should happen when it is not — a
+refusal is currently indistinguishable from a failure at the browser.
+
+**`rejected_total()` already counts these and cannot be read from the board**,
+exactly like `write_lock_timeouts()`. Two diagnostics, both unreachable; see D3.
+
+**Acceptance:** the ceiling is stated in numbers here (done above), the target in
+R1 is either met or the limit is raised deliberately, and a refused connection
+produces something an operator can understand rather than silence.
+
+---
+
 ### D12 — No way to return to the datum after activating a saved zero
 **Status:** open · **Severity:** medium · **Reported:** operator, on hardware
 
@@ -495,6 +554,43 @@ comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
 
 **Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
 and 186 tests still pass.
+
+---
+
+### T9 — Put a measured storage budget in writing
+**Status:** open · **Raised by:** the operator, planning a one-to-two month test
+
+The question is simple and nobody could answer it: *run this for two months —
+does it fit?* Measured on the board on 7 August 2026:
+
+| | rate | one month | two months |
+|---|---|---|---|
+| Telemetry database | ~80 bytes/row at 1 row/s → ~6.9 MB/day | ~208 MB | ~416 MB |
+| Log at DEBUG | ~180 bytes/line, ~24 lines/min/operator → ~6.3 MB/day | ~188 MB | ~376 MB |
+
+Free space on the board: **2.6 GB**. So a two-month run at DEBUG lands near
+800 MB — it fits, but nothing enforces it and nobody had written it down.
+
+**Retention, corrected.** Telemetry purges at 60 days
+(`telemetry_retention_days`), so the database plateaus rather than growing
+without limit. The **real Logger461 rotates**, so production logging is bounded
+too. What is *not* bounded is the **stand-in** in `main.py`, which is what runs
+on any board without the wheel installed — including this one. It opens the file
+and appends forever.
+
+Still to do:
+
+- Confirm the telemetry purge actually plateaus the file. SQLite reuses freed
+  pages rather than shrinking, so the size should level off, not fall — verify
+  rather than assume.
+- Measure the message rate with several operators, not one.
+- **Size any MCU-side logging against this budget before adding it** (D3). Debug
+  chatter from the relay is the highest-rate traffic in the system, and if it
+  crosses the Bridge into the same log file it spends from the same allowance.
+  If the stand-in is what will be running, give it rotation first.
+
+**Acceptance:** a table like the one above, verified over a multi-hour run, with
+a stated maximum footprint the board cannot exceed.
 
 ---
 

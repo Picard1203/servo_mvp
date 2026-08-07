@@ -50,7 +50,8 @@ numbers, before and after the W5500 fix:
 | Sampler stalls in the 10–12 s band | 3 | 0 |
 | Longest sampler gap | 11.00 s | 2.00 s |
 | Fabricated positions written to the database | 7 | 0 |
-| Failed servo reads logged | invisible | 0 |
+| Bridge timeouts logged (`servo.bridge.error`) | 3 | 0 |
+| Fabricated positions logged as such | not recorded at all | 0 to record |
 
 Coverage at 100% still means every line ran, not that every assumption was
 questioned. It did not prevent the six defects in `AUDIT.md`, and it did not

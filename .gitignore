@@ -17,6 +17,19 @@ python/.env
 
 # Logs
 *.log
+*.jsonl
+
+# Arduino App Lab build and runtime cache.
+#
+# Created on the board by `arduino-app-cli app start` / the App Lab Run
+# button: .cache/sketch holds ~900 compiled objects for the STM32 side, and
+# .cache/.venv is the provisioned Python environment. 55M and fully
+# regenerable, so it never travels by git.
+#
+# Deleting it forces a COLD rebuild — measured at ~7 minutes on the board
+# versus ~16 seconds warm. That is the difference README section 5 warns
+# about when it says wiping the folder makes App Lab re-provision.
+.cache/
 
 # graphify — track the graph, not the machinery.
 #

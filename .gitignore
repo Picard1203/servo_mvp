@@ -1,1 +1,60 @@
+# Python
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+
+# Local config and data — never tracked.
+# .env.board and .env.example ARE tracked: they are templates.
+# python/.env is the live board config and must not be.
+python/.env
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# graphify — track the graph, not the machinery.
+#
+# Tracked on purpose: graph.json, graph.html, GRAPH_REPORT.md, manifest.json,
+# cost.json, .graphify_labels.json. The air-gapped machine cannot rebuild the
+# semantic layer without an API key, so the built graph must travel with us.
+#
+# Ignored: regenerable caches and machine-specific paths. .graphify_root and
+# .graphify_python hold ABSOLUTE paths from whichever machine last ran a build,
+# so committing them breaks every other machine that clones this.
+graphify-out/cache/
+graphify-out/.graphify_root
+graphify-out/.graphify_python
+graphify-out/.needs_update
+graphify-out/.graphify_detect.json
+graphify-out/.graphify_extract.json
+graphify-out/.graphify_ast.json
+graphify-out/.graphify_semantic*.json
+graphify-out/.graphify_analysis.json
+graphify-out/.graphify_incremental.json
+graphify-out/.graphify_cached.json
+graphify-out/.graphify_uncached.txt
+graphify-out/.graphify_old.json
+graphify-out/.graphify_chunk_*.json
+graphify-out/20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Claude Code local overrides (machine-specific)
+.claude/settings.local.json
+
+# Skills archive — see skills/README.md.
+# The big cross-agent library travels by folder copy (adb push / shipped zip),
+# not by git. Tracking 105M would slow every clone for no gain.
+# Revisit if the air-gap transfer ever becomes a git bundle.
+skills/agentic-awesome-skills/

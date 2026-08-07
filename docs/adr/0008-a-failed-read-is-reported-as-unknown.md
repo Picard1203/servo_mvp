@@ -16,7 +16,17 @@ is discarded the information is gone for good.
 This is not hypothetical. On 7 August 2026, on hardware, three Bridge stalls of
 10.99 seconds each produced empty snapshots whose `raw_counts` were used anyway.
 The UI displayed −212.74°, the database stored seven fabricated samples, and one
-row recorded count −1, which no 0..4095 servo can report. Nothing was logged.
+row recorded count −1, which no 0..4095 servo can report.
+
+**The bus failure itself was logged, and clearly** — three `servo.bridge.error`
+records reading `function=servo_read error="Request 'servo_read' timed out after
+10s"`, one per stall. What was not recorded anywhere was the consequence: that a
+position had been **invented** from the failure and handed to the operator and
+the database. Reading the log, an engineer sees a bus that timed out and
+recovered; nothing says the screen lied in the meantime.
+
+That gap is the point. A logged cause with an unlogged consequence is how a
+defect survives a log review.
 
 The stakes are set by ADR-0007. Moves are permitted while the position reference
 is unverified, so **the travel window is the only guard** against driving into a
@@ -51,7 +61,9 @@ The API contract stays honest underneath it.
   `MotionService.recover()`.
 - Telemetry leaves a **gap** rather than a fabricated row. A gap is honest and
   visible in a time series; a zero is neither.
-- Every failed read logs `servo.read.failed`. Silence was how this survived.
+- Every failed read logs `servo.read.failed`, at the point where the position
+  would have been fabricated. `servo.bridge.error` already reported the *cause*;
+  this reports the *consequence*, which is the half that was missing.
 - Clients must render `null` as unknown. Anything that formats it as a number is
   reintroducing the defect at the last hop.
 

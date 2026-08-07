@@ -1,0 +1,16 @@
+profiles:
+  default:
+    fqbn: arduino:zephyr:unoq
+    platforms:
+      - platform: arduino:zephyr
+    libraries:
+      # Feetech/Waveshare bus-servo driver. NOT in Library Manager: install
+      # the .zip from the Waveshare ST3215 resources page, then make the name
+      # below match the INSTALLED FOLDER NAME.
+      - SCServo
+      # Ethernet Shield 2 (W5500). Needs the IPAddress cast patch on the
+      # Zephyr core - see libraries/README.txt.
+      - Ethernet (2.0.2)
+      # Required on the UNO Q for the Linux <-> MCU Bridge.
+      - Arduino_RouterBridge
+default_profile: default

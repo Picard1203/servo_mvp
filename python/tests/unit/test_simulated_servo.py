@@ -1,0 +1,96 @@
+"""SimulatedServoRepository: motion, deadband, faults, signed multi-turn."""
+
+from tests.conftest import wait_until
+
+
+class TestMotion:
+    """Basic motion profile."""
+
+    def test_moves_toward_target(self, sim):
+        sim.set_deadband(1)
+        sim.command_move(2000, 20000, 50)
+        assert wait_until(lambda: abs(sim.read_raw_counts() - 2000) <= 2)
+
+    def test_stop_holds_position(self, sim):
+        sim.set_deadband(1)
+        sim.command_move(4000, 2000, 50)
+        assert wait_until(lambda: sim.read_raw_counts() > 200)
+        sim.command_stop()
+        held = sim.read_raw_counts()
+        import time
+        time.sleep(0.2)
+        assert abs(sim.read_raw_counts() - held) <= 1
+
+
+class TestDeadband:
+    """Dead-zone behavior."""
+
+    def test_stops_inside_deadband(self, sim):
+        sim.set_deadband(50)
+        sim.command_move(1000, 20000, 50)
+        assert wait_until(
+            lambda: not sim.read_snapshot().moving, timeout=3.0)
+        assert abs(sim.read_raw_counts() - 1000) <= 50
+
+    def test_tighter_deadband_lands_closer(self, sim):
+        sim.set_deadband(2)
+        sim.command_move(1000, 20000, 50)
+        assert wait_until(lambda: not sim.read_snapshot().moving)
+        assert abs(sim.read_raw_counts() - 1000) <= 2
+
+    def test_minimum_deadband_is_one(self, sim):
+        sim.set_deadband(0)
+        assert sim._deadband_counts == 1
+
+
+class TestSignedMultiTurn:
+    """Absolute counts beyond one turn and below zero (contract)."""
+
+    def test_negative_counts_no_wrap(self, sim):
+        sim.set_deadband(1)
+        sim.command_move(-300, 20000, 50)
+        assert wait_until(lambda: abs(sim.read_raw_counts() + 300) <= 2)
+        assert sim.read_raw_counts() < 0
+
+    def test_counts_beyond_one_turn(self, sim):
+        sim.set_deadband(1)
+        sim.command_move(10000, 40000, 50)
+        assert wait_until(lambda: abs(sim.read_raw_counts() - 10000) <= 2)
+
+
+class TestFaults:
+    """Overload semantics."""
+
+    def test_overload_visible_in_snapshot(self, sim):
+        sim.simulate_overload()
+        assert sim.read_snapshot().overload is True
+
+    def test_new_position_command_clears_overload(self, sim):
+        sim.simulate_overload()
+        sim.command_move(sim.read_raw_counts(), 1000, 50)
+        assert sim.read_snapshot().overload is False
+
+    def test_other_flags_false(self, sim):
+        snapshot = sim.read_snapshot()
+        assert not any((snapshot.overcurrent, snapshot.overheat,
+                        snapshot.voltage_fault, snapshot.sensor_fault))
+
+
+class TestRangeConfiguration:
+    """configure_range records the travel-range mode."""
+
+    def test_single_turn_default(self, sim):
+        sim.configure_range(False, 1)
+        assert sim._multi_turn is False
+        assert sim._angle_resolution == 1
+
+    def test_multi_turn_with_amplification(self, sim):
+        sim.configure_range(True, 2)
+        assert sim._multi_turn is True
+        assert sim._angle_resolution == 2
+
+    def test_amplification_clamped_to_1_3(self, sim):
+        sim.configure_range(True, 9)
+        assert sim._angle_resolution == 3
+        sim.configure_range(True, 0)
+        assert sim._angle_resolution == 1

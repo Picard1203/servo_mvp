@@ -1,0 +1,18 @@
+name: Servo Control
+description: >
+  Serial-bus servo control for the Waveshare ST3215 on the Arduino UNO Q.
+  FastAPI backend with an LCARS web UI served from the board; any machine
+  on the network opens it by IP and port, several at once, with nothing
+  installed on the viewing machines.
+version: 0.2.0
+
+sketch:
+  path: sketch
+
+python:
+  path: python
+  main: main.py
+
+# No bricks: a brick pulls a Docker container from the internet the first
+# time it is used, which cannot happen on the air-gapped target. The UI is
+# served by FastAPI itself from python/static.

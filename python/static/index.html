@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Servo Control</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="page">
+
+    <header class="topband">
+      <span class="title">Servo Control</span>
+      <div class="statusline">
+        <span class="conn" id="conn"><span class="led"></span> <span id="connText">CONNECTING</span></span>
+        <span class="alarmslot" id="alarmslot">No active alarms</span>
+        <span class="server" id="serverAddr"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="col">
+        <section class="card" id="drive">
+          <h2>Measured position</h2>
+          <div class="posrow">
+            <div class="pos"><span class="n" id="posN">—</span><span class="u">°</span></div>
+            <span class="chip" id="movechip">—</span>
+          </div>
+          <div class="track"><i id="posBar"></i></div>
+          <div class="metrics">
+            <div class="m" id="mTemp"><div class="k">Temp</div><div class="v"><span id="vTemp">—</span><small> °C</small></div></div>
+            <div class="m" id="mVolt"><div class="k">Voltage</div><div class="v"><span id="vVolt">—</span><small> V</small></div></div>
+            <div class="m" id="mCur"><div class="k">Current</div><div class="v"><span id="vCur">—</span><small> A</small></div></div>
+            <div class="m"><div class="k">Torque</div><div class="v"><span id="vTorq">—</span><small> kg·cm</small></div></div>
+          </div>
+          <div class="faultgrid">
+            <div class="fault" id="fOverload">Overload<span class="s"><span class="okdot"></span>OK</span></div>
+            <div class="fault" id="fOvercurrent">Current<span class="s"><span class="okdot"></span>OK</span></div>
+            <div class="fault" id="fOverheat">Heat<span class="s"><span class="okdot"></span>OK</span></div>
+            <div class="fault" id="fVoltage">Voltage<span class="s"><span class="okdot"></span>OK</span></div>
+            <div class="fault" id="fSensor">Sensor<span class="s"><span class="okdot"></span>OK</span></div>
+            <div class="fault" id="fAngle">Angle<span class="s"><span class="okdot"></span>OK</span></div>
+          </div>
+          <div id="recoverwrap" hidden>
+            <button class="btn alarmfix" id="recoverBtn">Clear fault &amp; resume</button>
+          </div>
+        </section>
+
+        <section class="card stretch" id="activity">
+          <h2>Recent activity</h2>
+          <div class="scrolllist" id="eventList"></div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <h2>Move</h2>
+          <div class="field"><label for="inAngle">Angle</label>
+            <div class="inputwrap">
+              <button class="step" data-nudge="inAngle" data-d="-0.06">−</button>
+              <input id="inAngle" type="text" inputmode="decimal" value="0.00">
+              <button class="step" data-nudge="inAngle" data-d="0.06">+</button>
+              <span class="unit">DEG</span>
+            </div>
+          </div>
+          <div class="field"><label for="inSpeed">Speed</label>
+            <div class="inputwrap">
+              <button class="step" data-nudge="inSpeed" data-d="-5">−</button>
+              <input id="inSpeed" type="text" inputmode="decimal" value="30">
+              <button class="step" data-nudge="inSpeed" data-d="5">+</button>
+              <span class="unit">°/S</span>
+            </div>
+          </div>
+          <div class="btns">
+            <button class="btn go" id="moveBtn">Engage</button>
+            <button class="btn stop" id="stopBtn">Stop</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Controls</h2>
+          <div class="cubes">
+            <button class="cube" id="lockCube">Lock</button>
+            <button class="cube" id="calCube">Calibrate</button>
+            <button class="cube" id="exportCube">Export 24h CSV</button>
+          </div>
+        </section>
+
+        <section class="card stretch" id="positions">
+          <h2>Saved positions</h2>
+          <div class="scrolllist" id="zeroList"></div>
+          <div class="zbtns">
+            <button class="btn small" id="saveBtn">Save current</button>
+            <button class="btn small" id="useBtn">Use</button>
+            <button class="btn small" id="removeBtn">Remove</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+
+  <!-- transient notices (top-left, auto-dismiss) -->
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- confirm dialog: reused for calibrate / remove -->
+  <dialog class="modal" id="confirmDlg">
+    <h3 class="modal-title" id="confirmTitle">Confirm</h3>
+    <p class="modal-body" id="confirmBody"></p>
+    <div class="modal-actions">
+      <button class="btn small modal-cancel" id="confirmNo">Cancel</button>
+      <button class="btn small modal-ok" id="confirmYes">Confirm</button>
+    </div>
+  </dialog>
+
+  <!-- text-input dialog: naming a saved position -->
+  <dialog class="modal" id="promptDlg">
+    <h3 class="modal-title" id="promptTitle">Name</h3>
+    <p class="modal-body" id="promptBody"></p>
+    <div class="inputwrap modal-input">
+      <input type="text" id="promptInput" maxlength="40" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn small modal-cancel" id="promptNo">Cancel</button>
+      <button class="btn small modal-ok" id="promptYes">Save</button>
+    </div>
+  </dialog>
+
+  <script src="/app.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

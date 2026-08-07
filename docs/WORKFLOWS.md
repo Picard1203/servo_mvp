@@ -186,16 +186,22 @@ timer — both are exposed to exactly those.
 
 ---
 
-### W7 — Write a project-specific skill
-**Highest-leverage item on this page**, per the IoT-SkillsBench finding.
+### W7 — Project-specific skill: **DONE**
+**Status:** written, 7 August 2026 · `skills/uno-q-st3215/SKILL.md`
 
-Package what this repo already knows into a `SKILL.md`: the ST3215 register
-facts, the 0.06°/count and 3004-count numbers, the five relay rules, the six
-fixed bugs, and the datum-must-sit-mid-travel constraint.
+Installed with `cp -r skills/uno-q-st3215 ~/.claude/skills/`. The same `SKILL.md`
+format works in Antigravity (`~/.agents/skills`).
 
-That content is "human-expert" in the benchmark's sense, and the benchmark found
-it near-decisive on real hardware. It also travels — the same `SKILL.md` format
-works in Antigravity.
+Covers: why the UNO Q is not a normal Arduino (LLEXT, dual brain, core pinning,
+`src/` compilation rules); the ST3215 register map with the four traps
+(`0x37` is the EEPROM lock not a safety lock, `0x3C` is PWM duty not torque,
+`0x28`=128 sets centre, SMS_STS never SCSCL); status bit4; sign-magnitude
+decoding; the belt geometry and the datum-must-sit-mid-travel law; the six relay
+rules; the Bridge contract; a symptom→cause table; and the deployment traps.
+
+**Keep it current.** When a defect in `BACKLOG.md` closes and teaches something
+general, add it to the skill. It is the durable form of what this repo knows —
+the docs explain *this* project, the skill travels to the next one.
 
 ---
 

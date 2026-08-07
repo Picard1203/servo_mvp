@@ -10,6 +10,7 @@ which skill drives which piece of work, and for install commands.
 
 | Directory | Size | Tracked in git | What it is |
 |---|---|---|---|
+| **`uno-q-st3215/`** | 20K | yes | **Ours.** The board-and-servo skill this project needed and nobody had written. Install with `cp -r skills/uno-q-st3215 ~/.claude/skills/`. |
 | `_global-claude-skills/` | 296K | yes | Copy of `~/.claude/skills` — `graphify`, `grilling`, `grill-with-docs`, `domain-modeling`, `tdd`, `to-tickets`, `improve-codebase-architecture`. The ones already in use. |
 | `superpowers/` | 2.2M | yes | obra/superpowers — 14 skills. `test-driven-development`, `systematic-debugging`, `defense-in-depth`, `condition-based-waiting`, `testing-anti-patterns`, `writing-plans`, `executing-plans`, `verification-before-completion`. The methodology layer. |
 | `iot-skillsbench/` | 692K | yes | Human-expert embedded skills from the HIL benchmark, in `skills-human-expert/` (plus `skills-llm-generated/` for comparison and `tasks/`). Docs and source stripped. |

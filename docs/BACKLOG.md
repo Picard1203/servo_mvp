@@ -118,6 +118,16 @@ restores it. Reproduces **with a single UI instance open**, so this is not purel
 a concurrency-limit problem.
 
 Candidate causes, none confirmed:
+- **Relay chunk size is half the proven value.** `RELAY_NOTES.md` §5 states
+  plainly: *"256 is the value the working relay used."* The code ships
+  `kRelayChunkBytes = 128` (`sketch/src/Config.h:43`) and `RELAY_CHUNK_BYTES=128`
+  (`python/.env.example:10`). The two sides agree with each other, so the contract
+  checker is happy — but both differ from the reference implementation. Chunk size
+  is bytes per Bridge message, so **halving it doubles the number of Bridge round
+  trips for identical payload.** Given that the Bridge starving is already a known
+  failure mode (rule 3, the `loop()` yield), doubling its traffic is a plausible
+  contributor to both this and D6. Cheapest experiment on the list: set it to 256
+  on both sides and re-run.
 - Relay slot exhaustion. `kMaxRelaySockets = 6` (`sketch/src/Config.h:45`) is the
   **only** connection limit in the system — there is no Python-side cap. A single
   browser opens up to 6 connections per host on its own, and `app.js` polls
@@ -161,6 +171,10 @@ system did. Per-connection churn is available at DEBUG but off by default.
 
 Occasional slow first paint. Cause unmeasured. Suspected inefficiency in the
 serving path, plausibly interacting with D4.
+
+**First thing to try:** the halved relay chunk size described under D4. Every
+byte of the UI crosses the Bridge in `kRelayChunkBytes` chunks, so a first paint
+is exactly the workload that a doubled round-trip count would slow down.
 
 **Acceptance:** load time measured and stated; a number to hold against.
 

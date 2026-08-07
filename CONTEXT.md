@@ -5,6 +5,85 @@ LCARS-themed web UI served from the board: operators open `http://<board-ip>:800
 several at once, nothing installed on their machines. Final deployment is
 air-gapped; the dev board has WiFi, the production ones will not.
 
+## Language
+
+### Position and geometry
+
+**Count**:
+The servo encoder's unit of absolute position; 4096 per servo turn.
+_Avoid_: tick, step, encoder unit
+
+**Output degree**:
+An angle measured at the mechanism, after the 44:30 belt reduction. One count
+is 0.06 output degrees. Unqualified "degrees" always means output degrees.
+_Avoid_: servo degree (that is the pre-belt angle, a different quantity)
+
+**Datum**:
+The calibration reference captured from a real servo reading, against which
+output angles are measured. Must sit mid-travel; a datum at count 0 strands
+the negative half of the window.
+_Avoid_: zero point, home, origin, offset
+
+**Zero reference**:
+A saved, named baseline position an operator can recall. The datum is one
+distinguished zero reference, not a separate kind of thing.
+_Avoid_: preset, bookmark, waypoint, favourite
+
+**Travel window**:
+The reachable output-angle range, ±90° by default. A target outside it is
+refused as `out_of_travel`, never clamped.
+_Avoid_: range, limits, bounds
+
+### Telemetry
+
+**Snapshot**:
+One instantaneous sensory readout from the servo, carrying its own `valid`
+flag. An invalid snapshot is a failed read, not a reading of zero.
+_Avoid_: reading, poll, sample
+
+**Sample**:
+One persisted telemetry row, written by the sampler at the configured
+interval and subject to retention.
+_Avoid_: snapshot, record, datapoint
+
+**Fault**:
+One of six conditions decoded from status register 0x41 (overload,
+overcurrent, overheat, voltage, sensor, angle).
+_Avoid_: error, alarm (alarm is the UI's word for a surfaced fault)
+
+**timestamp**:
+The time field on every entity, schema, DB column, CSV column and query
+param. Spelled out everywhere.
+_Avoid_: ts, time, when
+
+### MCU boundary
+
+**Bridge**:
+The RPC channel between the Linux side and the MCU. Calls are serialised;
+payloads are CSV strings with typed arguments.
+_Avoid_: link, IPC, channel
+
+**Relay**:
+The MCU-side byte pump that mirrors Ethernet-shield connections to the Linux
+side. Owns no HTTP knowledge — it moves bytes.
+_Avoid_: proxy, tunnel, forwarder
+
+**Slot**:
+One mirrored TCP connection inside the relay, identified by index. Adopted
+exactly once via `accept()`.
+_Avoid_: socket, connection id, channel
+
+### Control
+
+**Lock**:
+The digital interlock that refuses movement while engaged.
+_Avoid_: e-stop, freeze, hold, safety
+
+**Backend**:
+Which `ServoRepository` implementation is live — simulated or hardware —
+selected by `use_hardware_servo`.
+_Avoid_: mode, driver, mock, fake
+
 ## Layout
 
 ```

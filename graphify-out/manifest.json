@@ -444,25 +444,15 @@
     "ast_hash": "c1bc0257942b52e0574e2cc2e8fb9c39",
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
-  "sketch/sketch.ino": {
-    "mtime": 1785849906.0,
-    "ast_hash": "159d08d311ab77cfe15507048b47eea9",
-    "semantic_hash": "159d08d311ab77cfe15507048b47eea9"
-  },
-  "sketch/tests/OnTarget/OnTarget.ino": {
-    "mtime": 1785850212.0,
-    "ast_hash": "db490ca2c5fde3e91ce2cfe41b99e7da",
-    "semantic_hash": "db490ca2c5fde3e91ce2cfe41b99e7da"
-  },
   "CLAUDE.md": {
-    "mtime": 1786088958.0,
-    "ast_hash": "69752c8696318707959c572f4e919de4",
-    "semantic_hash": "69752c8696318707959c572f4e919de4"
+    "mtime": 1786096713.0,
+    "ast_hash": "1a0fea67ee03dfa008988efa3b965144",
+    "semantic_hash": ""
   },
   "CONTEXT.md": {
-    "mtime": 1786088826.0,
-    "ast_hash": "3f176e7fbd0bd63d6569aed0595c5bb7",
-    "semantic_hash": "3f176e7fbd0bd63d6569aed0595c5bb7"
+    "mtime": 1786096700.0,
+    "ast_hash": "e76cbb0073f255b2fb9e7ecfd42685fe",
+    "semantic_hash": ""
   },
   "README.md": {
     "mtime": 1786009172.0,
@@ -490,9 +480,9 @@
     "semantic_hash": "c07aec6d21643184b3e218661eae2d4c"
   },
   "docs/agents/domain.md": {
-    "mtime": 1786088907.0,
-    "ast_hash": "168641bf6f018b85ad585d053385a53e",
-    "semantic_hash": "168641bf6f018b85ad585d053385a53e"
+    "mtime": 1786096727.0,
+    "ast_hash": "109b629597aba932a59bdff083b25ca7",
+    "semantic_hash": ""
   },
   "docs/agents/issue-tracker.md": {
     "mtime": 1786088942.0,

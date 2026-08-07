@@ -30,29 +30,50 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-186 Python tests, 100% line coverage of app/
+192 Python tests, 100% line coverage of app/
 164 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 ```
 
-**But the system is not stable.** Eight open defects are recorded in
-`BACKLOG.md`, several observed on real hardware. Coverage at 100% means every
-line ran, not that every assumption was questioned — it did not prevent any of
-the six defects in `AUDIT.md`, and it is not preventing the current eight.
+**It has now been run on real hardware, driving the real servo** (7 August 2026,
+backlog T8). That run changed the picture more than any amount of reading could
+have.
+
+**Closed by it:** D1, D2, D9, and the cause of D4. **Opened by it:** D10, D11,
+D12 — none of which anyone had thought to look for.
+
+**The system is materially calmer but not yet stable.** What the run proved, in
+numbers, before and after the W5500 fix:
+
+| | before | after |
+|---|---|---|
+| Sampler stalls in the 10–12 s band | 3 | 0 |
+| Longest sampler gap | 11.00 s | 2.00 s |
+| Fabricated positions written to the database | 7 | 0 |
+| Failed servo reads logged | invisible | 0 |
+
+Coverage at 100% still means every line ran, not that every assumption was
+questioned. It did not prevent the six defects in `AUDIT.md`, and it did not
+prevent D9 — where the correct rule and its violation sat twelve lines apart in
+one file, both covered, both green.
 
 ### The single most important open item
 
-**D2 — `capture()` can store a failed read as position 0.** It is the linchpin,
-not just one bug among eight.
+**D10 — the sampler threw once in seven minutes and the log cannot say why.**
+`logger.exception` recorded the message without the exception or traceback.
 
-Moves are deliberately permitted while the position reference is unverified
-(ADR-0007), because the site is roughly three hours away and refusing movement
-would turn a recoverable signal loss into a site visit. That makes the travel
-window the only guard against driving into a silent clamp — and **the travel
-window is computed from the datum.** A bad datum displaces the guard by exactly
-the error it exists to catch.
+It ranks first not because it is the biggest defect but because everything
+remaining is measurement — the D4 soak, first paint, the chunk-size experiment,
+the benchmarks that define "stable" — and an unexplained exception that destroys
+its own evidence corrupts every measurement taken near it.
 
-Fix D2 first. D1 is its symptom.
+### The lesson worth carrying
+
+Three of this project's defect families are now the same defect: **a rule applied
+to one path and not to its twin.** `AUDIT.md`'s originals, D2's
+`calibrate()`-but-not-`capture()`, and D9's two baselines. When fixing anything
+here, the second question is always: *where is this rule's twin, and does it
+know?*
 
 ## Environment right now
 
@@ -63,8 +84,16 @@ Fix D2 first. D1 is its symptom.
 - More adapters are expected within the month. If they arrive before the MVP is
   finished, the system gets boxed into the secure network for handover; if not,
   it ships with the single coloured adapter.
-- This version has not yet been run on the board: there is no `.env` and no
-  database (backlog D8).
+- **This version now runs on the board.** `python/.env` exists, the backend logs
+  `backend=hardware` at boot, and the database is populated. The app is started
+  headlessly with `arduino-app-cli app start user:servo_mvp`, which is also how
+  App Lab starts it — App Lab opens its Python and serial monitors when it does.
+- **The database is `ArduinoApps/servo_mvp/servo_mvp.db`, inside the sshfs
+  mount.** `.env.board` sets a relative `DB_PATH` on purpose, because the Python
+  side runs in a container where `HOME` is `/home/app`. Earlier docs claimed it
+  sat outside the mount and needed `adb`; that is true only of the default.
+- The active datum is count 2049, captured mid-travel by the operator, and ±90
+  is reachable in both directions from it.
 
 ## Hardware facts, all bench-verified
 
@@ -80,6 +109,13 @@ Fix D2 first. D1 is its symptom.
   `Ethernet.init()`
 - Ethernet 2.0.2 needs an `IPAddress((uint32_t)0)` cast patch on this core
 - `kMaxRelaySockets = 6` is the **only** connection limit in the system
+- **The W5500 is one chip on one SPI bus, reached from two threads.** `Poll()`
+  runs on the loop thread, `net_tx` / `net_shutdown` on the Bridge thread. They
+  must be serialised — `RELAY_NOTES.md` rule 7. Six sockets are not six
+  resources.
+- Sketch libraries need explicit versions in `sketch.yaml`; an unversioned
+  reference fails with `Invalid Library Reference`. The **platform** is still
+  unpinned and needs `arduino:zephyr` ≥ 0.56.0 (backlog T2)
 
 ## Decisions on record
 
@@ -98,7 +134,10 @@ Seven ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
 ## Known gaps, stated honestly
 
 - **The relay and controller have no automated coverage.** Every bug in this
-  project has lived there. The native tests cover pure maths only.
+  project has lived there. The native tests cover pure maths only. The W5500
+  mutex (backlog D4) was verified by compiling, running and measuring on the
+  board — **not by a single test**, because no test in this repository can
+  reach it.
 - **`sketch/tests/OnTarget/` has never been uploaded** (backlog T3).
 - **The C++ side does not log** anything during operation (backlog D3), so when
   the MCU misbehaves there is no way to see what it did.

@@ -1,65 +1,70 @@
-# Domain Docs
+# Domain docs
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+How the engineering skills consume this repo's documentation.
+
+The full reading flow is in the root `CLAUDE.md`. This file covers only what
+skills need to know.
 
 ## Layout: single-context
 
 ```
 /
-├── CONTEXT.md              description + ## Language glossary + project constraints
+├── CLAUDE.md               the router — read first
+├── CONTEXT.md              glossary ONLY (no status, no decisions, no layout)
+├── CONVENTIONS.md          code style, including undecided items
 ├── docs/
-│   ├── adr/                architecture decision records (0001-slug.md, ...)
-│   ├── AUDIT.md            full-system audit — why the system is shaped this way
-│   ├── PROJECT_STATE.md    point-in-time snapshot
-│   └── FILE_REGISTRY.md    catalogue of every file ever delivered
-├── python/
-├── sketch/
-├── libraries/
-└── tools/
+│   ├── PROJECT_STATE.md    where the project is
+│   ├── BACKLOG.md          open defects and tasks — the work queue
+│   ├── adr/                architecture decision records (0001-slug.md, …)
+│   ├── AUDIT.md            frozen historical record
+│   └── FILE_REGISTRY.md    catalogue of superseded deliverables
+├── python/  sketch/  libraries/  tools/
 ```
-
-## Before exploring, read these
-
-- **`CONTEXT.md`** at the repo root — the `## Language` glossary first, then the
-  locked decisions, hardware facts and known gaps.
-- **`docs/adr/`** — read ADRs that touch the area you're about to work in.
-- **`docs/AUDIT.md`** — read before touching the relay or the calibration path.
-- **`sketch/src/RELAY_NOTES.md`** — the five relay rules; read before changing
-  `NetworkRelay`.
-
-If `docs/adr/` is empty, proceed silently. Decisions currently live in
-`CONTEXT.md`'s "Locked decisions" table until one is pulled out into its own ADR;
-`domain-modeling` creates ADRs lazily, when a decision actually crystallises.
 
 ## Prefer the knowledge graph over raw browsing
 
-`graphify-out/` holds a graph fusing the AST with the docs' rationale. Run
-`graphify query "<question>"` before grepping or reading source files — it returns
-a scoped subgraph at a fraction of the token cost. See the root `CLAUDE.md` for
-the full command set. Grep remains correct for editing or debugging specific lines.
+`graphify-out/` fuses the AST with the docs' rationale. **Run
+`graphify query "<question>"` before grepping or reading source** — it returns a
+scoped subgraph at a fraction of the token cost. Use `graphify explain "<node
+id>"` rather than opening a file the graph has already described. Grep and full
+reads are correct for editing or debugging specific lines, once the graph has
+pointed you there.
+
+Pass this rule into every sub-agent prompt that involves code exploration.
 
 ## Use the glossary's vocabulary
 
-When your output names a domain concept (an issue title, a refactor proposal, a
-hypothesis, a test name), use the term as defined in `CONTEXT.md`'s `## Language`
-section, and avoid the synonyms listed under each term's `_Avoid_` line —
-`timestamp` never `ts`, `count` never `tick`, `datum` never `home`.
+When naming a domain concept — an issue title, a refactor proposal, a hypothesis,
+a test name — use the term as defined in `CONTEXT.md`'s `## Language` section and
+avoid the synonyms under each `_Avoid_` line: `timestamp` never `ts`, `count`
+never `tick`, `datum` never `home`, `Lock` never `e-stop`.
 
-If the concept you need isn't in the glossary yet, that's a signal: either you're
-inventing language the project doesn't use (reconsider), or there's a real gap —
-note it for `domain-modeling`.
+Watch the four terms that are easily conflated: **zero reference** (the genus),
+**datum** (the one absolute member), **baseline** (whichever is active), and the
+servo's `kLock` register (EEPROM write lock — not the **Lock**).
+
+If a concept is missing from the glossary, that is a signal: either you are
+inventing language the project does not use, or there is a real gap — add it.
+
+## Decisions
+
+`docs/adr/` holds seven ADRs and is **not** empty. Read the ones touching your
+area before working there. `CONTEXT.md` no longer carries a decisions table —
+that content moved into the ADRs.
+
+If your output contradicts an ADR, surface it rather than silently overriding:
+
+> _Contradicts ADR-0002 (no framework) — but worth reopening because…_
+
+## Where open work lives
+
+`docs/BACKLOG.md`, and nowhere else. There is no external issue tracker; the
+`gh`-based workflow that was once described here was never used and has been
+removed.
 
 ## Related skills
 
-- **`domain-modeling`** — maintains the `## Language` glossary and writes ADRs.
-  Formats: `~/.claude/skills/domain-modeling/CONTEXT-FORMAT.md` and `ADR-FORMAT.md`.
+- **`domain-modeling`** — maintains the glossary and writes ADRs. Formats:
+  `~/.claude/skills/domain-modeling/CONTEXT-FORMAT.md` and `ADR-FORMAT.md`.
 - **`grilling`** — stress-tests a plan or decision in rounds.
-- **`grill-with-docs`** — runs a grilling session that maintains the docs as it goes;
-  delegates to both of the above.
-
-## Flag ADR conflicts
-
-If your output contradicts an existing ADR or a locked decision in `CONTEXT.md`,
-surface it explicitly rather than silently overriding:
-
-> _Contradicts the "Plain HTML/CSS/JS, no framework" decision — but worth reopening because…_
+- **`grill-with-docs`** — a grilling session that maintains the docs as it goes.

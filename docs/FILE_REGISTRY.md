@@ -1,34 +1,29 @@
 # File registry
 
-Every file ever delivered for this project, what it is, and whether you still
-need it. **Nothing here is required for day-to-day work** — `servo_mvp.zip`
-contains the live project. This exists so that if you ever need an old file,
-you know which one and why, instead of guessing from filenames.
+A catalogue of artifacts produced for this project **that do not live in this
+repository** — earlier deliverables, reference documents and superseded
+implementations. It exists so that when you need an old file you know which one
+and why, instead of guessing from filenames.
 
-## Nothing is lost when you start a new chat
+> **Nothing here is required for day-to-day work.** The live project is this
+> repository, under git. Start at `CLAUDE.md`.
+>
+> This file describes a pre-git workflow where the project moved between chats as
+> a `servo_mvp.zip`. That is history. It is kept because the **Reference** section
+> below still points at genuinely useful documents.
 
-- Old conversations stay in your Claude history and remain searchable. A new
-  chat can search them by topic if something specific is needed.
-- Every artifact is a file you already hold — none of it lived only in chat.
-- The reasoning that matters was written down, not left in the transcript:
-  `PROJECT_STATE.md`, `AUDIT.md`, `servo_truth.md`,
-  `sketch/src/RELAY_NOTES.md`.
+## The ones worth knowing about
 
-What a fresh chat costs you: the informal back-and-forth. What it saves:
-resending a very long history on every message.
-
----
-
-## START HERE — the only three that matter
-
-| File | Purpose |
-|---|---|
-| **PROJECT_STATE.md** | Attach at the start of a new chat. Locked decisions, verified hardware numbers, all six fixed bugs, known gaps, how to work. |
-| **servo_mvp.zip** | The live project. Backend, GUI, sketch, tests, tools. |
-| **FILE_REGISTRY.md** | This file. |
-
-Also inside the zip: `AUDIT.md` (why the system is shaped as it is) and
-`sketch/src/RELAY_NOTES.md` (the five relay rules).
+- **`servo_truth.md`** — the ST3215 register map with every value tagged VERIFIED
+  or BENCH. The servo reference, and the source of most hardware numbers now
+  summarised in `PROJECT_STATE.md`.
+- **`UNO_Q_Network_Options_Tradeoff.md`** — why the Ethernet-shield relay was
+  chosen. Read it before anyone proposes changing the network architecture; the
+  decision itself is recorded as ADR-0001.
+- **`4_relay_sketch_ino.txt`** and **`5_relay_main_py.txt`** — the *working*
+  relay implementation. Comparing against these is how the worst bug in the
+  project was found. If a relay rewrite goes wrong, read these before
+  re-deriving.
 
 ---
 

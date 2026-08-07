@@ -99,6 +99,15 @@ Snapshot fields: `valid,counts,moving,temp_c,volt_v,curr_a,torque_kgcm,load,stat
 
 ## Going live
 
-Switch `deps.py` from `SimulatedServoRepository` to `BridgeServoRepository`.
-Nothing above that line changes — services, API, GUI and all 168 tests stay
-exactly as they are.
+Already wired. `deps.py` selects `BridgeServoRepository` over
+`SimulatedServoRepository` on the `use_hardware_servo` setting, so going live is
+a configuration flag on the board (`cp .env.board .env`), not a code change.
+Nothing above that line changes — services, API, UI and all 186 tests stay
+exactly as they are. See ADR-0004.
+
+## Known gap
+
+Nothing in `src/` logs during operation — `App.cpp` prints a one-time setup
+banner and that is all. `ServoBus`, `ServoController`, `NetworkRelay` and
+`BridgeApi` are silent, and every defect this project has had lived in those four
+files. See backlog D3.

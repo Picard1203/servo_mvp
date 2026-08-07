@@ -1,0 +1,9 @@
+{
+  "name": "arduino-cli",
+  "description": "Create, build, and upload Arduino projects using arduino-cli. Provides slash commands for common workflows and auto-activating knowledge for Arduino development.",
+  "version": "1.0.0",
+  "author": {
+    "name": "lookfwd"
+  },
+  "keywords": ["arduino", "embedded", "microcontroller", "iot", "hardware"]
+}

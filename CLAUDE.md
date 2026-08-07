@@ -1,41 +1,115 @@
-## Codebase navigation
+# Servo MVP — start here
 
-This repo has a graphify knowledge graph at `graphify-out/`. It fuses the AST of
-every source file with the rationale extracted from the docs, so a query returns
-a scoped subgraph instead of a pile of grep hits.
+Arduino UNO Q + Waveshare ST3215 serial-bus servo. FastAPI backend and an
+LCARS-themed web UI served from the board.
 
-**Use it before reading or grepping source.** It is the cheap path — a query
-costs a fraction of the tokens that browsing `python/app/` or `sketch/src/` does.
+**This file is the router. Read it, then follow the flow below.** Everything the
+project knows is written down — do not rebuild context by reading source.
 
-- `graphify query "<question>"` — start here for any question about how something
-  works, what calls what, or where a behaviour lives. Add `--budget <n>` when the
-  answer is truncated.
-- `graphify path "<A>" "<B>"` — how two things relate.
-- `graphify explain "<concept>"` — a focused explanation of one node.
-- `graphify-out/GRAPH_REPORT.md` — read only for a broad architecture review, or
-  when query/path/explain do not surface enough.
+---
 
-Grep and full-file reads are still right for editing or debugging specific lines —
-just let graphify orient you first.
+## 1. Use graphify. It is not optional.
 
-After changing code, run `graphify update .` to keep the graph current
-(AST-only, no API cost). A `PreToolUse` hook nudges toward this automatically.
+`graphify-out/` holds a knowledge graph fusing the AST of every source file with
+the rationale extracted from the docs. A query returns a scoped subgraph instead
+of a pile of grep hits, **at a fraction of the token cost of browsing
+`python/app/` or `sketch/src/`.**
 
-Two known extraction gaps: graphify has no `.ino` or `.css` mapping, so
-`sketch/sketch.ino`, `sketch/tests/OnTarget/OnTarget.ino` and
-`python/static/style.css` are skipped unless routed to the C++ grammar manually.
+```bash
+graphify query "<question>"      # start here for ANY question about the code
+graphify query "<q>" --budget N  # when the answer is truncated
+graphify path "<A>" "<B>"        # how two things relate
+graphify explain "<concept>"     # one focused node
+graphify update .                # after changing code (AST-only, no API cost)
+```
 
-## Agent skills
+**Rules, learned the expensive way:**
 
-### Issue tracker
+- Run `graphify query` **before** grepping or reading any source file.
+- `graphify explain "<node id>"` beats reading a whole file. When a query returns
+  a node id, use it — do not open the file to find what the graph already told
+  you.
+- Read full files only to **edit or debug specific lines**, after the graph has
+  pointed you at them.
+- Pass this rule to any sub-agent you dispatch. It applies to them too.
+- Run `graphify update .` after changing code. A `PreToolUse` hook nudges you.
 
-Issues live in GitHub Issues for `Picard1203/servo_mvp`, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Two known extraction gaps: no `.ino` or `.css` mapping, so `sketch/sketch.ino`,
+`sketch/tests/OnTarget/OnTarget.ino` and `python/static/style.css` are skipped
+unless routed to the C++ grammar manually.
 
-### Domain docs
+---
 
-Single-context: `CONTEXT.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
+## 2. The document flow
 
-`CONTEXT.md` carries the `## Language` glossary — the project's ubiquitous
-language. Use its terms in issue titles, test names, and proposals, and prefer
-them over the synonyms listed under `_Avoid_`. The `domain-modeling` skill
-maintains the glossary and writes ADRs into `docs/adr/`.
+Read in this order. Each answers a different question.
+
+| # | File | Answers |
+|---|---|---|
+| 1 | `CLAUDE.md` (this) | How do I work here? |
+| 2 | `docs/PROJECT_STATE.md` | Where is the project right now? |
+| 3 | `docs/BACKLOG.md` | **What do I do next?** ← the work queue |
+| 3b | `docs/WORKFLOWS.md` | **How do I do it?** ← skill + flow per item |
+| 4 | `CONTEXT.md` | What do the words mean? (glossary only) |
+| 5 | `CONVENTIONS.md` | How must the code look? |
+| 6 | `docs/adr/` | Why is it built this way? |
+| 7 | `docs/AUDIT.md` | What went wrong before? (frozen, historical) |
+| 8 | `sketch/src/RELAY_NOTES.md` | Before touching the relay. Non-negotiable. |
+
+**To pick up work: go to `docs/BACKLOG.md`.** It is the only file listing open
+items. Nothing else in the repo is a to-do list.
+
+One fact lives in exactly one file. If you find the same fact in two places, that
+is a defect — fix it rather than updating one copy.
+
+---
+
+## 3. Before you change anything
+
+Run all three. Note the numbers.
+
+```bash
+cd python && pytest                      # 186 tests
+cd sketch/tests/native && make           # 164 checks
+python3 tools/check_bridge_contract.py   # "both sides agree"
+```
+
+Run them again after. **If the numbers do not match, stop and say so.**
+
+The Python suite needs `pip install -r python/requirements-dev.txt` in a venv;
+the board's own environment is provisioned by App Lab.
+
+---
+
+## 4. How to work on this repo
+
+- **Read the written reasoning before rewriting anything.** Several bugs came
+  from re-deriving solved behaviour instead of porting it.
+- **Never bundle unrelated changes into a fix.**
+- **Say plainly what was actually tested versus assumed.** 100% line coverage did
+  not prevent any of the six defects in `AUDIT.md`.
+- **Use the glossary's words** (`CONTEXT.md`) in commits, tests and issues —
+  `timestamp` never `ts`, `count` never `tick`, `datum` never `home`.
+- **If your change contradicts an ADR, surface it** rather than silently
+  overriding: _"Contradicts ADR-0002 (no framework) — worth reopening because…"_
+- **Follow `CONVENTIONS.md`.** Where it marks something undecided, ask; do not
+  choose silently.
+
+## 5. Two traps that cost real time
+
+- **`python/.env` must exist on the board.** Without it `use_hardware_servo`
+  defaults to false, the simulator runs, and the UI moves convincingly while the
+  servo never twitches. `cp .env.board .env` on the board only. (Backlog D8.)
+- **`adb push` never deletes.** Wipe the target directory first, or renamed and
+  deleted files linger and get picked up instead of the new ones.
+
+## 6. Environment note
+
+The working copy is usually an **sshfs mount of the board itself**
+(`arduino@192.168.1.192:/home/arduino/ArduinoApps/`), so edits land on the board
+directly and there is no push step during development. That is a convenience for
+development only — it is not the deployment path. See `README.md` for real
+deployment.
+
+The database at `/home/arduino/servo_mvp.db` sits **outside** that mount and is
+not reachable from the working copy. Use `adb` to inspect it.

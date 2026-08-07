@@ -1,5 +1,17 @@
 # Full-system audit
 
+> **FROZEN — historical record.** This documents one past investigation and the
+> fixes that came out of it. It is dated by nature and is **not maintained**.
+>
+> For open work see `BACKLOG.md`. For current status see `PROJECT_STATE.md`.
+>
+> Read this before touching the relay or the calibration path — the reasoning
+> here is why those are shaped as they are.
+>
+> **One claim below is now out of date.** "Calibration refuses a reading the
+> servo never gave" is true of `calibrate()` only; `capture()` has no such guard
+> and can still store a failed read as position 0. See backlog D2.
+
 Written after "-90 physically stops at 0". That one observation was worth
 more than every log: it is a hardware-range failure, not a networking one,
 and following it found a chain of four defects that share a single cause -

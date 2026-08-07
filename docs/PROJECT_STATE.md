@@ -1,123 +1,106 @@
-# Servo MVP — project state
+# Project state
 
-**Attach this file at the start of a new chat instead of carrying the old
-conversation.** It replaces the history. Everything below is current.
+Where the project is right now. Updated as reality changes.
 
----
-
-## What exists
-
-Arduino UNO Q + Waveshare ST3215 serial-bus servo. FastAPI backend and an
-LCARS-themed web UI served from the board: operators open `http://<board-ip>:8000`,
-several at once, nothing installed on their machines. Final deployment is
-air-gapped; the dev board has WiFi, the production ones will not.
-
-Everything ships in `servo_mvp.zip`:
-
-```
-servo_mvp/
-├── app.yaml
-├── AUDIT.md                     full-system audit, read this for context
-├── python/
-│   ├── app/                     backend
-│   ├── static/                  index.html, style.css, app.js
-│   ├── tests/                   186 tests, 100% line coverage
-│   ├── main.py                  BOARD entrypoint
-│   ├── run_dev.py               DEV-PC entrypoint (no board needed)
-│   └── .env.board               copy to .env ON THE BOARD ONLY
-├── sketch/
-│   ├── sketch.ino               thin; real code in src/
-│   ├── src/                     C++ classes + RELAY_NOTES.md
-│   └── tests/native/            164 host checks, `make`
-├── libraries/                   patched Ethernet + SCServo go here
-└── tools/check_bridge_contract.py
-```
-
-## Run it
-
-```bash
-cd python && python run_dev.py     # laptop, simulator, no board
-cd python && pytest                # 186 tests
-cd sketch/tests/native && make     # 164 checks, no board
-python3 tools/check_bridge_contract.py
-```
-
-Board deploy: wipe first (`adb push` never deletes), then
-`cp .env.board .env` — that single step turns on the real servo. Without it
-the simulator runs and the UI looks perfect while nothing moves.
+**This file does not list open work** — that is `BACKLOG.md`. It does not explain
+decisions — that is `docs/adr/`. It does not define terms — that is `CONTEXT.md`.
 
 ---
 
-## Locked decisions — do not re-litigate
+## What this is
 
-| Decision | Why |
-|---|---|
-| Travel ±90° (180° total) | Fits one servo turn (3004 counts); multi-turn off but configurable |
-| Plain HTML/CSS/JS, no framework | Air-gap: no build pipeline to vendor |
-| LCARS light theme, ISA-101 safety colours | Chosen after many iterations |
-| Typed inputs, not sliders | Operators need exact angles |
-| `timestamp`, never `ts` | Descriptive naming |
-| Bridge payloads: CSV strings, typed args | Debuggable in a log |
+Arduino UNO Q + Waveshare ST3215 serial-bus servo. A FastAPI backend and an
+LCARS-themed web UI served from the board: operators open
+`http://<board-ip>:8000`, several at once, nothing installed on their machines.
+
+The network path runs through the MCU, not the Linux side — production boards
+have the WiFi/Bluetooth chip desoldered (ADR-0001).
+
+## Where it is heading
+
+A **delivered MVP**. Other teams will judge it and decide whether to procure a
+full project. So the bar is not "feature complete" — it is **stable, benchmarkable
+and conventionally built**.
+
+Post-MVP, additional servos will be added as mechanical restraint (backlog R4).
+
+## Status
+
+Everything exists — backend, UI, sketch, tests — and all three verification
+commands pass:
+
+```
+186 Python tests, 100% line coverage of app/
+164 native sketch checks, -Wall -Wextra -Wpedantic -Werror
+Bridge contract checker: both sides agree
+```
+
+**But the system is not stable.** Eight open defects are recorded in
+`BACKLOG.md`, several observed on real hardware. Coverage at 100% means every
+line ran, not that every assumption was questioned — it did not prevent any of
+the six defects in `AUDIT.md`, and it is not preventing the current eight.
+
+### The single most important open item
+
+**D2 — `capture()` can store a failed read as position 0.** It is the linchpin,
+not just one bug among eight.
+
+Moves are deliberately permitted while the position reference is unverified
+(ADR-0007), because the site is roughly three hours away and refusing movement
+would turn a recoverable signal loss into a site visit. That makes the travel
+window the only guard against driving into a silent clamp — and **the travel
+window is computed from the datum.** A bad datum displaces the guard by exactly
+the error it exists to catch.
+
+Fix D2 first. D1 is its symptom.
+
+## Environment right now
+
+- Development runs on a **WiFi-mounted board**, not an air-gapped one. There is
+  one servo bus adapter and it sits on a "coloured" internet-facing network that
+  cannot be introduced to the secure network.
+- **The air-gapped path has therefore never been exercised** (backlog T2, R7).
+- More adapters are expected within the month. If they arrive before the MVP is
+  finished, the system gets boxed into the secure network for handover; if not,
+  it ships with the single coloured adapter.
+- This version has not yet been run on the board: there is no `.env` and no
+  database (backlog D8).
 
 ## Hardware facts, all bench-verified
 
 - 4096 counts per servo turn, 44:30 belt → **0.06° per count** at the output
 - ±90° = **3004 counts**; the datum must sit **mid-travel (~2048)**
-- **A datum at count 0 makes the negative half unreachable** — the servo
-  clamps below 0 silently and still reports success
+- **A datum at count 0 makes the negative half unreachable** — the servo clamps
+  below 0 silently and still reports success
 - direction **+1**; deadband **0**; speed saturates ~**1100 counts/s**;
   acceleration has no effect above ~**50**
 - Serial1 @ 1 Mbps is reliable (200/200 reads, 220 µs)
-- Ethernet shield needs **SpiRemap** — SPI2 sits on D11–D13 but the shield
-  takes SPI from ICSP (PD1/PC2/PC3). Apply it after `SPI.begin()` **and
-  again** after `Ethernet.init()`
+- Ethernet shield needs **SpiRemap** — SPI2 sits on D11–D13 but the shield takes
+  SPI from ICSP (PD1/PC2/PC3). Apply it after `SPI.begin()` **and again** after
+  `Ethernet.init()`
 - Ethernet 2.0.2 needs an `IPAddress((uint32_t)0)` cast patch on this core
+- `kMaxRelaySockets = 6` is the **only** connection limit in the system
 
-## Bugs already found and fixed — do not reintroduce
+## Decisions on record
 
-Full detail in `AUDIT.md` and `sketch/src/RELAY_NOTES.md`.
+Seven ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
 
-1. **Relay must use `accept()`, never `available()`** — `available()`
-   re-adopts the same client into several slots and splits one HTTP request
-   across several sockets
-2. **Detect disconnects BEFORE accepting** — otherwise a reused slot
-   corrupts the next request
-3. **`loop()` must yield** (`delay(1)`) or the Bridge thread starves and
-   `servo_read` hits its 10 s timeout
-4. **Bridge calls must be serialised** with a lock — the sampler thread and
-   HTTP threads collide, producing "Response for unknown msgid"
-5. **Failed reads must be distinguishable from data** (`snapshot.valid`) —
-   otherwise a failed read becomes a calibration datum of 0
-6. Unreachable targets are refused (`out_of_travel`), not silently clamped
+| ADR | Decision |
+|---|---|
+| 0001 | Network path runs through the MCU |
+| 0002 | Plain HTML/CSS/JS — no framework, no build step |
+| 0003 | Travel window ±90 output degrees; multi-turn off but configurable |
+| 0004 | Repository abstraction with a simulated backend |
+| 0005 | Develop as if already air-gapped |
+| 0006 | Bridge payloads are CSV strings |
+| 0007 | Moves are permitted while position is unverified |
 
 ## Known gaps, stated honestly
 
 - **The relay and controller have no automated coverage.** Every bug in this
-  project lived there. The native tests cover pure maths only.
-- **`sketch/tests/OnTarget/` has never been uploaded.** It checks ping,
-  config writes, landing accuracy and stop-holds — things a host cannot.
-- 100% coverage did not prevent any of the six defects above.
-
-## Older files
-
-`FILE_REGISTRY.md` catalogues every file ever delivered — what each one is,
-whether it is superseded, and when you would want it. Ask for any of them by
-name and I will use it. The two worth knowing about:
-`4_relay_sketch_ino.txt` and `5_relay_main_py.txt` are the *working* relay
-implementation, and comparing against them is how the worst bug was found.
-
-## If this is Claude Code rather than chat
-
-Same starting point. Read `PROJECT_STATE.md`, then `AUDIT.md`, then
-`sketch/src/RELAY_NOTES.md` before touching the relay. Run the three
-verification commands above before and after any change; if the numbers
-(186 / 164 / "both sides agree") do not match, stop and say so.
-
-## How I should work on this
-
-- Read the working reference before rewriting anything — several bugs came
-  from re-deriving solved behaviour instead of porting it
-- Never bundle unrelated changes into a fix
-- Deliver patches as idempotent `preview` / `--apply` scripts, not full
-  re-pushes
-- Say plainly what was actually tested versus assumed
+  project has lived there. The native tests cover pure maths only.
+- **`sketch/tests/OnTarget/` has never been uploaded** (backlog T3).
+- **The C++ side does not log** anything during operation (backlog D3), so when
+  the MCU misbehaves there is no way to see what it did.
+- **"Stable" is not yet defined by numbers.** It gets defined by measurement —
+  backlog R5 and R6.

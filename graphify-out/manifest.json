@@ -445,19 +445,19 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1786096713.0,
-    "ast_hash": "1a0fea67ee03dfa008988efa3b965144",
+    "mtime": 1786115128.0,
+    "ast_hash": "a78628e143b2273507549130f44e2aa4",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
-    "mtime": 1786096700.0,
-    "ast_hash": "e76cbb0073f255b2fb9e7ecfd42685fe",
-    "semantic_hash": ""
+    "mtime": 1786112296.0,
+    "ast_hash": "996f2ee11145c5323f5dd26e980d7f73",
+    "semantic_hash": "996f2ee11145c5323f5dd26e980d7f73"
   },
   "README.md": {
-    "mtime": 1786009172.0,
-    "ast_hash": "14d573436f4bd44b4a6604c45d6cc066",
-    "semantic_hash": "14d573436f4bd44b4a6604c45d6cc066"
+    "mtime": 1786112323.0,
+    "ast_hash": "f0e0fc4d0984fd5126e5d9fa7f47c3b3",
+    "semantic_hash": "f0e0fc4d0984fd5126e5d9fa7f47c3b3"
   },
   "app.yaml": {
     "mtime": 1785833306.0,
@@ -465,29 +465,24 @@
     "semantic_hash": "c35705e386e30676eec0befdeb6a5223"
   },
   "docs/AUDIT.md": {
-    "mtime": 1786048894.0,
-    "ast_hash": "0cd8af2c834faa36261d2dfcfc32ab3e",
-    "semantic_hash": "0cd8af2c834faa36261d2dfcfc32ab3e"
+    "mtime": 1786112355.0,
+    "ast_hash": "f85940ec655103ef6353ad7f9b019550",
+    "semantic_hash": "f85940ec655103ef6353ad7f9b019550"
   },
   "docs/FILE_REGISTRY.md": {
-    "mtime": 1786050042.0,
-    "ast_hash": "d88fdc0a3f565b90a8972307a751592c",
-    "semantic_hash": "d88fdc0a3f565b90a8972307a751592c"
+    "mtime": 1786112412.0,
+    "ast_hash": "1680558f28bf32352cabbce952f68274",
+    "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1786050054.0,
-    "ast_hash": "c07aec6d21643184b3e218661eae2d4c",
-    "semantic_hash": "c07aec6d21643184b3e218661eae2d4c"
+    "mtime": 1786112276.0,
+    "ast_hash": "cea82761b35eb72054e89e73dcf4bbd5",
+    "semantic_hash": "cea82761b35eb72054e89e73dcf4bbd5"
   },
   "docs/agents/domain.md": {
-    "mtime": 1786096727.0,
-    "ast_hash": "109b629597aba932a59bdff083b25ca7",
-    "semantic_hash": ""
-  },
-  "docs/agents/issue-tracker.md": {
-    "mtime": 1786088942.0,
-    "ast_hash": "260fa0e8407614a29ffa4c521e97ce98",
-    "semantic_hash": "260fa0e8407614a29ffa4c521e97ce98"
+    "mtime": 1786112375.0,
+    "ast_hash": "b6ebe8ab053beea863d91a0e615a3844",
+    "semantic_hash": "b6ebe8ab053beea863d91a0e615a3844"
   },
   "libraries/README.txt": {
     "mtime": 1785833274.0,
@@ -515,9 +510,9 @@
     "semantic_hash": "5928f90926905aaf97760b2f369448c1"
   },
   "sketch/README.md": {
-    "mtime": 1785850238.0,
-    "ast_hash": "a834d539ddcbe6fb60eb9707dd354a86",
-    "semantic_hash": "a834d539ddcbe6fb60eb9707dd354a86"
+    "mtime": 1786112347.0,
+    "ast_hash": "489825eea3dce73cfa15da325ceb8aa6",
+    "semantic_hash": "489825eea3dce73cfa15da325ceb8aa6"
   },
   "sketch/sketch.yaml": {
     "mtime": 1785849906.0,
@@ -528,5 +523,65 @@
     "mtime": 1786010782.0,
     "ast_hash": "66ff5c92a37766aa8f950ae8571c9e89",
     "semantic_hash": "66ff5c92a37766aa8f950ae8571c9e89"
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1786097214.0,
+    "ast_hash": "3db02c95ae4cc7828eb252a589fb6299",
+    "semantic_hash": "3db02c95ae4cc7828eb252a589fb6299"
+  },
+  "CONVENTIONS.md": {
+    "mtime": 1786111862.0,
+    "ast_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a",
+    "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
+  },
+  "docs/BACKLOG.md": {
+    "mtime": 1786115161.0,
+    "ast_hash": "5b4cd9b00b81c8e81a98ffc17ee3db68",
+    "semantic_hash": ""
+  },
+  "docs/adr/0001-network-path-through-the-mcu.md": {
+    "mtime": 1786110781.0,
+    "ast_hash": "f2aa35a8c86dad32a6ae51e7023c9874",
+    "semantic_hash": "f2aa35a8c86dad32a6ae51e7023c9874"
+  },
+  "docs/adr/0002-no-frontend-framework.md": {
+    "mtime": 1786110788.0,
+    "ast_hash": "4b8603d4d6b10533b9afbbf343bc9ac7",
+    "semantic_hash": "4b8603d4d6b10533b9afbbf343bc9ac7"
+  },
+  "docs/adr/0003-travel-window-plus-minus-90-output-degrees.md": {
+    "mtime": 1786110798.0,
+    "ast_hash": "1317f08b26ee75c9d45f0e6fc92ab01d",
+    "semantic_hash": "1317f08b26ee75c9d45f0e6fc92ab01d"
+  },
+  "docs/adr/0004-repository-abstraction-and-simulated-backend.md": {
+    "mtime": 1786110805.0,
+    "ast_hash": "968009c96be54bdc05b847fe68a4c0aa",
+    "semantic_hash": "968009c96be54bdc05b847fe68a4c0aa"
+  },
+  "docs/adr/0005-air-gapped-by-default-development.md": {
+    "mtime": 1786110814.0,
+    "ast_hash": "5c9a46f290dd188ff9baa6f1de5cafcf",
+    "semantic_hash": "5c9a46f290dd188ff9baa6f1de5cafcf"
+  },
+  "docs/adr/0006-csv-bridge-payloads.md": {
+    "mtime": 1786110819.0,
+    "ast_hash": "5c83780edec23cdfc854c9a94bbd1d0b",
+    "semantic_hash": "5c83780edec23cdfc854c9a94bbd1d0b"
+  },
+  "docs/adr/0007-moves-are-permitted-while-position-is-unverified.md": {
+    "mtime": 1786111770.0,
+    "ast_hash": "bea0d98de4277553515e44516298ba3c",
+    "semantic_hash": "bea0d98de4277553515e44516298ba3c"
+  },
+  "docs/adr/README.md": {
+    "mtime": 1786112387.0,
+    "ast_hash": "f1a31bfa4cccf86d3f427ce8f3f604c9",
+    "semantic_hash": "f1a31bfa4cccf86d3f427ce8f3f604c9"
+  },
+  "docs/WORKFLOWS.md": {
+    "mtime": 1786115122.0,
+    "ast_hash": "5082c9aa6bbfd51f414dbaab6956a7ed",
+    "semantic_hash": ""
   }
 }

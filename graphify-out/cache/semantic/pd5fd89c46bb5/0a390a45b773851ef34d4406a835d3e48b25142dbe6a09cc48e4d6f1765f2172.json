@@ -1,0 +1,1 @@
+{"nodes": [{"id": "claude_agent_skills_config", "label": "Agent Skills Configuration", "file_type": "concept", "rationale": "Points agent skills at the issue tracker and domain doc conventions for this repo.", "source_file": "CLAUDE.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

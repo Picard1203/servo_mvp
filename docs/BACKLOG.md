@@ -24,16 +24,11 @@ with the constraints that apply. Read the flow before starting the item.
 **Rewritten 7 August 2026, after the T8 board run.** D1, D2, D4's cause, D9 and
 T8 itself are closed; the ordering below replaces the pre-run one.
 
-**D10 first.** The sampler threw once in seven minutes and the log cannot say
-why. Everything after this is measurement, and an unexplained exception that
-destroys its own evidence corrupts every measurement taken near it. It is also
-small.
+**D10 and D11 are done** (7 August 2026), except that D10's underlying fault is
+still unexplained and will only reappear on a board run — the logging that lost
+it is fixed, so next time it will name itself.
 
-Then **D11** — the UI over-reacts to a single blip, on both the connection
-banner and the position readout. Cheap, and it is what the operator sees; the
-end users are not programmers.
-
-Then **D3** (MCU logging). Its case is stronger than when it was written: the
+**D3 next** (MCU logging). Its case is stronger than when it was written: the
 W5500 fix added `write_lock_timeouts()`, a number that says whether `loop()` is
 starving the Bridge, **and there is no way to read it from the board.** The
 diagnostic exists and cannot be reached.
@@ -47,7 +42,8 @@ races) → **R5/R6** (benchmarks, and turning "stable" into numbers).
 suits an executing agent; do it once the defects are closed so it does not
 collide with real fixes.
 
-Summary: **D10 → D11 → D3 → D4 soak/R1 → D6 → R5/R6 → T1/T6/T7 → D12/T3.**
+Summary: **D3 → D4 soak/R1 → D6 → R5/R6 → T1/T6/T7 → D12/T3**, with D10's
+unexplained fault watched for on every board run until it shows itself.
 
 **Status key:** `open` · `in progress` · `needs investigation` · `done`
 
@@ -392,7 +388,26 @@ twin. Third instance in this repository, counting `AUDIT.md`.
 ---
 
 ### D10 — `logger.exception` swallows the exception
-**Status:** open · **Severity:** medium · **Found by:** a live board run
+**Status:** half done — **the logging is fixed; the fault itself is still
+unexplained** · **Severity:** medium · **Found by:** a live board run
+
+**Fixed 7 August 2026.** The cause was the Logger461 stand-in in `main.py`:
+its `exception()` was a straight copy of `error()`, and attaching the exception
+is the entire difference between the two. It now records the exception type, its
+message and the traceback, and the console prints the traceback under the record
+instead of flattening it into the single-line format.
+
+**The test stub in `conftest.py` had the identical gap**, so a test asserting on
+a cause would have passed against a stub that dropped it exactly as production
+did. Both fixed together — this is the twin-path pattern for the fourth time in
+this repository.
+
+**Still open: the actual fault.** The sampler exception of 21:37:58 remains
+unexplained, and its evidence is gone. It can only be caught if it happens
+again — but now, when it does, the record will say what it was. **Watch for it
+on the next board run.**
+
+**Original report follows.**
 
 One `ERROR telemetry sampling failed` was recorded at 21:37:58 on 7 August 2026.
 It cost one skipped sample — the only sampler gap over 2 s in the whole run.
@@ -419,7 +434,23 @@ explained.
 ---
 
 ### D11 — A single failed poll is presented as a disconnection
-**Status:** open · **Severity:** medium · **Reported:** operator, on hardware
+**Status:** done · 7 August 2026 · **needs an operator's eye on the board**
+
+Both over-reactions now require `FAILURES_BEFORE_ALARM = 3` consecutive
+failures — about three seconds at one poll per second. A single lost answer is
+invisible; a real stall lasts ten seconds and still shows plainly. On an invalid
+reading inside the tolerance the readout holds the last **measured** position
+rather than blanking, and only blanks once the position is genuinely unknown.
+
+This paces what is *displayed*. It does not soften what is *reported*: the API
+still says `reading_valid: false` the moment a read fails, per ADR-0008. The
+honest contract sits underneath a calm surface, which is the split that ADR
+deliberately left open.
+
+**Not yet confirmed by eye** — the change is served from the board but wants an
+operator to drive it and say whether the flashing has stopped.
+
+**Original report follows.**
 
 `app.js:225-231`: any failed poll immediately flips the UI to OFFLINE and says
 "connection lost — retrying…". One dropped request in a continuous poll stream

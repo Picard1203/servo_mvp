@@ -151,7 +151,7 @@ the second call and the W5500 reports "no hardware".
 
 Ethernet 2.0.2 also needs an `IPAddress((uint32_t)0)` cast patch on this core.
 
-### Six relay rules — every one of these was a real bug
+### Seven relay rules — every one of these was a real bug
 
 1. **Adopt connections with `accept()`, never `available()`.** `accept()` hands
    over a connection exactly once, transferring ownership. `available()` returns
@@ -181,6 +181,21 @@ Ethernet 2.0.2 also needs an `IPAddress((uint32_t)0)` cast patch on this core.
 6. **Serialise Bridge calls.** A sampler thread and HTTP threads calling the
    Bridge concurrently interleave message ids and produce "Response for unknown
    msgid" plus 10 s timeouts. Use a lock.
+7. **Serialise the W5500 itself, across threads.** Rules 1–6 govern ordering
+   *within* the poll; this is the one they miss. `Poll()` runs on the loop
+   thread while `net_tx` / `net_shutdown` run on the **Bridge** thread, and
+   there are six sockets but **one chip on one SPI bus**. Two threads
+   mid-transaction splice their messages: the chip answers nonsense or waits
+   for a message that never finishes, the Bridge thread blocks behind it, and
+   `servo_read` dies at 10 s. Use a **mutex** (one resource, not a count —
+   and on Zephyr `k_mutex` gives priority inheritance). Three traps: never
+   hold it across a callback that notifies Linux (the Bridge thread may be
+   waiting for it inside `net_tx` — instant deadlock); bound the Bridge-side
+   wait with `K_MSEC` so a busy chip fails a write instead of hanging the RPC
+   thread; and cover whole operations, or you only narrow the window.
+   **`provide_safe` does not do this for you** — it means "called from the
+   Bridge thread while `loop()` may be in the relay", i.e. *you* are now
+   responsible. The name reads like a guarantee and is not one.
 
 Console: `Serial` works and is proven over USB. `Monitor` (the Bridge's console
 facade) is an option, not a requirement — its only advantage is reaching App Lab
@@ -226,6 +241,10 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
 | "Response for unknown msgid" / `servo_read` 10 s timeout | `loop()` not yielding, or concurrent unserialised Bridge calls |
 | W5500 "no hardware" | SpiRemap not applied the second time, after `Ethernet.init()` |
 | First exchange works, then corruption | Relay using `available()` instead of `accept()` |
+| Stalls of ~11 s, dropped sockets, first button press ignored | W5500 touched from the loop and Bridge threads with no mutex (rule 7) |
+| A stored position of 0 or -1 that the servo never reported | A failed read used without checking the snapshot's `valid` flag |
+| Commanded 90 deg, mechanism moved 212 deg | Two baselines: display and motion disagree on the no-datum default |
+| `Invalid Library Reference: Xxx ()` at build | A library in `sketch.yaml` with no version |
 | uvicorn "Invalid HTTP request received" during churn | Accepting before detecting disconnects |
 | Bridge call silently does nothing | Argument-count mismatch across the boundary — run the contract checker |
 | UI moves convincingly, servo never twitches | Running the simulated backend; `.env` missing on the board |

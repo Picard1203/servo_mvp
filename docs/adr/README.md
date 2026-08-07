@@ -17,6 +17,7 @@ against it.
 | [0005](0005-air-gapped-by-default-development.md) | Develop as if already air-gapped | dependencies, deployment, libraries |
 | [0006](0006-csv-bridge-payloads.md) | Bridge payloads are CSV strings | either side of the MCU boundary |
 | [0007](0007-moves-are-permitted-while-position-is-unverified.md) | Moves are permitted while position is unverified | motion, calibration, safety behaviour |
+| [0008](0008-a-failed-read-is-reported-as-unknown.md) | A failed read is reported as unknown, never as a number | the servo read path, the API contract, the UI |
 
 ## Numbering
 

@@ -5,7 +5,7 @@ ported, and the rewrite reintroduced problems the original had already solved.
 The reference is the Stage-2 relay sketch (`4_relay_sketch_ino.txt`) and its
 Python counterpart (`5_relay_main_py.txt`).
 
-If you change `NetworkRelay`, check these five points first.
+If you change `NetworkRelay`, check these seven points first.
 
 ## 1. Adopt connections with `accept()`, never `available()`
 
@@ -54,6 +54,58 @@ servo bus.
 one number in two places. It is bytes per Bridge message: halving it doubles
 the number of Bridge round trips for identical payload. 256 is the value the
 working relay used.
+
+**Contested, 7 August 2026.** The operator recalls 256 *failing* at the very
+first demo. Both statements cannot be the whole truth, and nobody has the
+measurement. Treat 256 as an experiment with a recorded result, not as a
+known-good value to restore. Note also that any chunk-size measurement taken
+before rule 7 was applied is worthless: a larger chunk means a longer SPI
+transaction, so it changed the width of the race window rather than the
+throughput. See backlog D6.
+
+## 7. Serialise access to the W5500 across threads
+
+The five rules above are all about ordering *within* `Poll()`. This one is
+about two threads, and it is the bug they did not cover.
+
+    Poll()            runs on the LOOP thread
+    WriteToClient()   run on the BRIDGE thread, via net_tx / net_shutdown
+    CloseClient()
+
+Six sockets, but **one chip and one SPI bus.** Every socket operation -
+`connected()`, `accept()`, `read()`, `write()`, `stop()` - is a conversation
+over that one wire. Two threads talking at once splice their messages
+together: the chip answers nonsense, or waits for the rest of a message that
+never arrives while the Bridge thread blocks behind it and `servo_read` dies
+at its 10 s deadline.
+
+Symptom, measured on the board before the fix: sampler gaps of **10.99 s,
+11.00 s, 11.00 s** - the servo_read timeout plus one sampler interval - each
+storing a fabricated position of count 0, and one of count -1, which no
+0..4095 servo can report. Connections dropping, and a first button press
+doing nothing.
+
+The relay shipped with **no mutex anywhere in `sketch/src/`** for a year.
+`provide_safe` is largely to blame: it means "you are now responsible for
+thread safety", but it reads as "registered safely", and the comment beside
+it describing the hazard was easy to walk past.
+
+Three things the fix must get right:
+
+1. **Never hold the lock across a sink callback.** The sinks notify Linux over
+   the Bridge, and the Bridge thread may be waiting for this same lock inside
+   `net_tx`. Holding it there deadlocks both threads permanently - worse than
+   the stall it fixes. Collect under the lock, release, then dispatch.
+2. **Bound the wait on the Bridge side** (`K_MSEC`, not `K_FOREVER`). A
+   blocked Bridge thread is the failure being fixed; a write that fails
+   honestly is recoverable, a wedged RPC thread is not. `write_lock_timeouts()`
+   counts these - a non-zero value means `loop()` is holding the chip too long.
+3. **Cover whole operations**, not individual calls, or the race window is
+   merely narrowed and it will look fixed while still failing occasionally.
+
+A mutex, not a semaphore: this protects one resource, it is not a count of
+several. `k_mutex` also gives priority inheritance, which matters when the
+Bridge thread outranks the loop thread.
 
 ## 6. Console: `Serial` works; `Monitor` is an option, not a requirement
 

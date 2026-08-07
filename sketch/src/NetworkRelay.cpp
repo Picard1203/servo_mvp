@@ -14,11 +14,30 @@ namespace {
 EthernetServer* g_server = nullptr;
 EthernetClient g_clients[config::kMaxRelaySockets];
 
+// How long the Bridge thread waits for the W5500 before giving up.
+//
+// It waits with a deadline rather than forever on purpose: a blocked
+// Bridge thread is the failure being fixed here, so a write that fails
+// honestly and lets the Linux side retry beats one that hangs the RPC
+// thread and takes servo_read down with it. The loop thread holds the
+// chip only for one bulk read per slot, so this is generous.
+constexpr int32_t kChipLockTimeoutMs = 50;
+
 }  // namespace
 
 NetworkRelay::NetworkRelay(uint8_t cs_pin, uint16_t api_port,
                            uint16_t chunk_bytes)
-    : cs_pin_(cs_pin), api_port_(api_port), chunk_bytes_(chunk_bytes) {}
+    : cs_pin_(cs_pin), api_port_(api_port), chunk_bytes_(chunk_bytes) {
+  k_mutex_init(&chip_lock_);
+}
+
+bool NetworkRelay::LockChip(k_timeout_t timeout) {
+  return k_mutex_lock(&chip_lock_, timeout) == 0;
+}
+
+void NetworkRelay::UnlockChip() {
+  k_mutex_unlock(&chip_lock_);
+}
 
 bool NetworkRelay::Begin(const uint8_t mac[6], const uint8_t ip[4],
                          const uint8_t gateway[4], const uint8_t subnet[4]) {
@@ -58,14 +77,28 @@ void NetworkRelay::SetSinks(OpenSink on_open, ByteSink on_bytes,
 bool NetworkRelay::WriteToClient(uint8_t slot, const uint8_t* data,
                                  uint16_t length) {
   if (slot >= config::kMaxRelaySockets) return false;
+  // Runs on the Bridge thread (net_tx is registered with provide_safe,
+  // which means "called from the Bridge thread while loop() may be inside
+  // the relay" - it does NOT make anything safe on its own).
+  if (!LockChip(K_MSEC(kChipLockTimeoutMs))) {
+    ++write_lock_timeouts_;
+    return false;
+  }
   EthernetClient& client = g_clients[slot];
-  if (!client || !client.connected()) return false;
-  return client.write(data, length) == length;
+  bool written = false;
+  if (client && client.connected()) {
+    written = client.write(data, length) == length;
+  }
+  UnlockChip();
+  return written;
 }
 
 void NetworkRelay::CloseClient(uint8_t slot) {
   if (slot >= config::kMaxRelaySockets) return;
+  // Also the Bridge thread, via net_shutdown.
+  if (!LockChip(K_MSEC(kChipLockTimeoutMs))) return;
   if (g_clients[slot]) g_clients[slot].stop();
+  UnlockChip();
 }
 
 void NetworkRelay::Poll() {
@@ -77,13 +110,23 @@ void NetworkRelay::Poll() {
   //    just dropped can be handed to a new connection in the same pass while
   //    net_close for the old one has not been sent, and the Linux side then
   //    feeds the new connection's bytes into the old socket.
+  //
+  //    The chip work happens under the lock; the sinks are called after it
+  //    is released, because a sink notifies Linux over the Bridge and the
+  //    Bridge thread may be waiting for this lock inside net_tx.
+  bool dropped[config::kMaxRelaySockets] = {false};
+  if (!LockChip(K_MSEC(kChipLockTimeoutMs))) return;   // retry next tick
   for (uint8_t slot = 0; slot < config::kMaxRelaySockets; ++slot) {
     const bool up = g_clients[slot].connected();
     if (was_up_[slot] && !up) {
       g_clients[slot].stop();
-      if (on_close_ != nullptr) on_close_(slot);
+      dropped[slot] = true;
     }
     was_up_[slot] = up;
+  }
+  UnlockChip();
+  for (uint8_t slot = 0; slot < config::kMaxRelaySockets; ++slot) {
+    if (dropped[slot] && (on_close_ != nullptr)) on_close_(slot);
   }
   // 2) Adopt new connections.
   //
@@ -93,6 +136,9 @@ void NetworkRelay::Poll() {
   // accept loop built on it adopts one connection into several slots and
   // then forwards fragments of a single byte stream under different slot
   // numbers - which corrupts every request that follows.
+  int opened = -1;
+  char opened_ip[16] = {0};
+  if (!LockChip(K_MSEC(kChipLockTimeoutMs))) return;   // retry next tick
   EthernetClient fresh = g_server->accept();
   if (fresh) {
     int slot = -1;
@@ -108,24 +154,33 @@ void NetworkRelay::Poll() {
     } else {
       g_clients[slot] = fresh;
       ++connections_total_;
-      if (on_open_ != nullptr) {
-        const IPAddress remote = fresh.remoteIP();
-        char text[16];
-        snprintf(text, sizeof(text), "%d.%d.%d.%d", remote[0], remote[1],
-                 remote[2], remote[3]);
-        on_open_(static_cast<uint8_t>(slot), text);
-      }
+      opened = slot;
+      const IPAddress remote = fresh.remoteIP();
+      snprintf(opened_ip, sizeof(opened_ip), "%d.%d.%d.%d", remote[0],
+               remote[1], remote[2], remote[3]);
     }
+  }
+  UnlockChip();
+  if ((opened >= 0) && (on_open_ != nullptr)) {
+    on_open_(static_cast<uint8_t>(opened), opened_ip);
   }
 
   // 3) Pump shield -> Linux. One bulk read per slot per pass; never a byte
   //    at a time, and never blocking.
+  //
+  //    One slot at a time: take the chip, pull one chunk, release, then
+  //    hand it to Linux. Holding the chip across on_bytes_ would block the
+  //    Bridge thread inside net_tx for the whole round trip.
   for (uint8_t slot = 0; slot < config::kMaxRelaySockets; ++slot) {
-    EthernetClient& client = g_clients[slot];
-    if (!client.connected() || !client.available()) continue;
     uint8_t buffer[config::kRelayChunkBytes];
-    const int read = client.read(buffer, sizeof(buffer));
-    if (read > 0 && on_bytes_ != nullptr) {
+    int read = 0;
+    if (!LockChip(K_MSEC(kChipLockTimeoutMs))) return;  // retry next tick
+    EthernetClient& client = g_clients[slot];
+    if (client.connected() && client.available()) {
+      read = client.read(buffer, sizeof(buffer));
+    }
+    UnlockChip();
+    if ((read > 0) && (on_bytes_ != nullptr)) {
       on_bytes_(slot, buffer, static_cast<uint16_t>(read));
     }
   }

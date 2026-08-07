@@ -69,7 +69,7 @@ is a defect — fix it rather than updating one copy.
 Run all three. Note the numbers.
 
 ```bash
-cd python && pytest                      # 186 tests
+cd python && pytest                      # 192 tests
 cd sketch/tests/native && make           # 164 checks
 python3 tools/check_bridge_contract.py   # "both sides agree"
 ```
@@ -111,5 +111,15 @@ directly and there is no push step during development. That is a convenience for
 development only — it is not the deployment path. See `README.md` for real
 deployment.
 
-The database at `/home/arduino/servo_mvp.db` sits **outside** that mount and is
-not reachable from the working copy. Use `adb` to inspect it.
+The database is at `servo_mvp.db` in the app root — **inside** the mount, so it
+can be read directly. `.env.board` sets a relative `DB_PATH` deliberately: the
+Python side runs in a container where `HOME` is `/home/app`, so an absolute
+`/home/arduino/...` path would not persist where you can reach it. Only the
+*default* `db_path` sits outside the mount.
+
+`adb` is still how you **start and stop** the app without App Lab:
+
+```bash
+adb shell arduino-app-cli app start user:servo_mvp     # ~16s warm, ~7min cold
+adb shell arduino-app-cli app logs  user:servo_mvp
+```

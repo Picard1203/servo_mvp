@@ -66,7 +66,14 @@ class ServoStateView:
     """Coherent snapshot of servo + lock + baseline, read atomically.
 
     Attributes:
-        output_deg: Output angle relative to the active zero.
+        output_deg: Output angle relative to the active zero, or None
+            when the read failed. None means "not measured" and must
+            never be substituted with a number: a failed read reports
+            count 0, and 0 is indistinguishable from a genuine reading
+            at the bottom of travel.
+        raw_counts: Absolute encoder counts, or None when the read
+            failed.
+        reading_valid: False when the servo did not answer this read.
         moving: True while a move is in progress.
         locked: Digital lock state.
         settling: True while inside the post-lock settle window.
@@ -85,7 +92,9 @@ class ServoStateView:
         sensor_fault: Angle-sensor fault flag.
     """
 
-    output_deg: float
+    output_deg: Optional[float]
+    raw_counts: Optional[int]
+    reading_valid: bool
     moving: bool
     locked: bool
     settling: bool

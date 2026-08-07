@@ -10,7 +10,11 @@ from threading import Lock
 from time import monotonic
 from typing import Optional
 
-from app.models.entities import ServoStateView, TelemetrySnapshot
+from Logger461 import logger
+
+from app.core.exceptions import InvalidReadingError
+from app.models.entities import (ServoStateView, TelemetrySnapshot,
+                                 ZeroReference)
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.repositories.abstract.zero_repository import ZeroRepository
 
@@ -99,10 +103,7 @@ class ServoStateStore:
         Returns:
             Output angle in degrees.
         """
-        servo_deg = (raw_counts - self._active_counts()) \
-            / self._counts_per_servo_deg
-        return (servo_deg / self._servo_deg_per_output_deg
-                * self._servo_direction)
+        return self._to_output_deg(raw_counts, self._zeros.get_active())
 
     def reachable_output_range_deg(self) -> tuple[float, float]:
         """Returns the output angles reachable from the current baseline.
@@ -175,9 +176,16 @@ class ServoStateStore:
             locked = self._locked
             settling = self._settle_deadline > monotonic()
             verified = self._position_verified
+        if not reading.valid:
+            logger.warning("servo read failed; position is not known",
+                           metadata={"event": "servo.read.failed"},
+                           extra={"active_zero": active.name
+                                  if active is not None else "factory"})
         return ServoStateView(
-            output_deg=round(self._to_output_deg(reading.raw_counts, active),
-                             2),
+            output_deg=(round(self._to_output_deg(reading.raw_counts, active),
+                              2) if reading.valid else None),
+            raw_counts=reading.raw_counts if reading.valid else None,
+            reading_valid=reading.valid,
             moving=reading.moving,
             locked=locked,
             settling=settling,
@@ -194,26 +202,34 @@ class ServoStateStore:
             sensor_fault=reading.sensor_fault,
             angle_fault=reading.angle_fault)
 
-    def current_output_deg(self) -> float:
+    def current_output_deg(self) -> Optional[float]:
         """Returns the current output angle relative to the active zero.
 
         Returns:
-            Output angle in degrees.
+            Output angle in degrees, or None when the read failed.
         """
-        return self.output_deg_from_counts(self._servo.read_raw_counts())
+        return self.snapshot().output_deg
 
-    def read_raw_counts(self) -> int:
+    def read_counts(self) -> int:
         """Returns the current absolute encoder position in counts.
+
+        Raises:
+            InvalidReadingError: When the servo did not answer. Callers
+                get no number rather than a fabricated zero.
 
         Returns:
             Current raw counts.
         """
-        return self._servo.read_raw_counts()
+        reading = self._servo.read_snapshot()
+        if not reading.valid:
+            raise InvalidReadingError(
+                "the servo did not answer the position read")
+        return reading.raw_counts
 
     # ---------------------------------------------------------- internals
 
-    def _active_counts(self) -> int:
-        """Returns the active baseline in raw counts.
+    def _baseline_counts(self, active: Optional[ZeroReference]) -> int:
+        """Returns the baseline in raw counts for a prefetched zero.
 
         With no zero captured the baseline is the MIDDLE of the servo's
         travel, not count 0. Zero would be the wrong default: the servo
@@ -222,15 +238,32 @@ class ServoStateStore:
         anything. The middle makes the nominal window symmetric and
         reachable from a cold start.
 
+        This is the ONLY definition of the baseline. It used to be stated
+        twice - correctly here, and as a bare 0 in the conversion the
+        snapshot used - so the display and the motion path disagreed by
+        half a turn. On 7 August 2026 that sent the mechanism 212.7 deg
+        on a command of 90.
+
+        Args:
+            active: The active ZeroReference, or None.
+
         Returns:
             Active zero raw counts, or the centre of travel.
         """
-        active = self._zeros.get_active()
         if active is not None:
             return active.raw_counts
         return self._counts_per_turn // 2
 
-    def _to_output_deg(self, raw_counts: int, active) -> float:
+    def _active_counts(self) -> int:
+        """Returns the active baseline in raw counts.
+
+        Returns:
+            Active zero raw counts, or the centre of travel.
+        """
+        return self._baseline_counts(self._zeros.get_active())
+
+    def _to_output_deg(self, raw_counts: int,
+                       active: Optional[ZeroReference]) -> float:
         """Converts counts to output degrees using a prefetched baseline.
 
         Args:
@@ -240,6 +273,7 @@ class ServoStateStore:
         Returns:
             Output angle in degrees.
         """
-        base = active.raw_counts if active is not None else 0
-        servo_deg = (raw_counts - base) / self._counts_per_servo_deg
-        return servo_deg / self._servo_deg_per_output_deg
+        servo_deg = ((raw_counts - self._baseline_counts(active))
+                     / self._counts_per_servo_deg)
+        return (servo_deg / self._servo_deg_per_output_deg
+                * self._servo_direction)

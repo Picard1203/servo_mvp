@@ -32,7 +32,8 @@ async def get_state(state: StateDep) -> ServoStateResponse:
     """
     view = state.snapshot()
     return ServoStateResponse(
-        output_deg=view.output_deg, moving=view.moving, locked=view.locked,
+        output_deg=view.output_deg, reading_valid=view.reading_valid,
+        moving=view.moving, locked=view.locked,
         settling=view.settling, position_verified=view.position_verified,
         active_zero=view.active_zero_name,
         temperature_c=view.temperature_c, voltage_v=view.voltage_v,

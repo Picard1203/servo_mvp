@@ -240,8 +240,15 @@ function setOnline(online) {
 }
 
 function renderState(s) {
-  $("posN").textContent = s.output_deg.toFixed(1);
-  const pct = Math.min(100, Math.max(0, (s.output_deg / 360) * 100));
+  // output_deg is null when the servo did not answer. Show that as
+  // unknown and never as a number: a failed read arrives as count 0,
+  // which is indistinguishable from the bottom of travel, and the
+  // operator commands moves from what this readout says.
+  const known = s.reading_valid && s.output_deg !== null;
+  $("posN").textContent = known ? s.output_deg.toFixed(1) : "--";
+  const pct = known
+    ? Math.min(100, Math.max(0, (s.output_deg / 360) * 100))
+    : 0;
   $("posBar").style.width = pct + "%";
 
   $("vTemp").textContent = s.temperature_c.toFixed(1);
@@ -281,6 +288,12 @@ function renderState(s) {
     slot.className = "alarmslot alarm";
     slot.textContent = "\u25a0 ALARM \u00b7 " + faultName(s) +
       (s.overload ? " \u2014 torque cut back" : "");
+  } else if (!known) {
+    // Ranks above the unverified warning: an unset reference means the
+    // shown angle may be wrong, a lost reading means there is no angle.
+    slot.className = "alarmslot warn";
+    slot.textContent =
+      "\u25b2 Position unknown \u2014 the servo did not answer the last read";
   } else if (!s.position_verified) {
     slot.className = "alarmslot warn";
     slot.textContent =

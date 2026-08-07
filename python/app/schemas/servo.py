@@ -1,5 +1,7 @@
 """Request/response schemas for the servo router."""
 
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
@@ -80,7 +82,10 @@ class ServoStateResponse(BaseModel):
     """Full state snapshot for the client poller.
 
     Attributes:
-        output_deg: Current output angle vs. the active zero.
+        output_deg: Current output angle vs. the active zero, or null
+            when the servo did not answer. Clients must render null as
+            "unknown" and never as 0 - a failed read is not a position.
+        reading_valid: False when this snapshot has no position in it.
         moving: True while a move is in progress.
         locked: Digital lock state.
         settling: True while inside the post-lock settle window.
@@ -98,7 +103,8 @@ class ServoStateResponse(BaseModel):
         sensor_fault: Angle-sensor fault flag.
     """
 
-    output_deg: float
+    output_deg: Optional[float]
+    reading_valid: bool
     moving: bool
     locked: bool
     settling: bool

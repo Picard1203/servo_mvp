@@ -8,7 +8,8 @@ from tests.conftest import wait_until
 class TestState:
     """GET /api/v1/servo/state."""
 
-    EXPECTED_KEYS = {"output_deg", "moving", "locked", "settling",
+    EXPECTED_KEYS = {"output_deg", "reading_valid", "moving", "locked",
+                     "settling",
                      "position_verified", "active_zero", "temperature_c",
                      "voltage_v", "current_a", "torque_kgcm", "overload",
                      "overcurrent", "overheat", "voltage_fault",

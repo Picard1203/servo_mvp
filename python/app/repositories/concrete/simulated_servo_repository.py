@@ -36,6 +36,10 @@ class SimulatedServoRepository:
     def read_raw_counts(self) -> int:
         """Returns the absolute encoder position in counts.
 
+        TEST AFFORDANCE, not part of ServoRepository. The simulator
+        cannot fail a read, so a bare int is safe here; production code
+        must go through read_snapshot() and honour its `valid` flag.
+
         Returns:
             Current raw counts.
         """

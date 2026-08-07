@@ -152,18 +152,6 @@ class BridgeServoRepository(ServoRepository):
                            extra={"payload": raw})
             return self._empty_snapshot()
 
-    def read_raw_counts(self) -> int:
-        """Returns the absolute encoder position in counts.
-
-        The value is ABSOLUTE MULTI-TURN: it may exceed 0..4095 and may be
-        negative. The sketch composes the reading and decodes the
-        sign-magnitude wire format before sending it.
-
-        Returns:
-            Current raw counts.
-        """
-        return self.read_snapshot().raw_counts
-
     # ------------------------------------------------------------ commands
 
     def command_move(self, target_counts: int, speed_counts_s: int,

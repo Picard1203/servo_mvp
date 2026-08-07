@@ -162,11 +162,11 @@ class TestRecover:
     def test_recover_clears_overload_without_moving(self, backend, sim):
         from app.deps import get_motion_service, get_state_store
         motion = get_motion_service()
-        position = get_state_store().read_raw_counts()
+        position = get_state_store().read_counts()
         sim.simulate_overload()
         motion.recover()
         assert sim.read_snapshot().overload is False
-        assert abs(get_state_store().read_raw_counts() - position) <= 2
+        assert abs(get_state_store().read_counts() - position) <= 2
         events = [e.event for e in _events(backend)]
         assert "servo.fault.recovered" in events
 

@@ -78,7 +78,7 @@ class TestSnapshotDecoding:
 
     def test_counts_beyond_one_turn(self, bridge, repo):
         bridge.reply = "1,9000,0,30.0,12.0,0.1,1.1,0,0"
-        assert repo.read_raw_counts() == 9000
+        assert repo.read_snapshot().raw_counts == 9000
 
 
 class TestFaultBits:

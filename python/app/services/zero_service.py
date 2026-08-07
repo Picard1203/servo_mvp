@@ -34,11 +34,22 @@ class ZeroService:
         Args:
             name: Operator-given unique name.
 
+        Raises:
+            InvalidReadingError: When the servo did not answer. calibrate()
+                has always guarded this; capture() did not, so a bus
+                hiccup while an operator saved a named zero stored
+                raw_counts=0. Activating that zero later strands the
+                whole negative half of travel.
+
         Returns:
             The stored zero.
         """
+        reading = self._servo.read_snapshot()
+        if not reading.valid:
+            raise InvalidReadingError(
+                "the servo did not answer; no zero was captured")
         zero = ZeroReference(
-            id=None, name=name, raw_counts=self._servo.read_raw_counts(),
+            id=None, name=name, raw_counts=reading.raw_counts,
             is_active=False, is_datum=False,
             created_at=datetime.now().isoformat(timespec="seconds"))
         stored = self._zeros.add(zero)

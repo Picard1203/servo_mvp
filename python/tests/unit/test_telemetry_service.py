@@ -16,6 +16,59 @@ def service(backend):
     return get_telemetry_service()
 
 
+class TestFailedReadsAreNotStored:
+    """A stalled bus must leave a gap, not a row claiming position 0.
+
+    Seven such rows reached the board's database on 7 August 2026, six
+    of them count 0 and one count -1, each written while the Bridge was
+    timing out. A gap is honest; a fabricated zero is not, and it is
+    indistinguishable from a genuine reading at the bottom of travel.
+    """
+
+    def test_an_invalid_reading_is_not_persisted(self, backend, service, sim):
+        from app.models.entities import TelemetrySnapshot
+        from app.deps import get_telemetry_repository
+
+        def dead_bus():
+            return TelemetrySnapshot(
+                raw_counts=0, moving=False, temperature_c=0.0,
+                voltage_v=0.0, current_a=0.0, torque_kgcm=0.0,
+                overload=False, overcurrent=False, overheat=False,
+                voltage_fault=False, sensor_fault=False, angle_fault=False,
+                valid=False)
+
+        sim.read_snapshot = dead_bus
+        service._sample_once()
+        rows = list(get_telemetry_repository().query(0, time.time() + 1, 10))
+        assert rows == []
+
+    def test_one_sample_costs_exactly_one_bus_read(self, backend, service,
+                                                   sim):
+        """The stored row must come from a single coherent read.
+
+        The row used to be stitched from snapshot() plus a second,
+        independent read_raw_counts(), so raw_counts and output_deg
+        could describe different instants - and it doubled the sampler's
+        Bridge traffic, which is what starves the thread that then times
+        out.
+        """
+        reads = {"snapshot": 0, "raw": 0}
+        original = sim.read_snapshot
+
+        def counted_snapshot():
+            reads["snapshot"] += 1
+            return original()
+
+        def counted_raw():
+            reads["raw"] += 1
+            return 0
+
+        sim.read_snapshot = counted_snapshot
+        sim.read_raw_counts = counted_raw
+        service._sample_once()
+        assert reads == {"snapshot": 1, "raw": 0}
+
+
 class TestSampling:
     """Single-sample persistence."""
 

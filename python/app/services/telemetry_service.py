@@ -97,13 +97,22 @@ class TelemetryService:
     def _sample_once(self) -> None:
         """Reads one coherent snapshot and persists it.
 
+        A failed read is skipped, not stored. It would land as position
+        0, which reads exactly like a genuine sample at the bottom of
+        travel; a gap in the series is honest and visible. The row is
+        built from this one snapshot only - it used to take a second,
+        independent read for raw_counts, so a single row could describe
+        two different instants and every sample cost two Bridge calls.
+
         Returns:
             None.
         """
         view = self._state.snapshot()
+        if not view.reading_valid:
+            return
         self._telemetry.add(TelemetrySample(
             timestamp=time(),
-            raw_counts=self._state.read_raw_counts(),
+            raw_counts=view.raw_counts,
             output_deg=view.output_deg,
             moving=view.moving,
             locked=view.locked,

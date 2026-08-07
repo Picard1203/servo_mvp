@@ -8,20 +8,14 @@ from app.models.entities import TelemetrySnapshot
 class ServoRepository(ABC):
     """Contract for reading and commanding the servo (real or simulated)."""
 
-    @abstractmethod
-    def read_raw_counts(self) -> int:
-        """Returns the absolute encoder position in counts (multi-turn).
-
-        Contract: the value is ABSOLUTE MULTI-TURN - it may exceed
-        0..4095 and may be negative. Hardware implementations must
-        compose the within-turn reading with the servo's turn counter
-        and decode the sign-magnitude wire format correctly (bit 15 is
-        the sign bit for position fields; naive parsing shows ~32700
-        when crossing below zero).
-
-        Returns:
-            Current raw counts.
-        """
+    # There is deliberately NO read_raw_counts() on this contract.
+    #
+    # It returned a bare int, so a failed read arrived as 0 - identical
+    # to a genuine reading at the bottom of travel, and the snapshot's
+    # `valid` flag was thrown away to produce it. Every caller must take
+    # a snapshot and decide what to do when it is invalid. Guarding one
+    # call site fixes today; removing the method fixes every call site
+    # that will ever exist.
 
     @abstractmethod
     def read_snapshot(self) -> TelemetrySnapshot:

@@ -68,6 +68,71 @@ class TestSnapshot:
         assert isinstance(view.output_deg, float)
 
 
+class TestFailedReadIsNeverAPosition:
+    """A read the servo never answered must not become a position.
+
+    Observed on the board on 7 August 2026: three consecutive Bridge
+    stalls, each 10.99 s (the servo_read timeout plus one sampler
+    interval), returned an empty snapshot with valid=False. snapshot()
+    used its raw_counts anyway, so the UI displayed -212.74 deg and the
+    database stored it. One sample stored count -1, which no 0..4095
+    servo can report. Nothing was logged.
+
+    This is the same defect class as the calibrate() guard in
+    TestCalibrationRobustness, applied to the path that feeds every
+    operator decision.
+    """
+
+    @staticmethod
+    def _dead_bus():
+        from app.models.entities import TelemetrySnapshot
+        return TelemetrySnapshot(
+            raw_counts=0, moving=False, temperature_c=0.0, voltage_v=0.0,
+            current_a=0.0, torque_kgcm=0.0, overload=False,
+            overcurrent=False, overheat=False, voltage_fault=False,
+            sensor_fault=False, angle_fault=False, valid=False)
+
+    def test_invalid_reading_reports_no_position(self, backend, sim):
+        from app.deps import get_state_store
+        sim.read_snapshot = self._dead_bus
+        view = get_state_store().snapshot()
+        assert view.reading_valid is False
+        assert view.output_deg is None
+        assert view.raw_counts is None
+
+    def test_invalid_reading_is_logged(self, backend, sim):
+        from app.deps import get_state_store
+        sim.read_snapshot = self._dead_bus
+        get_state_store().snapshot()
+        assert "servo.read.failed" in backend.logger.events()
+
+
+class TestOneBaseline:
+    """The display and the motion path must share one baseline.
+
+    Observed on the board: with no datum captured and the servo parked
+    at count 0, an operator pressed "move to 90". The motion path used
+    the mid-travel baseline and correctly logged from_deg -122.7, so the
+    servo swept 3550 counts - 212.7 output degrees. The display used a
+    baseline of 0 and read "0.0 deg" throughout. The operator commanded
+    90 from a screen showing 0 and the mechanism moved 212.7.
+    """
+
+    def test_snapshot_agrees_with_the_motion_conversion(self, backend, sim):
+        from app.deps import get_state_store
+        store = get_state_store()
+        counts = store.snapshot().raw_counts
+        assert store.snapshot().output_deg == round(
+            store.output_deg_from_counts(counts), 2)
+
+    def test_no_datum_baselines_on_mid_travel_not_zero(self, backend):
+        from app.deps import get_state_store
+        store = get_state_store()
+        centre = backend.settings.counts_per_turn // 2
+        assert store.output_deg_from_counts(centre) == 0.0
+        assert store.output_deg_from_counts(0) < -100.0
+
+
 class TestDirection:
     """servo_direction inverts commanded and reported motion together.
 

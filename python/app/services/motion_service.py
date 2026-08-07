@@ -129,10 +129,18 @@ class MotionService:
         new position command; commanding the current position clears the
         fault without moving.
 
+        That "without moving" depends entirely on the read. A failed
+        read reports count 0, so recovering on a stalled bus used to
+        command position 0 - driving the mechanism to the bottom of its
+        travel in the name of not moving it.
+
+        Raises:
+            InvalidReadingError: When the current position is unknown.
+
         Returns:
             None.
         """
-        counts = self._state.read_raw_counts()
+        counts = self._state.read_counts()
         self._servo.command_move(
             counts, self._state.counts_speed_from_output_speed(
                 self._settings.default_speed_dps),

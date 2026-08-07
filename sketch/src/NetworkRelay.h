@@ -8,6 +8,7 @@
 #define NETWORK_RELAY_H
 
 #include <stdint.h>
+#include <zephyr/kernel.h>
 
 namespace net {
 
@@ -69,7 +70,35 @@ class NetworkRelay {
   ///         kMaxRelaySockets allows.
   uint32_t rejected_total() const { return rejected_total_; }
 
+  /// @return Times the Bridge thread gave up waiting for the W5500. A
+  ///         non-zero value means loop() is holding the chip too long.
+  uint32_t write_lock_timeouts() const { return write_lock_timeouts_; }
+
  private:
+  /// Takes the W5500 lock.
+  ///
+  /// Every socket operation - connected(), accept(), read(), write(),
+  /// stop() - is a conversation over ONE SPI bus to ONE chip, and Poll()
+  /// runs on the loop thread while WriteToClient() and CloseClient() run
+  /// on the Bridge thread. Two threads mid-conversation on the same wire
+  /// splice their messages together: the chip answers nonsense, or waits
+  /// for the rest of a message that never arrives while the Bridge thread
+  /// blocks behind it and servo_read dies at its 10 s deadline.
+  ///
+  /// NEVER hold this across a sink callback. The sinks notify Linux over
+  /// the Bridge, and the Bridge thread may be waiting for this very lock
+  /// inside net_tx - holding it there deadlocks both threads permanently,
+  /// which is worse than the stall it fixes.
+  ///
+  /// @param timeout How long to wait for the chip.
+  /// @return True when the lock was taken; false on timeout.
+  bool LockChip(k_timeout_t timeout);
+
+  /// Releases the W5500 lock. Only ever call after a true from LockChip.
+  void UnlockChip();
+
+  struct k_mutex chip_lock_;
+  uint32_t write_lock_timeouts_ = 0;
   uint8_t cs_pin_;
   uint16_t api_port_;
   uint16_t chunk_bytes_;

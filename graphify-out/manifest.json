@@ -190,9 +190,9 @@
     "semantic_hash": ""
   },
   "python/main.py": {
-    "mtime": 1786009916.0,
-    "ast_hash": "d28207b7e1f06d1f5a7a2d18ccc9cbd7",
-    "semantic_hash": "d28207b7e1f06d1f5a7a2d18ccc9cbd7"
+    "mtime": 1786139928.0,
+    "ast_hash": "9b219753485f77cd7bf08c4439b3f447",
+    "semantic_hash": ""
   },
   "python/run_dev.py": {
     "mtime": 1785916452.0,
@@ -200,8 +200,8 @@
     "semantic_hash": "12406d28aec8d097fed06de20b60cce7"
   },
   "python/static/app.js": {
-    "mtime": 1786136981.0,
-    "ast_hash": "3370068f3b782e6945f809e76328b247",
+    "mtime": 1786140054.0,
+    "ast_hash": "380a04459bd02ff62656544765bc022c",
     "semantic_hash": ""
   },
   "python/tests/__init__.py": {
@@ -210,9 +210,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/tests/conftest.py": {
-    "mtime": 1786010016.0,
-    "ast_hash": "2e432c1de1764e71d567c43c68c87291",
-    "semantic_hash": "2e432c1de1764e71d567c43c68c87291"
+    "mtime": 1786139938.0,
+    "ast_hash": "9bac3f5fc1233f9a2d71741cc137bccf",
+    "semantic_hash": ""
   },
   "python/tests/e2e/__init__.py": {
     "mtime": 1785832022.0,
@@ -330,8 +330,8 @@
     "semantic_hash": "99c535ee75fad68ec695db4383bc99fd"
   },
   "python/tests/unit/test_telemetry_service.py": {
-    "mtime": 1786136748.0,
-    "ast_hash": "0763833ea58ef81d9049ef4594de51bd",
+    "mtime": 1786139900.0,
+    "ast_hash": "aded8cc9a8be51ac8bba31586ed16767",
     "semantic_hash": ""
   },
   "python/tests/unit/test_zero_service.py": {
@@ -370,12 +370,12 @@
     "semantic_hash": "980ebcc38b60c07348dfe6f8735bcf7f"
   },
   "sketch/src/NetworkRelay.cpp": {
-    "mtime": 1786138303.0,
+    "mtime": 1786139548.0,
     "ast_hash": "d12436abb10ee4ebdb7fb045d768e7ab",
     "semantic_hash": ""
   },
   "sketch/src/NetworkRelay.h": {
-    "mtime": 1786138254.0,
+    "mtime": 1786139548.0,
     "ast_hash": "efd1b1a93866fd7462b59a05e8b27128",
     "semantic_hash": ""
   },
@@ -445,8 +445,8 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "a78628e143b2273507549130f44e2aa4",
+    "mtime": 1786139543.0,
+    "ast_hash": "a551a0afb1b8f4ebfffda1f8db091bb2",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -475,9 +475,9 @@
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "cea82761b35eb72054e89e73dcf4bbd5",
-    "semantic_hash": "cea82761b35eb72054e89e73dcf4bbd5"
+    "mtime": 1786139543.0,
+    "ast_hash": "19a701a305ac1d3838733e14a7c354b8",
+    "semantic_hash": ""
   },
   "docs/agents/domain.md": {
     "mtime": 1786133662.0,
@@ -520,9 +520,9 @@
     "semantic_hash": ""
   },
   "sketch/src/RELAY_NOTES.md": {
-    "mtime": 1786010782.0,
-    "ast_hash": "66ff5c92a37766aa8f950ae8571c9e89",
-    "semantic_hash": "66ff5c92a37766aa8f950ae8571c9e89"
+    "mtime": 1786139548.0,
+    "ast_hash": "f82e4c674b88ee685541ef5b87cf5dbb",
+    "semantic_hash": ""
   },
   "CONVENTIONS.md": {
     "mtime": 1786133661.0,
@@ -530,8 +530,8 @@
     "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
   },
   "docs/BACKLOG.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "543c144c65d54c810829b216817def86",
+    "mtime": 1786140096.0,
+    "ast_hash": "9f2965551542a67a0f2f95c57e974462",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -570,9 +570,9 @@
     "semantic_hash": "bea0d98de4277553515e44516298ba3c"
   },
   "docs/adr/README.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "f1a31bfa4cccf86d3f427ce8f3f604c9",
-    "semantic_hash": "f1a31bfa4cccf86d3f427ce8f3f604c9"
+    "mtime": 1786139543.0,
+    "ast_hash": "e43d2629bf6068f36fb0a2b43ecf2183",
+    "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
     "mtime": 1786133661.0,
@@ -2350,8 +2350,8 @@
     "semantic_hash": ""
   },
   "skills/uno-q-st3215/SKILL.md": {
-    "mtime": 1786133674.0,
-    "ast_hash": "d802bab26fe5ddac680f00b022f488a0",
+    "mtime": 1786139548.0,
+    "ast_hash": "91bde1495378d90c0e1d5b81dacb7609",
     "semantic_hash": ""
   },
   "skills/superpowers/assets/app-icon.png": {
@@ -2362,6 +2362,11 @@
   "skills/superpowers/assets/superpowers-small.svg": {
     "mtime": 1786133670.0,
     "ast_hash": "8c39dc35e79dce44358f7602116c33d5",
+    "semantic_hash": ""
+  },
+  "docs/adr/0008-a-failed-read-is-reported-as-unknown.md": {
+    "mtime": 1786139543.0,
+    "ast_hash": "4c8864dbc08168aafeeeb01bab641d2f",
     "semantic_hash": ""
   }
 }

@@ -165,3 +165,34 @@ class TestSamplerResilience:
         from tests.conftest import wait_until
         assert wait_until(lambda: calls["n"] >= 3, timeout=3)   # survived
         assert "telemetry.error" in backend.logger.events()
+
+    def test_a_sampler_failure_records_what_went_wrong(self, backend,
+                                                       monkeypatch):
+        """The record must carry the cause, not just the fact.
+
+        A live board run on 7 August 2026 logged 'telemetry sampling
+        failed' and nothing else - no exception type, no message, no
+        traceback - so the fault could not be identified without
+        reproducing it. An ERROR that destroys its own evidence is worse
+        than no ERROR: it looks like diagnosis.
+        """
+        from app.deps import get_state_store, get_telemetry_repository
+        from app.services.telemetry_service import TelemetryService
+        from tests.conftest import wait_until
+        service = TelemetryService(get_telemetry_repository(),
+                                   get_state_store(), backend.settings)
+
+        def always_fails():
+            raise RuntimeError("the bus fell over")
+
+        monkeypatch.setattr(service, "_sample_once", always_fails)
+        service.start_sampler()
+        assert wait_until(lambda: "telemetry.error"
+                          in backend.logger.events(), timeout=3)
+        failure = next(entry for entry in backend.logger.records
+                       if len(entry) == 4
+                       and entry[2].get("event") == "telemetry.error")
+        extra = failure[3]
+        assert extra.get("exception_type") == "RuntimeError"
+        assert "the bus fell over" in extra.get("exception", "")
+        assert "Traceback" in extra.get("traceback", "")

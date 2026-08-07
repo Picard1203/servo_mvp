@@ -8,6 +8,7 @@ every test gets a fresh database, fresh settings, and fresh singletons.
 import os
 import sys
 import tempfile
+import traceback
 import types
 from typing import Optional
 
@@ -116,7 +117,26 @@ class LoggerStub:
         self._record("CRITICAL", message, metadata, extra)
 
     def exception(self, message, metadata=None, extra=None) -> None:
-        self._record("ERROR", message, metadata, extra)
+        """Mirrors the real logger: the exception rides with the record.
+
+        Must attach it, or a test asserting on the cause passes against a
+        stub that drops it just as the production logger once did.
+
+        Args:
+            message: Message.
+            metadata: Event metadata.
+            extra: Structured fields; the exception is added to them.
+
+        Returns:
+            None.
+        """
+        kind, value, _ = sys.exc_info()
+        enriched = dict(extra or {})
+        if kind is not None:
+            enriched["exception_type"] = kind.__name__
+            enriched["exception"] = str(value)
+            enriched["traceback"] = traceback.format_exc().rstrip()
+        self._record("ERROR", message, metadata, enriched)
 
     def log(self, level, message, metadata=None, extra=None) -> None:
         self._record(level, message, metadata, extra)

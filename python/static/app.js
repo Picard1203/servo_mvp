@@ -29,6 +29,19 @@ const ANGLE_STEP = 0.06;
 /* how long a transient notice stays on screen */
 const TOAST_MS = 5000;
 
+/* How many consecutive failures before the UI declares a problem.
+ *
+ * At one poll per second this is about three seconds. A single lost
+ * answer is ordinary traffic, not a fault: reacting to one made the
+ * connection banner flash "connection lost" and the position blink to
+ * "--" while everything was in fact working, which reads as a broken
+ * machine to an operator who is not a programmer.
+ *
+ * This paces what is DISPLAYED. It does not soften what is reported -
+ * the API still says reading_valid false the moment a read fails, per
+ * ADR-0008. A real stall lasts ten seconds and still shows plainly. */
+const FAILURES_BEFORE_ALARM = 3;
+
 const $ = (id) => document.getElementById(id);
 
 const state = {
@@ -37,6 +50,9 @@ const state = {
   selectedZeroId: null,
   acceleration: 50,      /* fixed sensible default; not exposed to the user */
   online: false,
+  pollFailures: 0,       /* consecutive failed polls */
+  readFailures: 0,       /* consecutive invalid servo readings */
+  lastKnownDeg: null,    /* last position actually measured */
 };
 
 /* ---------------- HTTP helpers ---------------- */
@@ -226,9 +242,13 @@ async function pollState() {
   try {
     const s = await apiGet("/servo/state");
     state.lastState = s;
+    state.pollFailures = 0;
     setOnline(true);
     renderState(s);
-  } catch (_) { setOnline(false); }
+  } catch (_) {
+    state.pollFailures += 1;
+    if (state.pollFailures >= FAILURES_BEFORE_ALARM) setOnline(false);
+  }
 }
 
 function setOnline(online) {
@@ -240,15 +260,27 @@ function setOnline(online) {
 }
 
 function renderState(s) {
-  // output_deg is null when the servo did not answer. Show that as
-  // unknown and never as a number: a failed read arrives as count 0,
-  // which is indistinguishable from the bottom of travel, and the
-  // operator commands moves from what this readout says.
-  const known = s.reading_valid && s.output_deg !== null;
-  $("posN").textContent = known ? s.output_deg.toFixed(1) : "--";
-  const pct = known
-    ? Math.min(100, Math.max(0, (s.output_deg / 360) * 100))
-    : 0;
+  // output_deg is null when the servo did not answer. Never show that as
+  // a number of its own: a failed read arrives as count 0, which is
+  // indistinguishable from the bottom of travel, and the operator
+  // commands moves from what this readout says.
+  //
+  // A single failed read holds the last MEASURED position rather than
+  // blanking, because one blip is not a fault. After
+  // FAILURES_BEFORE_ALARM in a row the position is genuinely unknown and
+  // says so.
+  const measured = s.reading_valid && s.output_deg !== null;
+  if (measured) {
+    state.readFailures = 0;
+    state.lastKnownDeg = s.output_deg;
+  } else {
+    state.readFailures += 1;
+  }
+  const known = measured || ((state.readFailures < FAILURES_BEFORE_ALARM)
+                             && (state.lastKnownDeg !== null));
+  const deg = measured ? s.output_deg : state.lastKnownDeg;
+  $("posN").textContent = known ? deg.toFixed(1) : "--";
+  const pct = known ? Math.min(100, Math.max(0, (deg / 360) * 100)) : 0;
   $("posBar").style.width = pct + "%";
 
   $("vTemp").textContent = s.temperature_c.toFixed(1);

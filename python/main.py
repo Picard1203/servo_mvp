@@ -35,6 +35,7 @@ def _ensure_logger461() -> None:
     import os
     import pathlib
     import threading
+    import traceback
     import types
 
     log_path = os.environ.get("LOG_FILE", "servo_dev.jsonl")
@@ -75,11 +76,18 @@ def _ensure_logger461() -> None:
                 "extra": extra or {},
             }
             event = (metadata or {}).get("event", "")
+            # The traceback is multi-line, so it goes under the record
+            # rather than into the single-line tail. It stays whole in
+            # the JSON either way.
+            trace = (extra or {}).get("traceback")
             tail = ""
             if extra:
-                tail = "  " + " ".join(f"{k}={v}" for k, v in extra.items())
+                tail = "  " + " ".join(f"{k}={v}" for k, v in extra.items()
+                                       if k != "traceback")
             print(f"{now:%H:%M:%S} {level:<8} {event:<26} {message}{tail}",
                   flush=True)
+            if trace:
+                print(trace, flush=True)
             try:
                 with self._lock, open(self._path, "a",
                                       encoding="utf-8") as handle:
@@ -103,7 +111,28 @@ def _ensure_logger461() -> None:
             self._emit("CRITICAL", m, metadata, extra)
 
         def exception(self, m, metadata=None, extra=None) -> None:
-            self._emit("ERROR", m, metadata, extra)
+            """Records an ERROR with the exception being handled.
+
+            Attaching the exception is the whole difference between this
+            and error(). Without it the record says something failed and
+            nothing about what, which is worse than silence: it looks
+            like diagnosis. A live sampler failure was lost this way.
+
+            Args:
+                m: Message.
+                metadata: Event metadata.
+                extra: Structured fields; the exception is added to them.
+
+            Returns:
+                None.
+            """
+            kind, value, _ = sys.exc_info()
+            enriched = dict(extra or {})
+            if kind is not None:
+                enriched["exception_type"] = kind.__name__
+                enriched["exception"] = str(value)
+                enriched["traceback"] = traceback.format_exc().rstrip()
+            self._emit("ERROR", m, metadata, enriched)
 
         def log(self, level, m, metadata=None, extra=None) -> None:
             self._emit(str(level).upper(), m, metadata, extra)

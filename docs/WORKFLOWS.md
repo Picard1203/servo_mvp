@@ -23,7 +23,7 @@ Four of its skills target defects this project actually has:
 | Skill | Why it fits here |
 |---|---|
 | `defense-in-depth` | D2 *is* a defence-in-depth failure — the guard is on `calibrate()` and not `capture()`. The skill's question is "where else is one path hardened and its twin not?" |
-| `testing-anti-patterns` | 186 tests at 100% coverage caught none of six past defects and none of the current eight. |
+| `testing-anti-patterns` | 192 tests at 100% coverage caught none of six past defects and none of the current eight. |
 | `condition-based-waiting` | `wait_until()` (`python/tests/conftest.py:222`) is a **god node with 38 edges** — the third most connected node in the graph. That many tests hanging off one async wait is a flakiness surface. |
 | `systematic-debugging` | Four phases: reproduce → isolate → identify → verify. D4, D5 and D6 all have unknown causes. |
 
@@ -99,9 +99,10 @@ for). Optionally `/debug-serial` from Arduino-Agent.
 2. Set `LOG_LEVEL=DEBUG` **for this run only**, so the relay's connect/disconnect
    lines at `bridge_relay.py:80,115` actually appear.
 3. Boot, exercise the UI, and reproduce the drop from D4.
-4. Pull logs and query the database over `adb` — note the DB at
-   `/home/arduino/servo_mvp.db` is outside the sshfs mount and only reachable
-   this way.
+4. Pull logs over `adb`. The database is at `servo_mvp.db` in the app root —
+   **inside** the sshfs mount, so it can be read directly. `.env.board` sets a
+   relative `DB_PATH` deliberately; only the *default* `db_path` sits outside
+   the mount. (An earlier version of this step said otherwise — see D8.)
 5. Read the stored datum. If `raw_counts=0`, D1 is fully explained.
 
 **Why first:** D4, D5 and D6 all have unknown causes. Planning over unknowns
@@ -205,13 +206,52 @@ the docs explain *this* project, the skill travels to the next one.
 
 ---
 
+### W8 — The delivery layer: **DONE**
+**Status:** written and installed, 8 August 2026 · `skills/deliver`,
+`skills/operator-lens`, `skills/twin-review`
+
+Three project-specific skills that turn the flows above into something
+executable, rather than something to be read and re-derived each time. Installed
+with `cp -r skills/<name> ~/.claude/skills/` (and `~/.agents/skills/` for
+Antigravity).
+
+| Skill | What it does |
+|---|---|
+| `deliver` | "We need X" → done. Orient on the graph → plan → **one stop for approval** → run the whole thing → verify → update the backlog entry and sweep for doc truth. Board-touching steps always stop and hand over the commands. |
+| `operator-lens` | Walks the control surface as the operator or the receiving team, not the developer. Five questions per control; files findings into `BACKLOG.md` in house format. |
+| `twin-review` | Four parallel reviewers on one diff — twin path, operator impact, relay safety, doc truth. **On demand only.** Iteration cap 2, then escalate. |
+
+`deliver` borrows superpowers' `writing-plans` and `executing-plans` for the
+plan-and-checkpoint mechanics; both are now installed. Nothing else from the
+frameworks surveyed was adopted.
+
+**Why written rather than installed.** BMAD-METHOD (51.6k★), Spec-Kit (80k★) and
+metaswarm were all evaluated. Each installs its own document skeleton, which
+would duplicate `BACKLOG.md`, the ADRs and `CONVENTIONS.md` — a direct violation
+of *one fact lives in exactly one file*. metaswarm's blocking quality gate is a
+coverage threshold, and this repository is the standing counter-example to
+coverage as a gate. The same reasoning as W7, and the same evidence:
+IoT-SkillsBench found human-expert project-specific skills decisive where
+generic ones were not.
+
+**What was borrowed anyway:** metaswarm's parallel design-review gate, with its
+iteration cap, is where `twin-review` comes from. Reviewing in parallel is cheap
+and catches the twin-path class; *implementing* in parallel across the four
+files where every defect in this project has lived is not worth the collision
+risk.
+
+**Keep them current**, on the same terms as W7 — when a backlog item closes and
+teaches something general, feed it back.
+
+---
+
 ## Every flow ends the same way
 
 `verification-before-completion` — the mechanised form of the rule already in
 `CLAUDE.md`:
 
 ```bash
-cd python && pytest                      # 186
+cd python && pytest                      # 192
 cd sketch/tests/native && make           # 164
 python3 tools/check_bridge_contract.py   # both sides agree
 graphify update .

@@ -50,6 +50,7 @@ Read in this order. Each answers a different question.
 | 2 | `docs/PROJECT_STATE.md` | Where is the project right now? |
 | 3 | `docs/BACKLOG.md` | **What do I do next?** ← the work queue |
 | 3b | `docs/WORKFLOWS.md` | **How do I do it?** ← skill + flow per item |
+| 3c | `docs/OPEN_QUESTIONS.md` | What is blocked on a human answer? ← ask these together |
 | 4 | `CONTEXT.md` | What do the words mean? (glossary only) |
 | 5 | `CONVENTIONS.md` | How must the code look? |
 | 6 | `docs/adr/` | Why is it built this way? |
@@ -57,7 +58,16 @@ Read in this order. Each answers a different question.
 | 8 | `sketch/src/RELAY_NOTES.md` | Before touching the relay. Non-negotiable. |
 
 **To pick up work: go to `docs/BACKLOG.md`.** It is the only file listing open
-items. Nothing else in the repo is a to-do list.
+items. Nothing else in the repo is a to-do list. Work it in **batches** — the
+ordering section explains why the unit here is a session, not an item.
+
+**Three skills drive the work** (`skills/`, installed to `~/.claude/skills/`;
+see `WORKFLOWS.md` W8):
+
+- **`deliver`** — "we need X" → done. One stop at the plan, then the full run.
+- **`operator-lens`** — sees the system as the operator and the receiving team
+  do. Run it before planning anything they can see.
+- **`twin-review`** — four parallel reviewers on one diff. On demand only.
 
 One fact lives in exactly one file. If you find the same fact in two places, that
 is a defect — fix it rather than updating one copy.

@@ -475,8 +475,8 @@
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1786187519.0,
-    "ast_hash": "70d4b2aafef9891313e50b98aa9895f6",
+    "mtime": 1786188349.0,
+    "ast_hash": "c28e37a3b456d0c013244fb883a17cdd",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -530,8 +530,8 @@
     "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
   },
   "docs/BACKLOG.md": {
-    "mtime": 1786187498.0,
-    "ast_hash": "c6de105f75db60014d4a8370ba787930",
+    "mtime": 1786188345.0,
+    "ast_hash": "7d65118ef3b94981d40fdec58a37239c",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -2395,8 +2395,8 @@
     "semantic_hash": ""
   },
   "docs/OPEN_QUESTIONS.md": {
-    "mtime": 1786186732.0,
-    "ast_hash": "5e94f417a2a5b5139d92028a641e4e75",
+    "mtime": 1786188259.0,
+    "ast_hash": "ecaaf618f25d7dfeef15722f78df8e98",
     "semantic_hash": ""
   }
 }

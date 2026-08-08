@@ -113,6 +113,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 | **R6** "stable" as numbers | The delivery is judged against it |
 | **D8** made impossible to get wrong | A silent fallback to the simulator at handover is the worst failure available |
 | **D16** | The operator must not be shown 0.00 V as a measurement |
+| **T10** the recovery runbook | The receiving team runs it unattended for days. They must know what to do when it misbehaves, and the site is three hours away |
 | **Docs true** | Cheap, and the project's own standard |
 
 ### Should ship — cut only under real pressure, and say so out loud
@@ -216,8 +217,14 @@ derives from `counts_per_turn` and the belt ratio, so retuning either propagates
 - **`output_step_deg = 0.06` is a rounding of 0.059925**, used consistently by
   both sides (`config.py:106`, `app.js:27`) and documented at `config.py:103`.
   It means a commanded step is 1.0012 counts, so roughly one nudge in 800 moves
-  two counts instead of one — under 0.12° across the full ±90 range. Deliberate
-  and harmless; stated here so it is not rediscovered as a bug.
+  two counts instead of one — under 0.12° across the full ±90 range.
+  **The operator is aware of the rounding and has not decided whether to change
+  it (8 August 2026).** Recommendation: leave it. 0.06 is a number an operator
+  can read and type; 0.059925 is not, and the error it buys is a tenth of a
+  degree across the whole travel window on a mechanism whose datum was captured
+  by hand. Revisit only if a requirement appears that needs count-exact
+  addressing from the UI — and if it does, the fix is to command *counts* rather
+  than to print more decimals.
 - **The UI tells the operator the step is 0.1°** while config and backend both
   enforce 0.06 — filed as **D21**. The ratio is right everywhere; the sentence
   describing it to the operator is not.

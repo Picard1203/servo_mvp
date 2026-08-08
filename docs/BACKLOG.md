@@ -128,6 +128,7 @@ these two are unbounded until designed. If the calendar slips, it slips here.
 | | Item | Size |
 |---|---|---|
 | 14 | **R6** define "stable" from Batch 3's numbers | M |
+| 14b | **T10** the recovery runbook, both halves | M |
 | 15 | **T5** architecture diagram + ERD | M |
 | 16 | **T3** on-target test suite, run once | S |
 | 17 | **D7** UI at the operator screen size | S — **blocked, see `OPEN_QUESTIONS.md`** |
@@ -866,6 +867,9 @@ explicitly contemplates coarsening every step), the UI keeps saying 0.1°.
 
 **Twin-path again:** one side derives from configuration, the other hardcodes.
 
+**Confirmed by the operator, 8 August 2026:** the 0.1° figure is left over from
+an earlier design and is simply wrong. **Fix it.**
+
 **Acceptance:** the operator is shown the enforced step, and it comes from the
 backend rather than from a constant in the client.
 
@@ -893,9 +897,26 @@ The data is there: telemetry is sampled once a second, retained 60 days, and
 `torque_kgcm` is already stored and already a CSV column. **The gap is purely
 the operator's route to it**, and it defeats the primary reason R5 exists.
 
-**Acceptance:** the operator can export any time range they choose, including
-one spanning days, from the UI; the default stays convenient; and the download
-does not navigate away from the control page (D18).
+**Scope confirmed and widened by the operator, 8 August 2026.** Two deliverables,
+not one, and **both must exist on the backend *and* in the UI** — a tool that
+only runs from a shell is unreachable for the team who ran the test:
+
+1. **CSV over a chosen range.** The operator picks start and end. The backend
+   endpoint already takes `from` and `to`; it is the UI that hardcodes 24 hours.
+   So this is mostly a control, not a feature — but the range picker has to
+   cope with a five-day window without the operator typing epoch seconds.
+2. **The graphs, generated on request and downloadable.** Same range, the
+   matplotlib set described under R5, produced by the board and delivered to the
+   browser. **This is the part that does not exist at either layer.** Decide
+   deliberately whether rendering happens on the board (simple, but matplotlib
+   on the MPU during a live run competes with the sampler) or the endpoint
+   serves data that the client plots — and record the choice, because it is the
+   kind of decision that gets re-argued.
+
+**Acceptance:** from the UI, the operator picks a time range spanning days and
+gets both the CSV and the graph set for exactly that range; neither navigates
+away from the control page (D18); and both are reachable from the backend alone
+for anyone working over `adb`.
 
 **Related:** R5 (this is its delivery path), D18 (same control, silent failure),
 T9 (a multi-day pull must not exhaust memory — stream it, as the CSV export
@@ -951,6 +972,48 @@ Still to do:
 
 **Acceptance:** a table like the one above, verified over a multi-hour run, with
 a stated maximum footprint the board cannot exceed.
+
+---
+
+### T10 — Write the recovery runbook, in two halves
+**Status:** open · **Severity:** high · **Raised by:** the operator answering
+`OPEN_QUESTIONS.md` Q3, 8 August 2026
+
+The site is roughly three hours away and **there is no written procedure for
+what to do when the system misbehaves.** ADR-0007's entire argument rests on not
+turning a signal loss into a site visit — and then nothing says what the person
+who did travel should actually do.
+
+The operator's answer defines the shape: **on site is the same UI as remote,
+plus `adb`, because they are USB-C connected rather than coming through the
+relay.** So there are two audiences and two documents:
+
+**Remote half** — what an operator with only the browser can do. The UI says
+OFFLINE: what does that mean, how long to wait before it is real (three failed
+polls, about three seconds), what a refusal looks like versus a fault, and when
+to stop pressing and call someone.
+
+**On-site half** — the `adb` sequence, in order, with what is safe to run while
+a mechanism is attached:
+
+```bash
+adb shell arduino-app-cli app logs  user:servo_mvp
+adb shell arduino-app-cli app start user:servo_mvp   # ~16 s warm, ~7 min cold
+```
+
+Plus: reading the database directly, confirming `servo.backend backend=hardware`
+rather than the simulator (D8), and **what is never safe** — the mechanism can
+be moved by hand with power off, so a restart with somebody's hands in it is not
+a neutral act.
+
+**On-site is also the diagnostic seat.** Whoever holds the USB-C cable is the
+only person who can catch D10's unexplained sampler exception, or anything the
+soak surfaces. Give them the commands before the trip, not during it.
+
+**Acceptance:** both halves written, and the on-site half rehearsed once by
+somebody who did not write it.
+
+**Related:** Q3, Q9, D3 (the MCU counters they will want and cannot read), D8.
 
 ---
 
@@ -1096,6 +1159,22 @@ The only enforced limit anywhere is `kMaxRelaySockets = 6`.
 
 **Open question:** can the Bridge sustain that load at all? Unknown.
 
+**Sharpened by the operator, 8 August 2026** (`OPEN_QUESTIONS.md` Q2, Q3, Q9):
+
+- **The sessions are screens left open, not people driving.** That is the cheap
+  case — a polling browser reuses one connection. Driving is occasional.
+- **The on-site session is the same UI plus `adb`**, connected over USB-C.
+- **7 is a hard ceiling, not a setting.** `Config.h:44` already recorded why:
+  the W5500 has 8 hardware sockets and the listener takes one. Raising
+  `kMaxRelaySockets` from 6 buys **exactly one more slot**, then stops.
+- **So the lever is `timeout_keep_alive=5`, not the socket count.** Five seconds
+  of slot retention per connection is what produces the measured ceiling of
+  about one new connection per second. That is the number to tune.
+- **And the arithmetic may not be what it looks like** — if the USB-C session
+  reaches uvicorn without crossing the W5500 (Q9), it costs no relay socket at
+  all and the budget is the remote screens alone. **Unverified. Do not report
+  R1 as met on the strength of it.**
+
 ---
 
 ### R2 — Motor isolation: cut drive power, keep sensors alive
@@ -1134,9 +1213,14 @@ implementation details:
 - **What happens to a move command while isolated.** Refuse it with a reason
   code (the `sayError()` path, which needs D14 first), or accept and queue it?
   Refusing is the honest answer and matches `locked`.
-- **Whether it survives a reboot.** Torque enable is a servo register; a power
-  cycle re-enables drive. If the operator isolated deliberately, coming back
-  energised is a surprise with a mechanism attached.
+- ~~**Whether it survives a reboot.**~~ **DECIDED 8 August 2026 — it latches.**
+  Isolation persists across a restart and is re-applied at startup *before any
+  move can be accepted*. Reasoning in `OPEN_QUESTIONS.md` Q4, in short: a
+  protective state should be the one that survives, and unlike calibration
+  (ADR-0007) clearing isolation needs no one on site — it is one click in the
+  UI the remote operator already has open. The latch lives in the database as
+  operator intent, because the servo register re-enables on power-up regardless.
+  **Wants an ADR before build**, and it must agree with R8's emergency stop.
 - **What `state` reports**, so the UI can render it and telemetry can record it.
   A new field on `ServoStateResponse` — and per D16, decide its behaviour on an
   invalid read *at the same time*, not afterwards.

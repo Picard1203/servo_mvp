@@ -9,14 +9,18 @@ tense. Do not merge them.
 
 1. Read `../CLAUDE.md` if you have not — especially the graphify rules. **Query
    the graph before reading source; it costs a fraction of the tokens.**
-2. Run the three verification commands and note the numbers (186 / 164 / agree).
-3. Take an item below in the suggested order.
+2. Run the three verification commands and note the numbers (192 / 164 / agree).
+3. Take the next **batch** from "Ordering, rewritten 8 August 2026" — not a
+   single item. The unit of work here is a session; T8 proved it.
 4. Update this file as part of the change — an item is not done until its entry
    says so.
 5. Run `graphify update .` after changing code.
 6. Re-run the three commands. If the numbers moved, stop and say so.
 
-## Suggested order
+## Suggested order — SUPERSEDED 8 August 2026
+
+> **Do not work from this section.** It is kept for its reasoning, which is
+> sound. The live ordering is **"Ordering, rewritten 8 August 2026"** below.
 
 **`WORKFLOWS.md` gives a flow per item** — which skill drives it, in what steps,
 with the constraints that apply. Read the flow before starting the item.
@@ -44,6 +48,108 @@ collide with real fixes.
 
 Summary: **D3 → D4 soak/R1 → D6 → R5/R6 → T1/T6/T7 → D12/T3**, with D10's
 unexplained fault watched for on every board run until it shows itself.
+
+---
+
+## Ordering, rewritten 8 August 2026 — by session, with sizes
+
+**The ordering above is superseded. It is kept because its reasoning is sound;
+what it got wrong was the unit and the scope.**
+
+Two corrections drive this rewrite:
+
+1. **The unit of work here is a session, not an item.** T8 proved it: one board
+   run settled four items and found four more that were on nobody's list.
+   Ordering items individually schedules work that cannot actually be done
+   individually.
+2. **The only two unbuilt MVP features were invisible.** R2 and R5 are both
+   scoped *in MVP*, both not started, and neither appeared in the order above.
+   Unbuilt features carry far more schedule risk than known defects, because
+   their effort is unknown. Both are now written up as build items.
+
+Sizes are **S / M / L**, meaning roughly: S = under a session; M = one focused
+session; L = more than one, or needs the board and a human watching.
+
+### Batch 1 — Desk work, no board (do now, in parallel with nothing)
+
+| | Item | Size | Why here |
+|---|---|---|---|
+| 1 | **D14** network errors read as "Failed to fetch" | S | Every later board session produces these; unreadable errors waste the session |
+| 2 | **D15** no in-flight feedback | S | Makes D13 worse by inviting a second press. Fix before measuring D13 |
+| 3 | **D16** telemetry rendered as 0.0 on a failed read | S | Twin-path, fifth instance. One rule, five fields |
+| 4 | **D21** UI states the wrong step size (0.1° vs 0.06°) | S | Same handler as D14; a number shown to the operator that is simply wrong |
+| 5 | **D20** dead `eventTime` branch | S | Two minutes; it is a comment that lies |
+
+**Rationale:** all four are client-side or schema-level, none need hardware, and
+three of them change what the *next* board session is able to observe. Fixing
+the instrument before taking the measurement.
+
+### Batch 2 — Make the machine diagnosable (board present)
+
+| | Item | Size | Why here |
+|---|---|---|---|
+| 5 | **D3** C++ side has no logging | M | `write_lock_timeouts()` and `rejected_total()` both exist and **cannot be read from the board.** Two diagnostics, unreachable |
+| 6 | **D13** decision: is six slots enough? | M | Not a bug — an architectural limit. **Wants an ADR**, see below |
+
+D13's numbers are already measured. What is missing is a *decision*: raise
+`kMaxRelaySockets`, drop `timeout_keep_alive`, pool on the client, or accept the
+ceiling and surface refusals properly. That decision changes R1's answer, so it
+comes before R1 is measured — and it belongs in `docs/adr/` because it will
+otherwise be re-litigated on every future connection bug.
+
+### Batch 3 — The measurement session (board, supervised, one long run)
+
+| | Item | Size |
+|---|---|---|
+| 7 | **D4** soak — closes the race, and is **R1's measurement** | L |
+| 8 | **R1** concurrent-operator ceiling | — same run |
+| 9 | **T9** storage growth over hours, not minutes | — same run |
+| 10 | **D10** watch for the unexplained sampler exception | — same run |
+| 11 | **D6** first paint, then the 128 vs 256 chunk experiment | M |
+
+**One session, four items.** Tooling exists (`tools/synthetic_operator.py`,
+`tools/soak_report.py`), so this is two commands and a person watching. Run it
+supervised — an unattended failure at 03:00 is a gap in a log; a watched one is
+an observation.
+
+### Batch 4 — The two unbuilt MVP features
+
+| | Item | Size | Why here |
+|---|---|---|---|
+| 12 | **R2** motor isolation | L | Must ship *and be exercised by MVP testing*. Design first — see its entry |
+| 13 | **R5** metrics export and graphs, **torque first-class** | L | Blocks R6 entirely; the receiving teams have nothing to judge without it |
+| 14 | **D22** export any time range, not a fixed 24 h | S | R5's delivery path. A multi-day unattended run cannot be retrieved through a 24-hour button |
+
+**These are the schedule risk.** Everything above is bounded by known causes;
+these two are unbounded until designed. If the calendar slips, it slips here.
+
+### Batch 5 — The handover pack
+
+| | Item | Size |
+|---|---|---|
+| 14 | **R6** define "stable" from Batch 3's numbers | M |
+| 15 | **T5** architecture diagram + ERD | M |
+| 16 | **T3** on-target test suite, run once | S |
+| 17 | **D7** UI at the operator screen size | S — **blocked, see `OPEN_QUESTIONS.md`** |
+| 18 | **D12** route back to the datum | S |
+| 19 | **D17** position bar covers the travel window | S |
+| 20 | **D18** export without navigating away | S |
+| 21 | **D5** log reads as a narrative | S |
+
+### Batch 6 — Mechanical, suits an executing agent
+
+**T1** (conventions) → **T6** (exception hierarchy) → **T7** (database
+abstraction), in that order, once the defects are closed so mechanical edits do
+not collide with real fixes. High volume, low reasoning — the Antigravity split.
+
+### Not scheduled
+
+- **T2** air-gapped bundle — **blocked on adapter delivery (R7)**, not on us.
+- **D19** — needs a reachability answer first; see its entry.
+- **R3, R4, R8** — post-MVP by decision, not by omission.
+
+**What is not in any batch is as important as what is:** if a batch slips, the
+cut line in `PROJECT_STATE.md` says what ships anyway.
 
 **Status key:** `open` · `in progress` · `needs investigation` · `done`
 
@@ -528,6 +634,30 @@ exactly like `write_lock_timeouts()`. Two diagnostics, both unreachable; see D3.
 R1 is either met or the limit is raised deliberately, and a refused connection
 produces something an operator can understand rather than silence.
 
+**Promoted and reframed, 8 August 2026 (operator lens).** This is the most
+demo-damaging behaviour in the product: in a room of people deciding whether to
+procure a full project, "press it twice" is what they will remember. Two things
+follow.
+
+**First, it is a decision, not a fix.** The measurement is done. What is missing
+is a choice between raising `kMaxRelaySockets`, dropping uvicorn's
+`timeout_keep_alive=5`, pooling connections on the client, or accepting the
+ceiling and surfacing refusals honestly — each with a different cost, and the
+choice changes what R1 can possibly measure. **It needs an ADR**, or it will be
+re-argued at every future connection bug, exactly as the chunk-size question was.
+
+**Second, the operator half is now two separate defects**, because "the operator
+sees nothing" turned out to be two mechanisms, not one:
+
+- **D14** — when the refusal *does* reach the client, it is shown as the browser
+  string "Failed to fetch".
+- **D15** — nothing marks a command as in flight, so the operator presses again,
+  opening another connection and spending another slot. **The UI's reaction to
+  the symptom feeds the cause.**
+
+Fix both before measuring R1, or the measurement includes the operator's
+double-presses as load.
+
 ---
 
 ### D12 — No way to return to the datum after activating a saved zero
@@ -543,6 +673,236 @@ to the datum, and it is obvious which one it is.
 
 ---
 
+### D14 — The most likely error in the system shows the operator "Failed to fetch"
+**Status:** open · **Severity:** high · **Found by:** operator lens, 8 August 2026
+
+`sayError()` (`app.js:220`) translates five backend `reason` codes into plain
+English. Everything else falls through to `"error: " + err.message`.
+
+**A refused connection never has a reason code.** When the relay runs out of
+slots (D13) the `fetch` rejects at the network layer, so `asApiError()` is never
+reached, `err.reason` is `undefined`, and the operator is shown the browser's
+own string — **"error: Failed to fetch"**.
+
+So the single most likely failure in the whole system — the one D13 measured at
+5 in 10 back-to-back requests — produces the least intelligible message in the
+whole UI. The end users are not programmers.
+
+**Acceptance:** a network-level failure produces a sentence an operator can act
+on ("the controller is busy — try again in a moment"), distinct from a refusal
+by the servo and distinct from a fault. No browser-generated text reaches the
+screen.
+
+**Related:** D13 (the cause), D15 (why they press again).
+
+---
+
+### D15 — A command in flight looks identical to a command that did nothing
+**Status:** open · **Severity:** high · **Found by:** operator lens, 8 August 2026
+
+`bind()` (`app.js:539`) flashes the button for 400 ms. Every command handler is
+then `await`-ing an HTTP round trip with **no in-flight state**: the button is
+not disabled, nothing spins, and success is deliberately silent
+(`/* success: no notice */` appears at nine call sites).
+
+A `servo_read` can take up to the Bridge's 10 s timeout. In that window the
+operator sees a 400 ms flash and then nothing, so they press again — **and the
+second press opens another connection, which is exactly what exhausts the six
+W5500 slots.** The UI's response to slowness actively worsens its cause.
+
+This is the other half of "first press does nothing, press it again". D13
+explains why the first press failed; this explains why the operator's instinct
+makes it worse.
+
+**Acceptance:** while a command is in flight the control shows it and cannot be
+pressed again. A command that has not answered within a stated time says so.
+
+**Related:** D13, D14, D6.
+
+---
+
+### D16 — On a failed read the operator is shown 0.0 V, 0.0 A, 0.0 °C as if measured
+**Status:** open · **Severity:** high · **Found by:** operator lens, 8 August 2026
+
+`ServoStateResponse` (`python/app/schemas/servo.py:106`) makes `output_deg`
+`Optional[float]`, with a docstring that states the rule exactly:
+
+> *"or null when the servo did not answer. Clients must render null as
+> 'unknown' and never as 0 — a failed read is not a position."*
+
+**The four fields beside it are plain `float`.** `temperature_c`, `voltage_v`,
+`current_a` and `torque_kgcm` carry no null, so on a failed read they arrive as
+`0.0` from `_empty_snapshot()` and `renderState` (`app.js:286-289`) prints them
+unconditionally. The operator sees **Voltage 0.00 V** next to a position that
+correctly says unknown — which reads as *the servo has lost power*, and is
+false.
+
+**This is the twin-path defect for the fifth time in this repository.** The rule
+was written down, correctly, in a docstring — and applied to one field of five.
+Same shape as D2 (`calibrate()` but not `capture()`), D9 (two baselines), D10
+(production logger and its test stub).
+
+**Acceptance:** no telemetry value is rendered as a measurement when
+`reading_valid` is false. Either the schema nulls them all or the client blanks
+them all; one rule, five fields.
+
+**Related:** D2, D9, D10, ADR-0008.
+
+---
+
+### D17 — The position bar cannot show the negative half of travel
+**Status:** open · **Severity:** medium · **Found by:** operator lens, 8 August 2026
+
+`app.js:283` computes the bar as `(deg / 360) * 100`, clamped to 0–100.
+
+Travel is **±90 output degrees** (ADR-0003). So the whole positive half of travel
+occupies the first **25%** of the bar, and every negative angle clamps to **0%** —
+an operator at −45°, at −90° and at 0° sees an identical empty bar. Half the
+travel window is invisible on the only spatial indicator in the UI.
+
+The numeric readout is correct; this is the picture beside it disagreeing with
+it. Given D9 — where the operator commanded a move from a readout they trusted —
+an indicator that silently agrees with itself across a third of the range is
+worth fixing before the demo.
+
+**Acceptance:** the bar maps the configured travel window, `output_min_deg` to
+`output_max_deg`, with the datum visible as a marked centre.
+
+---
+
+### D18 — A failed CSV export navigates the operator out of the application
+**Status:** open · **Severity:** medium · **Found by:** operator lens, 8 August 2026
+
+`doExport()` (`app.js:522`) sets `window.location.href` to the export endpoint.
+That is not a request the page can observe: there is no `catch`, no status, no
+notice. If the endpoint errors, or the relay refuses the connection, the browser
+replaces the control UI with its own error page and the operator has to find
+their way back — from a machine-control screen.
+
+It is also a **new connection** every time, spending from the same six-slot
+budget as D13, taken at the moment an operator is most likely to also be driving.
+
+**Acceptance:** export fetches in the background, reports success or failure like
+every other command, and never navigates away from the control page.
+
+**Related:** D13, D14, R5 — the export is the seed of the benchmarking pack, so
+it will be used more, not less.
+
+---
+
+### D19 — Saved positions are listed against a baseline of 0 when no zero is active
+**Status:** open · **Severity:** medium · **Needs confirmation on hardware**
+· **Found by:** operator lens, 8 August 2026
+
+`renderZeros()` (`app.js:367`):
+
+```js
+const base = active ? active.raw_counts : 0;
+```
+
+Every saved position's displayed angle is `(raw_counts - base) / counts_per_deg`.
+**With no active zero, `base` is 0** — so a position stored at count 2049 lists
+as ≈150°, not 0°, and the list becomes a set of plausible-looking wrong numbers.
+
+**This is D9's exact line of code, in a third location.** D9 was a display
+baseline of 0 where motion used mid-travel; `_baseline_counts()` is now the
+single definition on the Python side — and this client-side copy did not learn.
+It is the twin-path pattern again, across the API boundary this time.
+
+Marked *needs confirmation* rather than confirmed: it requires a state with saved
+zeros and none active, which may not be reachable if the datum is always active.
+**Determine whether that state is reachable before deciding the fix** — if it is
+not reachable, the defect is that a fallback exists at all for a state that
+cannot happen, and it should be an error rather than a silent 0.
+
+**Related:** D9, D12.
+
+---
+
+### D20 — `eventTime()` claims a compatibility fallback it does not implement
+**Status:** open · **Severity:** low · **Found by:** operator lens, 8 August 2026
+
+`app.js:411-412`:
+
+```js
+/* backend field is `timestamp` (ISO string); tolerate legacy `timestamp` too */
+const raw = e.timestamp != null ? e.timestamp : e.timestamp;
+```
+
+Both branches are the same expression. The comment describes a tolerance for a
+legacy field name that the code does not provide — presumably `ts`, which
+`CONTEXT.md` forbids in favour of `timestamp`.
+
+Harmless today, and worth removing rather than fixing: the glossary settled the
+name, so the fallback should not exist. Filed because a comment that describes
+behaviour the code does not have is the same species as D10 — *it looks like
+diagnosis*.
+
+**Acceptance:** the dead branch and its comment are gone.
+
+---
+
+### D21 — The UI tells the operator the step is 0.1°; it is 0.06°
+**Status:** open · **Severity:** medium · **Found by:** the gear-ratio audit,
+8 August 2026
+
+The backend raises the right message, derived from configuration:
+
+```python
+step = self._settings.output_step_deg          # 0.06
+raise StepError(f"angle must be in steps of {step} deg")
+```
+
+**The client throws that message away.** `sayError()` (`app.js:224`) maps the
+`step` reason code to a hardcoded string: `"refused — angle must be a multiple
+of 0.1°"`. So the operator is told a granularity that is not the one enforced,
+by roughly a factor of two, and the correct figure — which travelled all the way
+from `config.py` — is discarded on arrival.
+
+The same handler discards the backend's message for **all five** mapped reason
+codes; `step` is simply the one where the constant is provably wrong. If
+`output_step_deg` is ever retuned (the config docstring at `config.py:53`
+explicitly contemplates coarsening every step), the UI keeps saying 0.1°.
+
+**Twin-path again:** one side derives from configuration, the other hardcodes.
+
+**Acceptance:** the operator is shown the enforced step, and it comes from the
+backend rather than from a constant in the client.
+
+**Related:** D14 (the same handler is where unmapped errors leak "Failed to
+fetch"), ADR-0003.
+
+---
+
+### D22 — The only export control is fixed at 24 hours
+**Status:** open · **Severity:** high · **Raised by:** the operator, 8 August 2026
+
+`doExport()` (`app.js:522`) hardcodes the window:
+
+```js
+const from = now - 24 * 3600;
+```
+
+**The handover benchmark is the receiving team running the system for several
+days unattended, after which the record is loaded and read.** With a 24-hour
+button, four days of a five-day run cannot be retrieved from the UI at all —
+they exist in the database and are reachable only by someone with `adb` or the
+sshfs mount, which is not the receiving team.
+
+The data is there: telemetry is sampled once a second, retained 60 days, and
+`torque_kgcm` is already stored and already a CSV column. **The gap is purely
+the operator's route to it**, and it defeats the primary reason R5 exists.
+
+**Acceptance:** the operator can export any time range they choose, including
+one spanning days, from the UI; the default stays convenient; and the download
+does not navigate away from the control page (D18).
+
+**Related:** R5 (this is its delivery path), D18 (same control, silent failure),
+T9 (a multi-day pull must not exhaust memory — stream it, as the CSV export
+already does).
+
+---
+
 ## Tasks
 
 ### T1 — Apply `CONVENTIONS.md` across the codebase
@@ -553,7 +913,7 @@ lines missing `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list
 comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
 
 **Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
-and 186 tests still pass.
+and 192 tests still pass.
 
 ---
 
@@ -758,6 +1118,37 @@ are **not** made one and the same.
 Deliberately so: emergency stop (R8) is coming, and if Lock and isolation were
 fused there would be no room left to express it.
 
+**Elevated to a build item, 8 August 2026.** This is one of only two unbuilt
+things scoped *in MVP*, and it had no design, no acceptance and no place in the
+suggested order — it was a requirement paragraph sitting behind thirteen
+defects. The firmware half is a single register write; **the operator half does
+not exist at all**, and that is the work.
+
+**Still to decide before any code** — these are design questions, not
+implementation details:
+
+- **What the operator sees.** A third cube beside Lock and Calibrate? What does
+  it read when engaged — "Motor off"? The state must be unmistakable, because a
+  de-energised servo that still reports telemetry looks exactly like a working
+  one on this UI.
+- **What happens to a move command while isolated.** Refuse it with a reason
+  code (the `sayError()` path, which needs D14 first), or accept and queue it?
+  Refusing is the honest answer and matches `locked`.
+- **Whether it survives a reboot.** Torque enable is a servo register; a power
+  cycle re-enables drive. If the operator isolated deliberately, coming back
+  energised is a surprise with a mechanism attached.
+- **What `state` reports**, so the UI can render it and telemetry can record it.
+  A new field on `ServoStateResponse` — and per D16, decide its behaviour on an
+  invalid read *at the same time*, not afterwards.
+
+**Acceptance:** the operator can cut drive power from the UI and see plainly that
+it is cut; telemetry keeps reading throughout, proving the sensors stayed alive;
+a move while isolated is refused with a message that says why; the state is
+reported in `/servo/state` and recorded in telemetry; and the behaviour across a
+reboot is documented, whichever way it is chosen.
+
+**Blocks:** MVP handover. **Wants first:** D14 (so the refusal reads properly).
+
 ---
 
 ### R3 — Confirm whether the Bridge could carry a frontend framework
@@ -805,10 +1196,61 @@ to handle.
 
 CSV export exists today and is the seed of this, but it is not enough on its own.
 
-**Acceptance:** given a start and end timestamp, produce the graphs that go in
-the handover pack.
+**Elevated to a build item, 8 August 2026.** The second of the two unbuilt
+in-MVP items. Its absence is not a missing feature — it is the reason R6 cannot
+be written, the reason the soak run has no output format, and the reason the
+receiving teams have nothing to judge. **Everything measured so far has been
+read out of an ad-hoc query or a log.**
 
-**Related:** this is also how "stable" gets defined — see R6.
+### The use case this actually serves — stated 8 August 2026 by the operator
+
+**The receiving team runs the system for several days on their own, unattended.
+Afterwards we load what it recorded and see what happened.** That is the
+benchmark. It reframes R5 from "graphs for a handover slide" into **a forensic
+record of a run nobody watched**, and three consequences follow:
+
+- **Torque is first-class, not a nice-to-have.** It is the measurement that says
+  whether the servo actually handled what it was asked to handle — the question
+  R5 exists to answer. `torque_kgcm` is **already sampled, already stored**
+  (`sqlite_telemetry_repository.py:28`) **and already in the CSV columns**
+  (`telemetry_service.py:17`), so the data layer needs nothing. **The graphs must
+  name it explicitly**, plotted against commanded motion so load is readable
+  against what was asked, with its peaks and sustained levels called out — not
+  buried as a fourth line on a shared axis.
+- **Nobody is watching while it runs.** Anything not recorded is lost for good.
+  Before that run, confirm the sampler survives days rather than minutes (D10's
+  unexplained exception, T9's growth rates, and the stand-in logger in `main.py`
+  that appends forever without rotation).
+- **The window is days, not a session.** See D22 — the only export control in the
+  UI is fixed at 24 hours, so after a five-day run an operator can retrieve the
+  last day of it and no more.
+
+**60-day telemetry retention (`telemetry_retention_days`) comfortably covers a
+multi-day run** — verify it plateaus rather than assume it, per T9.
+
+**Acceptance, made concrete:**
+
+- Given a start and end timestamp, produce a PNG set: position against time with
+  commanded target overlaid; **torque against time, with commanded motion
+  overlaid, plus peak and sustained figures stated in numbers**; sampler
+  interval distribution, with the 9–13 s stall band marked (that band is what
+  `tools/soak_report.py` already judges); temperature, voltage and current
+  against time; and a count of invalid readings over the window.
+- **Must work over a multi-day window**, not just a session — that is the
+  handover benchmark. Downsample for the plot if needed, but never for the
+  stated numbers.
+- Runs on the board *or* off it against a pulled database — the graphs must not
+  require the servo to be attached, or nobody can produce them during a review.
+- One command, with the time range as arguments, documented in `README.md`.
+- The existing CSV export stays and remains the raw form; this sits on top of it.
+- **Reuses `tools/soak_report.py`'s verdict logic** rather than restating it —
+  one definition of "a stall", not two. See D9 on what two definitions cost.
+
+**Related:** this is also how "stable" gets defined — see R6. D18 — the export
+is the seed of this and currently fails silently. T9 — the storage numbers this
+must not contradict.
+
+**Blocks:** MVP handover, and R6 entirely.
 
 ---
 

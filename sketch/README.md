@@ -102,7 +102,7 @@ Snapshot fields: `valid,counts,moving,temp_c,volt_v,curr_a,torque_kgcm,load,stat
 Already wired. `deps.py` selects `BridgeServoRepository` over
 `SimulatedServoRepository` on the `use_hardware_servo` setting, so going live is
 a configuration flag on the board (`cp .env.board .env`), not a code change.
-Nothing above that line changes — services, API, UI and all 186 tests stay
+Nothing above that line changes — services, API, UI and all 192 tests stay
 exactly as they are. See ADR-0004.
 
 ## Known gap

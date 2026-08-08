@@ -445,8 +445,8 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1786139543.0,
-    "ast_hash": "a551a0afb1b8f4ebfffda1f8db091bb2",
+    "mtime": 1786186769.0,
+    "ast_hash": "b8e358afa5f1b66c5d31da526fd3b13b",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -455,9 +455,9 @@
     "semantic_hash": "996f2ee11145c5323f5dd26e980d7f73"
   },
   "README.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "f0e0fc4d0984fd5126e5d9fa7f47c3b3",
-    "semantic_hash": "f0e0fc4d0984fd5126e5d9fa7f47c3b3"
+    "mtime": 1786186099.0,
+    "ast_hash": "0f5a410c97b66b97babbbec38b0b9af4",
+    "semantic_hash": ""
   },
   "app.yaml": {
     "mtime": 1785833306.0,
@@ -475,8 +475,8 @@
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1786141852.0,
-    "ast_hash": "f3b0e6926c198c573f8df09d4862963a",
+    "mtime": 1786187519.0,
+    "ast_hash": "70d4b2aafef9891313e50b98aa9895f6",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -510,9 +510,9 @@
     "semantic_hash": "5928f90926905aaf97760b2f369448c1"
   },
   "sketch/README.md": {
-    "mtime": 1786133665.0,
-    "ast_hash": "489825eea3dce73cfa15da325ceb8aa6",
-    "semantic_hash": "489825eea3dce73cfa15da325ceb8aa6"
+    "mtime": 1786186099.0,
+    "ast_hash": "da4081702abb5946f2eac68eecabf319",
+    "semantic_hash": ""
   },
   "sketch/sketch.yaml": {
     "mtime": 1786134684.0,
@@ -530,8 +530,8 @@
     "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
   },
   "docs/BACKLOG.md": {
-    "mtime": 1786141998.0,
-    "ast_hash": "6e2ce7b96656e28ff0ee92463ed31bd8",
+    "mtime": 1786187498.0,
+    "ast_hash": "c6de105f75db60014d4a8370ba787930",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -575,8 +575,8 @@
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "fef3f93bdcca117cdb44607a0f3a8720",
+    "mtime": 1786186122.0,
+    "ast_hash": "820b84c6880c6b6f00c0544e0f8c4202",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.eslintrc.js": {
@@ -2365,18 +2365,38 @@
     "semantic_hash": ""
   },
   "docs/adr/0008-a-failed-read-is-reported-as-unknown.md": {
-    "mtime": 1786141842.0,
+    "mtime": 1786142207.0,
     "ast_hash": "931a9952dfae2a8dd2e506f3d1466878",
     "semantic_hash": ""
   },
   "tools/soak_report.py": {
-    "mtime": 1786141782.0,
+    "mtime": 1786142213.0,
     "ast_hash": "99433d6191a9e8a95132147e33ef78ee",
     "semantic_hash": ""
   },
   "tools/synthetic_operator.py": {
-    "mtime": 1786141719.0,
+    "mtime": 1786142213.0,
     "ast_hash": "15689ab107ed059726ef54d05aebb5d0",
+    "semantic_hash": ""
+  },
+  "skills/deliver/SKILL.md": {
+    "mtime": 1786186013.0,
+    "ast_hash": "5e68e1ceeb1ae76fd8ca79d51c5e7fde",
+    "semantic_hash": ""
+  },
+  "skills/operator-lens/SKILL.md": {
+    "mtime": 1786186048.0,
+    "ast_hash": "86353e176b99420d1118787a838bc5fb",
+    "semantic_hash": ""
+  },
+  "skills/twin-review/SKILL.md": {
+    "mtime": 1786186078.0,
+    "ast_hash": "16077747201dfe1275513f4278b60bac",
+    "semantic_hash": ""
+  },
+  "docs/OPEN_QUESTIONS.md": {
+    "mtime": 1786186732.0,
+    "ast_hash": "5e94f417a2a5b5139d92028a641e4e75",
     "semantic_hash": ""
   }
 }

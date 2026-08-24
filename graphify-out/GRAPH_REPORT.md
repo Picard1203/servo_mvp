@@ -1,23 +1,23 @@
 # Graph Report - servo_mvp  (2026-08-24)
 
 ## Corpus Check
-- 436 files · ~426,611 words
+- 436 files · ~428,641 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5303 nodes · 6835 edges · 461 communities (357 shown, 104 thin omitted)
+- 5309 nodes · 6845 edges · 451 communities (355 shown, 96 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 337 edges (avg confidence: 0.61)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3fa45013`
+- Built from commit: `dedba642`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - NetworkRelay
 - TestSettings
-- get_state_store
+- TelemetrySnapshot
 - app.js
 - server.cjs
 - ArduinoMCPServer
@@ -25,22 +25,22 @@
 - SqliteZeroRepository
 - Self-Generated Skills - Task Analysis
 - deps.py
-- test_bridge_servo_repository.py
+- get_servo_repository
 - README.md
 - ADR-0005 — Develop as if already air-gapped
 - check_client_behaviour.js
 - For the operators
-- TelemetryService
+- TelemetrySample
 - LogRecord
 - ServoStateStore
 - TEST
 - test_mcu_log.py
-- TelemetrySample
-- TestResilience
-- routers/zeros.py
+- SqliteTelemetryRepository
+- get_zero_service
+- ZeroResponse
 - Conventions
 - _read_sse_lines
-- routers/servo.py
+- dependencies
 - Superpowers Release Notes
 - Document reading flow (router)
 - D2 — capture() can store a failed read as position 0
@@ -63,7 +63,7 @@
 - ServoController.cpp
 - ServoSnapshot
 - Subagent-Driven Development
-- ._on_log
+- test_database.py
 - TinyTest.h
 - D4 — Connection drops after a few commands
 - Defects
@@ -94,7 +94,7 @@
 - devDependencies
 - compilerOptions
 - Superpowers v2.0.0 Release Notes
-- mcp-tool-router.ts
+- mcp-server.ts
 - Skilled AI Agents for Embedded and IoT Systems Development
 - Full typing with lowercase builtin generics
 - Layout divergence from the reference src/ tree
@@ -140,7 +140,7 @@
 - PWM Control - ESP32 + ESP-IDF
 - VL53L0X Time-of-Flight Distance Sensor
 - OpenCode Support Design
-- MotionService
+- http
 - lifecycle.test.js
 - MCPService
 - scripts
@@ -290,7 +290,7 @@
 - ws-protocol.test.js
 - test-session-start.sh
 - A failed read is reported as unknown, never as a number
-- @typescript-eslint/eslint-plugin
+- test_logging_setup.py
 - Commands Reference
 - graphify reference: query, path, explain
 - 1-Wire Timing (from datasheet)
@@ -306,7 +306,7 @@
 - decode_sign_magnitude
 - Operator lens
 - Development
-- mcp-server.ts
+- arduino-mcp-backend-module.ts
 - Arduino-Agent/.github/PULL_REQUEST_TEMPLATE.md
 - resolutions
 - Customization
@@ -344,7 +344,7 @@
 - v5.0.4 (2026-03-16)
 - v6.1.0 (2026-06-30)
 - Pi Tool Mapping
-- BridgeStub
+- test_bridge_relay.py
 - Checklist for effective Skills
 - Core principles
 - File Organization
@@ -398,7 +398,7 @@
 - js-yaml
 - ZeroReference
 - node-gyp
-- test_system_routes.py
+- BridgeStub
 - BUILDING.md
 - rimraf
 - @theia/cli
@@ -437,29 +437,19 @@
 - test-plugin-manifest.sh
 - opencode/run-tests.sh
 - Evaluation and iteration
-- TelemetryRepository
-- MCPContribution
-- TestMove
-- test_motion_service.py
-- TestTravelWindow
+- ignore-styles
+- get_state_store
 - The connection ceiling stays at 6 this batch
 - mcp-types.ts
-- TestAddQuery
-- ._command
+- test_sqlite_telemetry_repository.py
 - Troubleshooting
 - eslint-plugin-react-hooks
 - devDependencies
-- ._read_uncached
-- TestSnapshotDecoding
-- TestRangeConfiguration
-- MCPResponseService
-- TestInvalidFlagHonoured
-- TestFaultBits
 - node-fetch
 
 ## God Nodes (most connected - your core abstractions)
 1. `ArduinoMCPServer` - 62 edges
-2. `get_state_store()` - 56 edges
+2. `get_state_store()` - 57 edges
 3. `ServoStateStore` - 56 edges
 4. `TelemetrySnapshot` - 52 edges
 5. `Superpowers Release Notes` - 42 edges
@@ -490,7 +480,7 @@
 - **The MCU/Linux boundary contract** — context_bridge, docs_adr_0006_csv_bridge_payloads_decision, docs_adr_0006_csv_bridge_payloads_field_order_contract, readme_bridge_contract_checker, sketch_readme_bridge_payload_contract, docs_adr_0001_network_path_through_the_mcu_decision [EXTRACTED 1.00]
 - **The Five Relay Rules** — sketch_src_relay_notes_accept_not_available, sketch_src_relay_notes_disconnect_before_accept, sketch_src_relay_notes_loop_must_yield, sketch_src_relay_notes_bulk_read_per_slot, sketch_src_relay_notes_chunk_size_contract [EXTRACTED 1.00]
 
-## Communities (461 total, 104 thin omitted)
+## Communities (451 total, 96 thin omitted)
 
 ### Community 0 - "NetworkRelay"
 Cohesion: 0.11
@@ -500,9 +490,9 @@ Nodes (23): k_timeout_t, ByteSink, CloseSink, OpenSink, ByteSink, CloseSink, Ope
 Cohesion: 0.29
 Nodes (3): Settings: defaults, environment override, caching., Behavior of the pydantic-settings configuration., TestSettings
 
-### Community 2 - "get_state_store"
-Cohesion: 0.04
-Nodes (47): Initializes Logger461 for the process. Args: settings: Application settings…, setup_logging(), get_servo_repository(), get_state_store(), get_telemetry_service(), get_zero_repository(), Returns the atomic servo/lock/baseline state store. Returns: The process-wide…, Returns the telemetry service. Returns: The process-wide telemetry service. (+39 more)
+### Community 2 - "TelemetrySnapshot"
+Cohesion: 0.06
+Nodes (34): ActiveZeroError, DatumZeroError, DomainError, InvalidReadingError, NotFoundError, Exception, Domain exceptions, mapped to HTTP responses by the application layer., Raised when a referenced entity does not exist. (+26 more)
 
 ### Community 3 - "app.js"
 Cohesion: 0.06
@@ -521,8 +511,8 @@ Cohesion: 0.27
 Nodes (9): _http_request(), _parse(), E2E through the relay: raw HTTP bytes over the Bridge callbacks. The closest…, Builds a raw HTTP/1.1 request as the shield's client would send. Args: path:…, Joins all net_tx chunks captured for a slot. Args: slot: Connection slot.…, Splits a raw HTTP reply into (status_code, json_body). Args: reply: Raw HTTP…, Requests through net_open/net_rx; replies through net_tx., _reply_bytes() (+1 more)
 
 ### Community 7 - "SqliteZeroRepository"
-Cohesion: 0.11
-Nodes (13): Stores zero references in the zeros table., Creates or updates THE calibration datum zero. Args: raw_counts: Captured raw…, Maps a database row to the entity. Args: row: SQLite row. Returns: The mapped…, Persists a new zero reference. Args: zero: Entity with id=None. Returns: The…, Returns all zero references, newest first. Returns: All stored zeros., Returns one zero reference by id. Args: zero_id: Database id. Returns: The…, Deletes one zero reference. Args: zero_id: Database id. Returns: True when a…, Marks one zero active and clears the previous active flag. Args: zero_id:… (+5 more)
+Cohesion: 0.17
+Nodes (9): Stores zero references in the zeros table., Deletes one zero reference. Args: zero_id: Database id. Returns: True when a…, Marks one zero active and clears the previous active flag. Args: zero_id:…, SqliteZeroRepository, D10: one shared connection, read under a lock or corrupt.…, TestConcurrentAccess, fixture, Zero repository over a fresh database. Returns: The repository under test. (+1 more)
 
 ### Community 8 - "Self-Generated Skills - Task Analysis"
 Cohesion: 0.05
@@ -530,11 +520,11 @@ Nodes (41): 1. GPIO Operations, 1. Identify Task Requirements, 2. Select Relevan
 
 ### Community 9 - "deps.py"
 Cohesion: 0.04
-Nodes (72): BaseSettings, EventDep, FastAPI, ge, le, create_app(), FastAPI application assembly: routers and domain-error mapping. Construction of…, Creates and configures the FastAPI application. Returns: The configured… (+64 more)
+Nodes (76): BaseSettings, EventDep, FastAPI, ge, le, create_app(), FastAPI application assembly: routers and domain-error mapping. Construction of…, Creates and configures the FastAPI application. Returns: The configured… (+68 more)
 
-### Community 10 - "test_bridge_servo_repository.py"
-Cohesion: 0.14
-Nodes (11): bridge(), FakeBridge, fixture, BridgeServoRepository: the CSV contract with the sketch. No board and no Bridge…, Records Bridge calls and replies with a scripted payload., deps honours use_hardware_servo., Records one call. Args: name: Bridge function name. payload: Request payload.…, A fake bridge returning a healthy snapshot. Returns: The fake. (+3 more)
+### Community 10 - "get_servo_repository"
+Cohesion: 0.09
+Nodes (16): get_servo_repository(), Returns the servo repository chosen by use_hardware_servo. Simulated by default…, E2E: a full operator session against the live server over real HTTP., Boot -> calibrate -> move -> lock -> zeros -> telemetry -> fault., TestOperatorSession, POST /api/v1/servo/recover., guard_move_to_lock surfaces as 409 reason=moving., Calibrating on a dead bus must refuse, not store a zero. (+8 more)
 
 ### Community 11 - "README.md"
 Cohesion: 0.07
@@ -549,12 +539,12 @@ Cohesion: 0.18
 Nodes (7): APP, ctx, els, fs, path, toasts, vm
 
 ### Community 14 - "For the operators"
-Cohesion: 0.14
-Nodes (13): For the operators, For the programme, For whoever receives the MVP, Open questions, Q1 — What screen will you actually use? `half answered`, Q2 — How many operators at once, really, and doing what? `answered`, Q3 — When the machine misbehaves on site, what do you want to be able to do? `answered`, Q4 — Should motor isolation survive a reboot? `answered — engineering decision` (+5 more)
+Cohesion: 0.13
+Nodes (14): For the operators, For the programme, For whoever receives the MVP, Open questions, Q10 — Should code-level docs/comments carry rationale, or move to `docs/`? `open`, Q1 — What screen will you actually use? `half answered`, Q2 — How many operators at once, really, and doing what? `answered`, Q3 — When the machine misbehaves on site, what do you want to be able to do? `answered` (+6 more)
 
-### Community 15 - "TelemetryService"
-Cohesion: 0.06
-Nodes (25): get_telemetry_repository(), Returns the telemetry repository. Returns: The process-wide telemetry…, Samples until the process ends, at the configured interval. Returns: None., Reads one coherent snapshot and persists it. A failed read is skipped, not…, Applies retention at the configured interval. Returns: None., Persists the full sensory input every sampler interval., Starts the background sampling thread. Returns: None., Packs telemetry samples in range into a compact binary byte stream. Args:… (+17 more)
+### Community 15 - "TelemetrySample"
+Cohesion: 0.05
+Nodes (37): get_telemetry_repository(), get_telemetry_service(), Returns the telemetry service. Returns: The process-wide telemetry service., Returns the telemetry repository. Returns: The process-wide telemetry…, One persisted telemetry row. Attributes: timestamp: Unix timestamp of the…, TelemetrySample, ABC, Abstract persistence of telemetry samples. (+29 more)
 
 ### Community 16 - "LogRecord"
 Cohesion: 0.10
@@ -562,7 +552,7 @@ Nodes (20): kLogRingCapacity, DiagLog, Drain, dropped_total, Init, lock_, Push, 
 
 ### Community 17 - "ServoStateStore"
 Cohesion: 0.03
-Nodes (65): ActiveZeroError, DatumZeroError, DomainError, InvalidReadingError, NotFoundError, Exception, Domain exceptions, mapped to HTTP responses by the application layer., Raised when a referenced entity does not exist. (+57 more)
+Nodes (75): MotionDep, Immutable domain entities shared across layers., Coherent snapshot of servo + lock + baseline, read atomically. Attributes:…, ServoStateView, ABC, Abstract servo access: the seam between simulation and hardware., Starts a move toward an absolute counts target. A new position command also…, Stops motion at the current position. Returns: None. (+67 more)
 
 ### Community 18 - "TEST"
 Cohesion: 0.05
@@ -572,13 +562,17 @@ Nodes (32): angle_direction_mirrors_counts_but_still_round_trips, angle_full_tra
 Cohesion: 0.11
 Nodes (14): _lines(), mcu_log(), fixture, McuLog: receiving and writing diagnostic events forwarded from the MCU., Behavior when the board runtime is absent (dev PC)., Fresh registered receiver, writing into a throwaway file. Returns: The receiver…, Reads every JSON line from a file. Args: path: File to read. Returns: One dict…, Bridge callback registration. (+6 more)
 
-### Community 20 - "TelemetrySample"
-Cohesion: 0.12
-Nodes (17): SQLite connection management and schema initialization., Immutable domain entities shared across layers., One persisted telemetry row. Attributes: timestamp: Unix timestamp of the…, TelemetrySample, SQLite implementation of the telemetry repository., Stores telemetry samples in the telemetry table., Persists one sample. Args: sample: The sample to store. Returns: None., Counts samples in range and returns count and base timestamp. (+9 more)
-
-### Community 22 - "routers/zeros.py"
+### Community 20 - "SqliteTelemetryRepository"
 Cohesion: 0.14
-Nodes (21): delete, activate_zero(), capture_zero(), delete_zero(), list_zeros(), get, post, ZeroDep (+13 more)
+Nodes (9): Stores telemetry samples in the telemetry table., Persists one sample. Args: sample: The sample to store. Returns: None., Counts samples in range and returns count and base timestamp., Yields samples inside a time range, oldest first. Fetches the whole matching…, Deletes samples older than the retention window. Args: days: Retention in days.…, SqliteTelemetryRepository, fixture, Telemetry repository over a fresh database. Returns: The repository under test. (+1 more)
+
+### Community 21 - "get_zero_service"
+Cohesion: 0.09
+Nodes (18): get_zero_repository(), get_zero_service(), Returns the zero service. Returns: The process-wide zero service., Returns the zero repository. Returns: The process-wide zero repository., Cross-service integration flows (no HTTP): components working together., Telemetry sampler records a real movement profile., Overload flag reaches persisted telemetry., Zeros, state store and motion interacting. (+10 more)
+
+### Community 22 - "ZeroResponse"
+Cohesion: 0.11
+Nodes (23): delete, post_calibrate(), ZeroDep, Captures the current physical position as the calibration datum. Call when the…, activate_zero(), capture_zero(), delete_zero(), list_zeros() (+15 more)
 
 ### Community 23 - "Conventions"
 Cohesion: 0.11
@@ -588,9 +582,9 @@ Nodes (18): Architecture, Booleans and conditions, C++ (sketch side), Class docs
 Cohesion: 0.21
 Nodes (12): MonkeyPatch, _parse_sse_events(), Exception, SSE stream API integration tests., Reads exactly count lines from the response iterator. Args: response: The…, Parses SSE lines into a list of event dictionaries. Args: lines: Raw SSE lines.…, Custom exception to terminate stream generator during tests., _read_sse_lines() (+4 more)
 
-### Community 25 - "routers/servo.py"
-Cohesion: 0.09
-Nodes (36): MotionDep, Coherent snapshot of servo + lock + baseline, read atomically. Attributes:…, ServoStateView, get_state(), post_calibrate(), post_lock(), post_move(), post_recover() (+28 more)
+### Community 25 - "dependencies"
+Cohesion: 0.22
+Nodes (9): arduino-ide-extension, @modelcontextprotocol/sdk, dependencies, arduino-ide-extension, @modelcontextprotocol/sdk, @theia/core, ws, ws (+1 more)
 
 ### Community 26 - "Superpowers Release Notes"
 Cohesion: 0.05
@@ -637,8 +631,8 @@ Cohesion: 0.12
 Nodes (12): Handles the network client going away. Args: slot: Connection slot. Returns:…, Streams FastAPI reply bytes back down to the sketch. Args: slot: Connection…, Closes and forgets one mirrored connection. Args: slot: Connection slot.…, Handles a new network client reported by the sketch. Args: slot: Connection…, Forwards client bytes to FastAPI. Args: slot: Connection slot. data: Raw bytes…, _free_port(), live_backend(), fixture (+4 more)
 
 ### Community 37 - "BridgeServoRepository"
-Cohesion: 0.20
-Nodes (8): BridgeServoRepository, Talks to the servo through the MCU Bridge., Creates the repository. Args: bridge: Object exposing call(name, payload).…, With no bridge injected it falls back to the Arduino Bridge., The Bridge is a single multiplexed link; only one call at a time., Two threads reading at once must not overlap on the wire. Overlapping RPC…, TestConcurrencySafety, TestDefaultBridge
+Cohesion: 0.05
+Nodes (34): BridgeServoRepository, Performs one real bus read. The caller must hold the lock. Returns: The…, Starts a move toward an absolute counts target. A new position command also…, Stops motion at the current position. Returns: None., Configures the servo's dead-zone width. Args: counts: Dead-zone width in…, Configures single-turn or multi-turn absolute positioning. Args: multi_turn:…, Invokes a Bridge function, converting failures into empty results. Args: name:…, Invokes a Bridge function and logs a non-ok acknowledgement. Args: name: Bridge… (+26 more)
 
 ### Community 38 - "tests/conftest.py"
 Cohesion: 0.14
@@ -680,9 +674,9 @@ Nodes (21): ServoFaults, angle, overcurrent, overheat, overload, sensor, voltage
 Cohesion: 0.06
 Nodes (26): Code Reviewer Prompt Template, Example Output, Common Rationalizations, Example, How to Request, Red Flags, Requesting Code Review, When to Request Review (+18 more)
 
-### Community 48 - "._on_log"
-Cohesion: 0.25
-Nodes (5): _now_iso(), Renames path to path + ".1" once it has grown past the threshold. A single…, Returns the current UTC time as an ISO-8601 string, millisecond precision.…, Handles one diagnostic record forwarded from the MCU. Args: level: 0=DEBUG,…, Appends one JSON line, rotating the file past the size threshold. Args: line:…
+### Community 48 - "test_database.py"
+Cohesion: 0.32
+Nodes (4): SQLite connection management and schema initialization., SQLite implementation of the telemetry repository., SQLite implementation of the zero-reference repository., Database: schema creation, migration of old schemas, row survival.
 
 ### Community 49 - "TinyTest.h"
 Cohesion: 0.22
@@ -705,8 +699,8 @@ Cohesion: 0.17
 Nodes (12): Abstract Database with concrete SqliteDatabase, Three-tier exception hierarchy, Native tests cover pure maths only, T1 — Apply `CONVENTIONS.md` across the codebase, T3 — Run the on-target test suite, T4 — Moves while unverified: DECIDED, permitted, T5 — Add `design_diagrams/` with PlantUML, T6 — Restructure the exception hierarchy (+4 more)
 
 ### Community 54 - "test_servo_routes.py"
-Cohesion: 0.07
-Nodes (18): Servo API routes: state, move, stop, lock, calibrate, recover., POST /api/v1/servo/recover., guard_move_to_lock surfaces as 409 reason=moving., An unreachable target must be refused, not silently clamped., A failed read yields no numbers at all, not a position alone. D16.…, Nulling a field must not remove it: clients read every key., The refusal carries the configured step, not a hardcoded one. A regression…, POST /stop and /lock. (+10 more)
+Cohesion: 0.06
+Nodes (13): Servo API routes: state, move, stop, lock, calibrate, recover., The +/-90 deg window the operators asked for., An unreachable target must be refused, not silently clamped., POST /api/v1/servo/move., POST /stop and /lock., GET /api/v1/servo/state., POST /api/v1/servo/calibrate., TestCalibrate (+5 more)
 
 ### Community 55 - "SyntheticOperator"
 Cohesion: 0.05
@@ -733,8 +727,8 @@ Cohesion: 0.29
 Nodes (7): alias, export_binary(), get, Query, StreamingResponse, Exports compact packed binary telemetry data for client-side rendering. Args:…, TelemetryDep
 
 ### Community 61 - "MCPFrontendContribution"
-Cohesion: 0.18
-Nodes (5): postConstruct, MCPFrontendContribution, inject, injectable, MCPFileChangeEvent
+Cohesion: 0.11
+Nodes (8): optional, postConstruct, MCPFrontendContribution, inject, injectable, MCPContribution, inject, injectable
 
 ### Community 62 - "Baseline"
 Cohesion: 0.32
@@ -745,8 +739,8 @@ Cohesion: 0.07
 Nodes (29): Clone superpowers skills to OpenCode config directory, In your OpenCode project, My Skill, OpenCode Support Implementation Plan, Phase 1: Create Shared Core Module, Phase 2: Refactor Codex to Use Shared Core, Phase 3: Build OpenCode Plugin, Phase 4: Documentation (+21 more)
 
 ### Community 64 - "arduino-mcp-extension/package.json"
-Cohesion: 0.07
-Nodes (28): arduino-ide-extension, @modelcontextprotocol/sdk, arduino, claude, http, mcp, sse, theia-extension (+20 more)
+Cohesion: 0.15
+Nodes (12): description, license, main, name, scripts, build, build:dev, clean (+4 more)
 
 ### Community 65 - "arduino-agent-bridge.js"
 Cohesion: 0.12
@@ -765,8 +759,8 @@ Cohesion: 0.07
 Nodes (28): A1 — Per-session secret key (chosen approach), A2 — Host allowlist dropped; browser WS Origin retained, A3 — Server crashes on `null` / primitive WS payload, A4 — Frame-length bound in `decodeFrame` (adjacent), A. Server security hardening (`server.cjs`), B1 — macOS resource-fork dotfiles served as screen content, B2 — `stop-server.sh` can kill a reused PID, B3 — WebSocket client: silent reconnect, stale "Connected" (+20 more)
 
 ### Community 69 - "Database"
-Cohesion: 0.11
-Nodes (14): Connection, Database, Returns the shared SQLite connection. Returns: The open connection., Creates tables and indexes when missing. Returns: None., Owns the SQLite connection and serializes all access to it. ``write_lock``…, Adds columns introduced after a database was first created. Uses the ALTER-and-…, Fresh-database schema., Upgrading a database created before this change pack. (+6 more)
+Cohesion: 0.14
+Nodes (11): Connection, Database, Returns the shared SQLite connection. Returns: The open connection., Creates tables and indexes when missing. Returns: None., Owns the SQLite connection and serializes all access to it. ``write_lock``…, Adds columns introduced after a database was first created. Uses the ALTER-and-…, Fresh-database schema., Upgrading a database created before this change pack. (+3 more)
 
 ### Community 70 - "Bench-verified hardware facts"
 Cohesion: 0.50
@@ -794,7 +788,7 @@ Nodes (4): Dev And Test Dependencies, Runtime Dependencies, ARM64 Platform Wheel
 
 ### Community 76 - "devDependencies"
 Cohesion: 0.07
-Nodes (27): eslint, eslint-config-prettier, eslint-plugin-prettier, eslint-plugin-react, eslint-plugin-unused-imports, husky, ignore-styles, lerna (+19 more)
+Nodes (27): eslint, eslint-config-prettier, eslint-plugin-prettier, eslint-plugin-react, eslint-plugin-unused-imports, husky, lerna, lint-staged (+19 more)
 
 ### Community 77 - "compilerOptions"
 Cohesion: 0.07
@@ -804,9 +798,9 @@ Nodes (26): ES2020, lib, node_modules, src, compilerOptions, declaration, declar
 Cohesion: 0.07
 Nodes (26): Breaking Changes, Bug Fixes, Commit History, Credits, Documentation, File Changes, For Contributors, For Users (+18 more)
 
-### Community 79 - "mcp-tool-router.ts"
-Cohesion: 0.14
-Nodes (16): calculateRelevance(), CategorySummary, getCategoryTools(), getToolByName(), listToolCategories(), ROUTER_TOOLS, SearchResult, searchTools() (+8 more)
+### Community 79 - "mcp-server.ts"
+Cohesion: 0.08
+Nodes (31): MCP_SERVER_INSTRUCTIONS, findPrompt(), MCP_PROMPTS, MCPPromptArgument, MCPPromptDefinition, calculateRelevance(), CategorySummary, getCategoryTools() (+23 more)
 
 ### Community 80 - "Skilled AI Agents for Embedded and IoT Systems Development"
 Cohesion: 0.08
@@ -896,17 +890,17 @@ Nodes (20): Advanced: Status + Distance + Timing Budget, ATMega2560 + Arduino Im
 Cohesion: 0.10
 Nodes (20): Architecture, Background, Benefits, Code Reuse Strategy, Custom Tools, File Structure, High-Level Structure, Implementation Plan (+12 more)
 
-### Community 139 - "MotionService"
-Cohesion: 0.12
-Nodes (11): MotionService, Changes the digital lock, honoring the optional move guard. Args: locked:…, Clears a tripped overload fault by re-commanding the position. Hardware…, Decides whether the anti-backlash approach applies. Args: start_deg: Current…, Runs the two-leg consistent-direction approach. Leg 1 overshoots below the…, Validates and executes movement commands in output-degree space., Refuses targets the servo would silently clamp. The servo accepts counts…, Blocks until any active settle window elapses. Returns: None. (+3 more)
+### Community 139 - "http"
+Cohesion: 0.29
+Nodes (7): arduino, claude, http, mcp, sse, theia-extension, keywords
 
 ### Community 140 - "lifecycle.test.js"
 Cohesion: 0.18
 Nodes (20): assert, firstServerStarted(), fs, httpStatus(), isWindowsLikeShell(), killAndWait(), makeShellTempDir(), newestSessionDir() (+12 more)
 
 ### Community 141 - "MCPService"
-Cohesion: 0.10
-Nodes (10): bindMCPPreferences(), createMCPPreferences(), MCPConfiguration, MCPConfigurationDefaults, MCPPreferences, mcpPreferenceSchema, MCPIDEState, MCPService (+2 more)
+Cohesion: 0.08
+Nodes (11): bindMCPPreferences(), createMCPPreferences(), MCPConfiguration, MCPConfigurationDefaults, MCPPreferences, mcpPreferenceSchema, MCPFileChangeEvent, MCPIDEState (+3 more)
 
 ### Community 142 - "scripts"
 Cohesion: 0.10
@@ -1021,8 +1015,8 @@ Cohesion: 0.12
 Nodes (15): 1. Authority, 2. Commitment, 3. Scarcity, 4. Social Proof, 5. Unity, 6. Reciprocity, 7. Liking, Ethical Use (+7 more)
 
 ### Community 170 - "SimulatedServoRepository"
-Cohesion: 0.11
-Nodes (10): Stops motion at the current position. Returns: None., Records the range configuration. The simulator already models unbounded signed…, Configures the simulated dead-zone width. Args: counts: Dead-zone width in…, Trips the simulated overload fault (testing/commissioning aid). Returns: None., Advances position toward the target until the process ends. Returns: None., Thread-driven simulation of one ST3215-class servo., Returns the absolute encoder position in counts. TEST AFFORDANCE, not part of…, Returns position, motion flag and mock telemetry. Returns: The instantaneous… (+2 more)
+Cohesion: 0.10
+Nodes (11): Simulated servo: sprint-1 stand-in for the real serial bus. Models raw encoder…, Stops motion at the current position. Returns: None., Records the range configuration. The simulator already models unbounded signed…, Configures the simulated dead-zone width. Args: counts: Dead-zone width in…, Trips the simulated overload fault (testing/commissioning aid). Returns: None., Advances position toward the target until the process ends. Returns: None., Thread-driven simulation of one ST3215-class servo., Returns the absolute encoder position in counts. TEST AFFORDANCE, not part of… (+3 more)
 
 ### Community 171 - "I2C Communication - nRF52840 + Zephyr RTOS"
 Cohesion: 0.13
@@ -1492,6 +1486,10 @@ Nodes (4): assert_command_output(), fail(), pass(), test-session-start.sh script
 Cohesion: 0.29
 Nodes (6): A failed read is reported as unknown, never as a number, Consequences, Extended, 8 August 2026 — `valid` governs the whole snapshot, Status, The alternative that was considered, Why
 
+### Community 289 - "test_logging_setup.py"
+Cohesion: 0.40
+Nodes (3): Logging setup: Logger461 wiring., setup_logging passes the configured sink values to Logger461., TestSetupLogging
+
 ### Community 290 - "Commands Reference"
 Cohesion: 0.33
 Nodes (6): `/arduino-boards`, `/arduino-build`, `/arduino-libs`, `/arduino-new`, `/arduino-upload`, Commands Reference
@@ -1541,8 +1539,8 @@ Cohesion: 0.53
 Nodes (4): fail(), main(), pass(), test-sdd-workspace.sh script
 
 ### Community 302 - "decode_sign_magnitude"
-Cohesion: 0.16
-Nodes (9): decode_sign_magnitude(), Decodes a sign-magnitude field from the servo wire format. STS position fields…, parametrize, The wire-format decoder stays available to callers., TestSignMagnitude, parametrize, Sign-magnitude decoding: the ~32700 wrap bug., Wire-format decoding for STS position fields. (+1 more)
+Cohesion: 0.13
+Nodes (9): decode_sign_magnitude(), Decodes a sign-magnitude field from the servo wire format. STS position fields…, parametrize, Every documented status bit maps to its own flag., TestFaultBits, parametrize, Sign-magnitude decoding: the ~32700 wrap bug., Wire-format decoding for STS position fields. (+1 more)
 
 ### Community 303 - "Operator lens"
 Cohesion: 0.25
@@ -1552,9 +1550,9 @@ Nodes (7): Also wear the client's hat, Operator lens, Output — file it, do not
 Cohesion: 0.40
 Nodes (5): Building, Development, Extending, Project Structure, Smoke Test
 
-### Community 305 - "mcp-server.ts"
-Cohesion: 0.11
-Nodes (18): MCP_SERVER_INSTRUCTIONS, findPrompt(), MCP_PROMPTS, MCPPromptArgument, MCPPromptDefinition, createMCPArduinoServices(), MCPArduinoServices, MCPArduinoServicesProvider (+10 more)
+### Community 305 - "arduino-mcp-backend-module.ts"
+Cohesion: 0.24
+Nodes (4): createMCPArduinoServices(), MCPArduinoServices, MCPArduinoServicesProvider, MCPResponseService
 
 ### Community 306 - "Arduino-Agent/.github/PULL_REQUEST_TEMPLATE.md"
 Cohesion: 0.40
@@ -1569,8 +1567,8 @@ Cohesion: 0.40
 Nodes (5): Adding Board Manager URLs, Adding Code Patterns, Adding New Commands, Customization, Modifying Permissions
 
 ### Community 309 - "EventService"
-Cohesion: 0.16
-Nodes (9): Event, EventService, One operator-facing event. Attributes: timestamp: ISO timestamp. event: Dotted…, Thread-safe fixed-size store of recent events., Stores one event. Args: event: Dotted event identifier. message: Human-readable…, Returns the newest events, newest first. Args: limit: Maximum number of events…, EventService: recording, ordering, capacity, thread safety., Behavior of the operator-event ring buffer. (+1 more)
+Cohesion: 0.10
+Nodes (17): Event, EventService, One operator-facing event. Attributes: timestamp: ISO timestamp. event: Dotted…, Thread-safe fixed-size store of recent events., Stores one event. Args: event: Dotted event identifier. message: Human-readable…, Returns the newest events, newest first. Args: limit: Maximum number of events…, get, StreamingResponse (+9 more)
 
 ### Community 310 - "3rd Party Boards (Require Additional URLs)"
 Cohesion: 0.33
@@ -1633,7 +1631,7 @@ Cohesion: 0.40
 Nodes (5): Key Elements of Good Scenarios, Pressure Types, Testing Setup, VERIFY GREEN: Pressure Testing, Writing Pressure Scenarios
 
 ### Community 325 - "MCPServiceImpl"
-Cohesion: 0.17
+Cohesion: 0.18
 Nodes (4): MCPServiceClient, MCPServiceImpl, inject, injectable
 
 ### Community 326 - "workspaces"
@@ -1704,9 +1702,9 @@ Nodes (4): Codex, Harness Support, Lower Per-Session Token Cost, v6.1.0 (2026-06
 Cohesion: 0.50
 Nodes (3): Pi Tool Mapping, Subagents, Task lists
 
-### Community 344 - "BridgeStub"
+### Community 344 - "test_bridge_relay.py"
 Cohesion: 0.07
-Nodes (20): BridgeStub, Recording stub of the Arduino Bridge., Records a provided callback. Args: name: Bridge function name. fn: The…, Records a call and returns the configured result. Args: name: Bridge function…, echo_server(), fixture, BridgeRelay: connection mirroring, byte pumping, teardown paths., Remaining failure branches. (+12 more)
+Nodes (16): echo_server(), fixture, BridgeRelay: connection mirroring, byte pumping, teardown paths., Remaining failure branches., Local TCP server standing in for FastAPI; echoes received bytes back prefixed…, Behavior when the board runtime is absent (dev PC)., Fresh registered relay. Returns: The relay under test., Bridge callback registration. (+8 more)
 
 ### Community 345 - "Checklist for effective Skills"
 Cohesion: 0.50
@@ -1733,8 +1731,8 @@ Cohesion: 0.83
 Nodes (3): assert_contains(), assert_not_contains(), test-worktree-path-policy.sh script
 
 ### Community 351 - "wait_until"
-Cohesion: 0.10
-Nodes (12): Polls a predicate until true or timeout. Args: predicate: Zero-argument…, wait_until(), E2E: a full operator session against the live server over real HTTP., Boot -> calibrate -> move -> lock -> zeros -> telemetry -> fault., TestOperatorSession, SimulatedServoRepository: motion, deadband, faults, signed multi-turn., Absolute counts beyond one turn and below zero (contract)., Basic motion profile. (+4 more)
+Cohesion: 0.07
+Nodes (14): Polls a predicate until true or timeout. Args: predicate: Zero-argument…, wait_until(), ServoStateStore: conversions, lock/settle, verified flag, snapshot., Lock state and settle window., TestLockAndSettle, SimulatedServoRepository: motion, deadband, faults, signed multi-turn., Absolute counts beyond one turn and below zero (contract)., Basic motion profile. (+6 more)
 
 ### Community 379 - "Claude Code"
 Cohesion: 0.67
@@ -1789,28 +1787,20 @@ Cohesion: 0.22
 Nodes (14): bridgeInitializeInstructions(), fail(), fs, http, info(), main(), mcpRequest(), os (+6 more)
 
 ### Community 397 - "ZeroReference"
-Cohesion: 0.14
-Nodes (8): A saved baseline position. Attributes: id: Database id; None before…, ZeroReference, Persists a new zero reference. Args: zero: Entity with id=None. Returns: The…, Returns all zero references, newest first. Returns: All stored zeros., Returns one zero reference by id. Args: zero_id: Database id. Returns: The…, Returns the active zero reference, if any. Returns: The active zero, or None., Creates or updates THE calibration datum zero. At most one datum exists: the…, Returns all zeros, newest first. Returns: Stored zeros.
+Cohesion: 0.09
+Nodes (14): A saved baseline position. Attributes: id: Database id; None before…, ZeroReference, Persists a new zero reference. Args: zero: Entity with id=None. Returns: The…, Returns all zero references, newest first. Returns: All stored zeros., Returns one zero reference by id. Args: zero_id: Database id. Returns: The…, Returns the active zero reference, if any. Returns: The active zero, or None., Creates or updates THE calibration datum zero. At most one datum exists: the…, Creates or updates THE calibration datum zero. Args: raw_counts: Captured raw… (+6 more)
 
-### Community 399 - "test_system_routes.py"
-Cohesion: 0.12
-Nodes (9): System API routes: health and events., GET /api/v1/system/events., Health reporting when the board runtime is absent., The health endpoint names the servo backend in use., GET /api/v1/system/health., TestEvents, TestHealth, TestHealthDevComputer (+1 more)
+### Community 399 - "BridgeStub"
+Cohesion: 0.10
+Nodes (13): BridgeStub, Recording stub of the Arduino Bridge., Records a provided callback. Args: name: Bridge function name. fn: The…, Records a call and returns the configured result. Args: name: Bridge function…, System API routes: health and events., GET /api/v1/system/events., Health reporting when the board runtime is absent., The health endpoint names the servo backend in use. (+5 more)
 
 ### Community 441 - "Evaluation and iteration"
 Cohesion: 0.50
 Nodes (4): Build evaluations first, Develop Skills iteratively with the agent, Evaluation and iteration, Observe how agents navigate Skills
 
-### Community 442 - "TelemetryRepository"
-Cohesion: 0.17
-Nodes (8): ABC, Abstract persistence of telemetry samples., Contract for storing and querying telemetry history., Persists one sample. Args: sample: The sample to store. Returns: None., Counts samples in range and returns count and base timestamp., Yields samples inside a time range, oldest first. Args: ts_from: Range start,…, Deletes samples older than the retention window. Args: days: Retention in days.…, TelemetryRepository
-
-### Community 443 - "MCPContribution"
-Cohesion: 0.22
-Nodes (4): optional, MCPContribution, inject, injectable
-
-### Community 445 - "test_motion_service.py"
-Cohesion: 0.05
-Nodes (47): LockedError, MovingError, OutOfTravelError, Raised when a lock change is requested while a move is in progress., Raised when a target lies outside the servo's physical count range. The servo…, Raised when a commanded angle violates the configured step size., Raised when movement is requested while the digital lock is engaged., StepError (+39 more)
+### Community 445 - "get_state_store"
+Cohesion: 0.03
+Nodes (62): LockedError, MovingError, OutOfTravelError, Raised when a lock change is requested while a move is in progress., Raised when a target lies outside the servo's physical count range. The servo…, Raised when a commanded angle violates the configured step size., Raised when movement is requested while the digital lock is engaged., StepError (+54 more)
 
 ### Community 447 - "The connection ceiling stays at 6 this batch"
 Cohesion: 0.50
@@ -1820,13 +1810,9 @@ Nodes (3): Consequences, The connection ceiling stays at 6 this batch, Why
 Cohesion: 0.33
 Nodes (5): DEFAULT_MCP_CONFIG, MCPServerConfig, ProgressNotification, Root, TaskStatus
 
-### Community 449 - "TestAddQuery"
-Cohesion: 0.32
-Nodes (4): Builds a sample. Args: timestamp: Unix timestamp. overload: Overload flag…, Persistence round-trips., _sample(), TestAddQuery
-
-### Community 450 - "._command"
-Cohesion: 0.20
-Nodes (5): Starts a move toward an absolute counts target. A new position command also…, Stops motion at the current position. Returns: None., Configures the servo's dead-zone width. Args: counts: Dead-zone width in…, Configures single-turn or multi-turn absolute positioning. Args: multi_turn:…, Invokes a Bridge function and logs a non-ok acknowledgement. Args: name: Bridge…
+### Community 449 - "test_sqlite_telemetry_repository.py"
+Cohesion: 0.25
+Nodes (6): SqliteTelemetryRepository: add, ranged query, purge, fault columns., Builds a sample. Args: timestamp: Unix timestamp. overload: Overload flag…, Persistence round-trips., _sample(), TestAddQuery, TestPurge
 
 ### Community 451 - "Troubleshooting"
 Cohesion: 0.40
@@ -1836,29 +1822,25 @@ Nodes (5): Board Not Detected, Compilation Errors, Serial Monitor Issues, Troubl
 Cohesion: 0.22
 Nodes (9): devDependencies, rimraf, @types/node, @types/ws, typescript, rimraf, typescript, @types/node (+1 more)
 
-### Community 454 - "._read_uncached"
-Cohesion: 0.25
-Nodes (4): Performs one real bus read. The caller must hold the lock. Returns: The…, Invokes a Bridge function, converting failures into empty results. Args: name:…, Builds the reading used when the bus did not answer. Returns: A snapshot with…, Reads one coherent snapshot from the servo. Returns: The snapshot. On a bus…
-
 ## Knowledge Gaps
-- **2418 isolated node(s):** `state`, `REFUSALS`, `EVENT_LABELS`, `DAY_SHEET_COLS`, `RAW_HEADERS` (+2413 more)
+- **2419 isolated node(s):** `state`, `REFUSALS`, `EVENT_LABELS`, `DAY_SHEET_COLS`, `RAW_HEADERS` (+2414 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **104 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **96 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `BridgeServoRepository` connect `BridgeServoRepository` to `get_state_store`, `._command`, `._read_uncached`, `TestSnapshotDecoding`, `deps.py`, `test_bridge_servo_repository.py`, `TestFaultBits`, `TestInvalidFlagHonoured`, `decode_sign_magnitude`, `ServoStateStore`, `TestResilience`, `TestCommands`?**
+- **Why does `BridgeServoRepository` connect `BridgeServoRepository` to `TelemetrySnapshot`, `deps.py`, `get_servo_repository`, `decode_sign_magnitude`, `ServoStateStore`, `TestCommands`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `TelemetrySnapshot` connect `get_state_store` to `BridgeServoRepository`, `._read_uncached`, `SimulatedServoRepository`, `TelemetryService`, `ServoStateStore`, `TelemetrySample`, `test_servo_routes.py`, `TestMove`, `TestTravelWindow`?**
+- **Why does `TelemetrySnapshot` connect `TelemetrySnapshot` to `BridgeServoRepository`, `SimulatedServoRepository`, `get_servo_repository`, `TelemetrySample`, `ServoStateStore`, `get_zero_service`, `test_servo_routes.py`, `get_state_store`, `wait_until`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `get_settings()` connect `deps.py` to `TestSettings`, `get_state_store`, `tests/conftest.py`, `test_bridge_servo_repository.py`, `ServoStateStore`, `test_servo_routes.py`, `test_motion_service.py`?**
+- **Why does `SqliteZeroRepository` connect `SqliteZeroRepository` to `Database`, `deps.py`, `ZeroReference`, `test_database.py`, `get_zero_service`, `test_sqlite_zero_repository.py`?**
   _High betweenness centrality (0.004) - this node is a cross-community bridge._
 - **Are the 18 inferred relationships involving `ServoStateStore` (e.g. with `MotionService` and `InvalidReadingError`) actually correct?**
   _`ServoStateStore` has 18 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 33 inferred relationships involving `TelemetrySnapshot` (e.g. with `ServoRepository` and `BridgeServoRepository`) actually correct?**
   _`TelemetrySnapshot` has 33 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `state`, `REFUSALS`, `EVENT_LABELS` to the rest of the system?**
-  _2418 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2419 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `NetworkRelay` be split into smaller, more focused modules?**
   _Cohesion score 0.10591133004926108 - nodes in this community are weakly interconnected._

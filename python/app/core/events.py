@@ -7,7 +7,7 @@ coupling in either direction.
 
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Lock
 from typing import Optional
 
@@ -48,7 +48,8 @@ class EventService:
         Returns:
             None.
         """
-        entry = Event(timestamp=datetime.now().isoformat(timespec="seconds"),
+        entry = Event(timestamp=datetime.now(timezone.utc)
+                      .isoformat(timespec="seconds"),
                       event=event, message=message, data=data or {})
         with self._lock:
             self._events.append(entry)

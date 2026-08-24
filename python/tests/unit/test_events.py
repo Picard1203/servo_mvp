@@ -30,6 +30,16 @@ class TestEventService:
         messages = [e.message for e in events.recent(10)]
         assert messages == ["4", "3", "2"]
 
+    def test_timestamp_carries_an_explicit_utc_offset(self):
+        """D33: an offset-less timestamp is read as local time by a
+        browser, and the container's clock is UTC - so a naive
+        datetime.now() shows hours behind the operator's real local time.
+        """
+        events = EventService(capacity=10)
+        events.record("a.b", "first")
+        timestamp = events.recent(1)[0].timestamp
+        assert timestamp.endswith("+00:00") or timestamp.endswith("Z")
+
     def test_concurrent_records_do_not_corrupt(self):
         events = EventService(capacity=1000)
 

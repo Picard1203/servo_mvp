@@ -26,6 +26,23 @@ class TestValidation:
         motion.move_to(12.0, 60.0)
         motion.move_to(12.06, 60.0)
 
+    def test_move_message_states_full_precision(self, motion, backend):
+        """D34: 0.06 deg is the real minimum step; a message rounded to
+        1 decimal cannot show it (0.06 and 0.12 both read "0.1")."""
+        motion.move_to(12.06, 60.0)
+        accepted = next(e for e in _events(backend)
+                        if e.event == "servo.move.accepted")
+        assert "12.06" in accepted.message
+
+    def test_from_deg_keeps_full_precision(self, motion, backend, monkeypatch):
+        from app.deps import get_state_store
+        monkeypatch.setattr(get_state_store(), "current_output_deg",
+                            lambda: 6.06)
+        motion.move_to(12.0, 60.0)
+        accepted = [e for e in _events(backend)
+                   if e.event == "servo.move.accepted"][-1]
+        assert accepted.data["from_deg"] == 6.06
+
     @pytest.mark.parametrize("bad", [10.05, 0.333, 359.99])
     def test_invalid_steps_rejected(self, motion, bad):
         with pytest.raises(StepError):

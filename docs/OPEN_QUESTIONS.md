@@ -151,22 +151,25 @@ written down in R7: adapters before the MVP is finished → box into the secure
 network for handover; otherwise → hand over on the single coloured adapter. The
 cut line in `PROJECT_STATE.md` assumes the second unless told otherwise.
 
-### Q9 — Does the on-site USB-C session bypass the relay entirely? `open`
-**Raised by Q3's answer, 8 August 2026.** **Blocks:** R1's arithmetic.
-**This one is ours to answer, not the operator's — it needs measuring.**
+### Q9 — What can the on-site person do? `answered`
+**Answered by the operator, 8 August 2026.**
 
-The operator's phrasing was *"USB-C connected and not through the relay"*. If
-that is literally true — the on-site browser reaching uvicorn over the USB-C
-network interface on the Linux side, rather than through the W5500 — then **the
-on-site session costs zero relay sockets**, and the budget is the remote screens
-alone against 6.
+> *"The on-site should be able to do everything a dev — either there or at home
+> base — tells him to do, just like we are developing now."*
 
-That would be the difference between a comfortable margin and none.
+**So on-site has the full development surface**, not a restricted operator
+subset: `adb`, the sshfs mount, logs, the database, app start and stop — the
+same access this project is being built with. The runbook (T10) can therefore
+assume a competent pair of hands taking instructions, which makes it a
+*reference* rather than a script that must anticipate everything.
 
-*How to settle it:* connect over USB-C, load the UI, and read
-`rejected_total()` and the slot count from the MCU — **which cannot be done
-today**, and is the concrete case for the MCU logging work. Until then this is
-an assumption, and R1 must not be reported as met on the strength of it.
+**One half of this is not a preference and stays open as measurement, not as a
+question:** whether USB-C traffic actually bypasses the W5500 is a fact about
+the hardware. If it does, the on-site session costs **zero relay sockets** and
+the budget is the remote screens alone — the difference between a comfortable
+margin and none. It gets settled during the soak by reading the MCU counters,
+which is one more reason the logging work comes first. **Until measured, R1 must
+not be reported as met on the strength of it.** Tracked in R1, not here.
 
 ### Q8 — Is there a date? `open`
 **Blocks:** the cut line's usefulness.

@@ -57,9 +57,15 @@ Read in this order. Each answers a different question.
 | 7 | `docs/AUDIT.md` | What went wrong before? (frozen, historical) |
 | 8 | `sketch/src/RELAY_NOTES.md` | Before touching the relay. Non-negotiable. |
 
-**To pick up work: go to `docs/BACKLOG.md`.** It is the only file listing open
-items. Nothing else in the repo is a to-do list. Work it in **batches** — the
-ordering section explains why the unit here is a session, not an item.
+**To pick up work: go to `docs/BACKLOG.md` and read the `START HERE` block at
+the top.** It names the current session, what is in it, and where every item
+lives — so nothing has to be rediscovered. It is the only file listing open
+items; nothing else in the repo is a to-do list.
+
+**Note on §3 below:** the Python suite needs a venv that the development machine
+does not currently have. That is known. Verify with the native checks and the
+bridge contract, and **say plainly that the suite did not run** — do not go
+hunting for the missing 192.
 
 **Three skills drive the work** (`skills/`, installed to `~/.claude/skills/`;
 see `WORKFLOWS.md` W8):

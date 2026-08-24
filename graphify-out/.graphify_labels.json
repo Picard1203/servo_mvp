@@ -11,7 +11,7 @@
   "9": "smoke-test.js",
   "10": "BridgeServoRepository",
   "11": "README.md",
-  "12": "Tasks",
+  "12": "ADR-0005 — Develop as if already air-gapped",
   "13": "Database",
   "14": "For the operators",
   "15": "deps.py",
@@ -343,7 +343,7 @@
   "341": "v6.1.0 (2026-06-30)",
   "342": "condition-based-waiting-example.ts",
   "343": "Pi Tool Mapping",
-  "344": "Evaluation and iteration",
+  "344": "Tasks",
   "345": "Checklist for effective Skills",
   "346": "Core principles",
   "347": "File Organization",
@@ -453,5 +453,6 @@
   "451": "TestFaults",
   "452": ".connection",
   "453": "service",
-  "454": "@typescript-eslint/eslint-plugin"
+  "454": "Anti-patterns to avoid",
+  "455": "ignore-styles"
 }

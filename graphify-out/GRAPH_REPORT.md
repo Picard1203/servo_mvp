@@ -1,16 +1,16 @@
 # Graph Report - servo_mvp  (2026-08-08)
 
 ## Corpus Check
-- 426 files · ~391,985 words
+- 426 files · ~393,441 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5038 nodes · 6343 edges · 455 communities (348 shown, 107 thin omitted)
+- 5038 nodes · 6343 edges · 456 communities (349 shown, 107 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 303 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `018eb387`
+- Built from commit: `2ebbf406`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -27,7 +27,7 @@
 - smoke-test.js
 - BridgeServoRepository
 - README.md
-- Tasks
+- ADR-0005 — Develop as if already air-gapped
 - Database
 - For the operators
 - deps.py
@@ -344,7 +344,7 @@
 - v5.0.4 (2026-03-16)
 - v6.1.0 (2026-06-30)
 - Pi Tool Mapping
-- Evaluation and iteration
+- Tasks
 - Checklist for effective Skills
 - Core principles
 - File Organization
@@ -449,7 +449,8 @@
 - TestFaults
 - .connection
 - service
-- @typescript-eslint/eslint-plugin
+- Anti-patterns to avoid
+- ignore-styles
 
 ## God Nodes (most connected - your core abstractions)
 1. `ArduinoMCPServer` - 62 edges
@@ -484,7 +485,7 @@
 - **The MCU/Linux boundary contract** — context_bridge, docs_adr_0006_csv_bridge_payloads_decision, docs_adr_0006_csv_bridge_payloads_field_order_contract, readme_bridge_contract_checker, sketch_readme_bridge_payload_contract, docs_adr_0001_network_path_through_the_mcu_decision [EXTRACTED 1.00]
 - **The Five Relay Rules** — sketch_src_relay_notes_accept_not_available, sketch_src_relay_notes_disconnect_before_accept, sketch_src_relay_notes_loop_must_yield, sketch_src_relay_notes_bulk_read_per_slot, sketch_src_relay_notes_chunk_size_contract [EXTRACTED 1.00]
 
-## Communities (455 total, 107 thin omitted)
+## Communities (456 total, 107 thin omitted)
 
 ### Community 0 - "NetworkRelay"
 Cohesion: 0.10
@@ -534,9 +535,9 @@ Nodes (17): BridgeServoRepository, Performs one real bus read. The caller must h
 Cohesion: 0.07
 Nodes (20): Consequences, The network path runs through the MCU, not the Linux side, Consequences, Considered and rejected, Plain HTML, CSS and JavaScript — no framework, no build step, Consequences, Travel window is ±90 output degrees, and multi-turn stays off, Consequences (+12 more)
 
-### Community 12 - "Tasks"
-Cohesion: 0.09
-Nodes (25): Servo Control App Manifest, sshfs board mount as working copy, Abstract Database with concrete SqliteDatabase, Three-tier exception hierarchy, ADR-0002 — Plain HTML/CSS/JS, no framework, ADR-0005 — Develop as if already air-gapped, Native tests cover pure maths only, R7 — Handover logistics depend on adapter delivery (+17 more)
+### Community 12 - "ADR-0005 — Develop as if already air-gapped"
+Cohesion: 0.17
+Nodes (13): Servo Control App Manifest, sshfs board mount as working copy, ADR-0002 — Plain HTML/CSS/JS, no framework, ADR-0005 — Develop as if already air-gapped, R7 — Handover logistics depend on adapter delivery, T2 — Package the air-gapped bundle, Environment right now, IPAddress Cast Patch For Ethernet 2.0.2 (+5 more)
 
 ### Community 13 - "Database"
 Cohesion: 0.13
@@ -780,7 +781,7 @@ Nodes (4): Dev And Test Dependencies, Runtime Dependencies, ARM64 Platform Wheel
 
 ### Community 76 - "devDependencies"
 Cohesion: 0.07
-Nodes (27): eslint, eslint-config-prettier, eslint-plugin-prettier, eslint-plugin-react, eslint-plugin-unused-imports, husky, ignore-styles, lerna (+19 more)
+Nodes (27): eslint, eslint-config-prettier, eslint-plugin-prettier, eslint-plugin-react, eslint-plugin-unused-imports, husky, lerna, lint-staged (+19 more)
 
 ### Community 77 - "compilerOptions"
 Cohesion: 0.07
@@ -1215,8 +1216,8 @@ Cohesion: 0.17
 Nodes (11): Bite-Sized Task Granularity, Execution Handoff, File Structure, No Placeholders, Overview, Plan Document Header, Scope Check, Self-Review (+3 more)
 
 ### Community 222 - "[Analysis Title]"
-Cohesion: 0.17
-Nodes (12): Advanced: Skills with executable code, [Analysis Title], Anti-patterns to avoid, Avoid offering too many options, Avoid Windows-style paths, Conditional workflow pattern, Examples pattern, Executive summary (+4 more)
+Cohesion: 0.15
+Nodes (13): Advanced: Skills with executable code, [Analysis Title], Build evaluations first, Conditional workflow pattern, Develop Skills iteratively with the agent, Evaluation and iteration, Examples pattern, Executive summary (+5 more)
 
 ### Community 223 - "test-bootstrap-caching.mjs"
 Cohesion: 0.17
@@ -1690,9 +1691,9 @@ Nodes (4): Codex, Harness Support, Lower Per-Session Token Cost, v6.1.0 (2026-06
 Cohesion: 0.50
 Nodes (3): Pi Tool Mapping, Subagents, Task lists
 
-### Community 344 - "Evaluation and iteration"
-Cohesion: 0.50
-Nodes (4): Build evaluations first, Develop Skills iteratively with the agent, Evaluation and iteration, Observe how agents navigate Skills
+### Community 344 - "Tasks"
+Cohesion: 0.17
+Nodes (12): Abstract Database with concrete SqliteDatabase, Three-tier exception hierarchy, Native tests cover pure maths only, T1 — Apply `CONVENTIONS.md` across the codebase, T3 — Run the on-target test suite, T4 — Moves while unverified: DECIDED, permitted, T5 — Add `design_diagrams/` with PlantUML, T6 — Restructure the exception hierarchy (+4 more)
 
 ### Community 345 - "Checklist for effective Skills"
 Cohesion: 0.50
@@ -1797,6 +1798,10 @@ Nodes (5): Board Not Detected, Compilation Errors, Serial Monitor Issues, Troubl
 ### Community 453 - "service"
 Cohesion: 0.67
 Nodes (3): fixture, Fresh zero service. Returns: The service under test., service()
+
+### Community 454 - "Anti-patterns to avoid"
+Cohesion: 0.67
+Nodes (3): Anti-patterns to avoid, Avoid offering too many options, Avoid Windows-style paths
 
 ## Knowledge Gaps
 - **2371 isolated node(s):** `state`, `EVENT_LABELS`, `ADR-0008`, `counts_per_servo_deg_`, `servo_deg_per_output_deg_` (+2366 more)

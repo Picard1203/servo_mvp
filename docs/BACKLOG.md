@@ -5,6 +5,105 @@
 `AUDIT.md` is the *past* tense (bugs already fixed). This file is the *present*
 tense. Do not merge them.
 
+---
+
+# START HERE — the session plan
+
+**Agreed with the operator, 8 August 2026. Three sessions, in this order. Each
+starts cold; everything needed is written down below so nothing is rediscovered.**
+
+| Session | What it does | Board needed |
+|---|---|---|
+| **1 — next** | **Batch 1 then Batch 2** — fix the instrument, then make the MCU diagnosable | Batch 2 only |
+| **2** | **The soak** — one long supervised run | yes |
+| **3** | **Batch 4** — motor isolation, and the export with graphs | yes, at the end |
+
+Use **`/deliver`** to run a batch: it plans, **stops once** for approval, then
+runs the whole thing. Use **`/operator-lens`** before changing anything the
+operator sees, and **`/twin-review`** on the finished diff — every item in
+Batch 1 has a twin somewhere.
+
+**Do not run the Python suite looking for 192.** There is no venv on the
+development machine and this is known, not a failure — `pip install -r
+python/requirements-dev.txt` in a venv if you want it, otherwise verify with the
+other two commands and **say plainly that the suite did not run.** The native
+checks (164) and `tools/check_bridge_contract.py` ("both sides agree") both work
+with no setup.
+
+## Session 1, Batch 1 — Fix the instrument before taking the measurement
+
+Five fixes, all client-side or schema-level, **no board required.** Three of
+them change what Session 2 is able to observe, which is why they come first.
+Every location below is verified as of 8 August 2026.
+
+| # | Item | Where | The fix, in one line |
+|---|---|---|---|
+| 1 | **The most likely error shows "Failed to fetch"** (D14) | `app.js:220` `sayError()` | A network-level rejection has no `reason` code and never reaches `asApiError()` — give it its own branch and a sentence an operator can act on |
+| 2 | **A command in flight looks like one that did nothing** (D15) | `app.js:539` `bind()`; handlers `:441-528` | Mark the control busy and refuse a second press until it answers. **Design it touch-safe** — Q1 is unanswered, so assume a finger |
+| 3 | **A failed read shows 0.0 V as if measured** (D16) | `schemas/servo.py:106-116`; `app.js:286-289` | One rule, five fields. Either the schema nulls them all or the client blanks them all — decide once, apply to both |
+| 4 | **The UI says the step is 0.1°; it is 0.06°** (D21) | `app.js:224`; backend is right at `motion_service.py:255-258` | Stop discarding the backend's message. Confirmed leftover from an earlier design |
+| 5 | **`eventTime()` claims a fallback it does not implement** (D20) | `app.js:411-412` | Both branches identical. Delete the dead one and its comment |
+
+**Test-first where it is testable.** Items 3 and 4 have backend halves that can
+have failing tests written before the fix; items 1, 2 and 5 are browser-side and
+this repository has no browser test harness — **say so rather than claiming
+coverage.**
+
+**Then `/twin-review` the diff.** Item 3 is the fifth instance of the twin-path
+class in this repository; the sixth is the one nobody has found yet.
+
+## Session 1, Batch 2 — Make the machine diagnosable
+
+| # | Item | Where |
+|---|---|---|
+| 6 | **The C++ side has no logging** (D3) | `ServoBus`, `ServoController`, `NetworkRelay`, `BridgeApi` in `sketch/src/` |
+| 7 | **Decide the connection ceiling** (D13) | An ADR in `docs/adr/`, not a code change |
+
+**Read `sketch/src/RELAY_NOTES.md` before touching any of it.** The hard
+constraint: `loop()` must keep yielding or the Bridge thread starves into a 10 s
+timeout. Size the log volume against T9's budget *before* adding it — relay
+chatter is the highest-rate traffic in the system.
+
+**Two counters already exist and cannot be read from the board**:
+`write_lock_timeouts()` and `rejected_total()`. Exposing them is the point of
+this batch, because Session 2 needs them — including to settle whether the
+USB-C session bypasses the relay (R1).
+
+**The ceiling decision is a choice, not a fix.** The measurement is done. The
+W5500 has 8 hardware sockets and the listener takes one (`Config.h:44`), so **7
+is a wall** and raising `kMaxRelaySockets` from 6 buys exactly one slot. The
+real lever is `timeout_keep_alive=5` (`main.py:142`). Write the ADR before
+Session 2, or the soak measures a system nobody has decided the shape of.
+
+## Session 2 — The soak
+
+One long supervised run closing four things at once: the connection-drop defect
+(D4), the operator ceiling (R1), storage growth over hours rather than minutes
+(T9), and a watch for the unexplained sampler exception (D10). Tooling exists:
+
+```bash
+python3 tools/synthetic_operator.py --host <board> --minutes 120 \
+    --operators 3 --report soak.json
+python3 tools/soak_report.py --since <ISO timestamp>
+```
+
+Run it **supervised**. An unattended failure at 03:00 is a gap in a log; a
+watched one is an observation.
+
+## Session 3 — Batch 4
+
+Motor isolation (**latching, decided — see `OPEN_QUESTIONS.md` Q4; write the ADR
+first**), and the export: time-range selection plus the matplotlib graph set,
+**both on the backend and in the UI**, with torque first-class.
+
+## Not in these three sessions
+
+The handover pack (defining "stable", the recovery runbook, the **operations
+manual**, diagrams, on-target tests), and the mechanical conventions pass. See
+the batch list further down.
+
+---
+
 ## How to pick up work
 
 1. Read `../CLAUDE.md` if you have not — especially the graphify rules. **Query
@@ -129,6 +228,7 @@ these two are unbounded until designed. If the calendar slips, it slips here.
 |---|---|---|
 | 14 | **R6** define "stable" from Batch 3's numbers | M |
 | 14b | **T10** the recovery runbook, both halves | M |
+| 14c | **T11** the operations manual — **after** batches 1 and 4 land | M |
 | 15 | **T5** architecture diagram + ERD | M |
 | 16 | **T3** on-target test suite, run once | S |
 | 17 | **D7** UI at the operator screen size | S — **blocked, see `OPEN_QUESTIONS.md`** |
@@ -1014,6 +1114,60 @@ soak surfaces. Give them the commands before the trip, not during it.
 somebody who did not write it.
 
 **Related:** Q3, Q9, D3 (the MCU counters they will want and cannot read), D8.
+
+---
+
+### T11 — Write the operations manual
+**Status:** open · **Severity:** high · **Raised by:** the operator, 8 August 2026
+
+**The everyday document. Nothing in this repository tells someone how to operate
+the system.** Every document here is written for whoever is *building* it —
+`CLAUDE.md`, the ADRs, the conventions, this backlog. The person who sits down
+in front of the UI to do a day's work has nothing.
+
+That gap ships with the MVP unless it is closed: the receiving team runs this
+unattended for days, and the benchmark is only as good as their ability to
+operate it correctly for those days.
+
+**Distinct from T10, and the split is deliberate:**
+
+| | T11 — operations manual | T10 — recovery runbook |
+|---|---|---|
+| When it is read | every day | when something is wrong |
+| Audience | the operator | the operator, then whoever is on site |
+| Content | how to do the work | how to get back to working |
+
+One fact in one file: **the manual does not repeat the runbook.** It points at
+it.
+
+**Contents, at minimum:**
+
+- **The startup ritual.** Drive the mechanism to mid-travel, press Calibrate —
+  and *why*, because the mechanism can be moved by hand while power is off, and
+  because a datum that is not mid-travel strands half the travel window
+  (ADR-0003, and the original cause behind D1).
+- **What every control does**, including the ones whose meaning is not obvious:
+  Lock versus motor isolation versus emergency stop, and why they are separate
+  controls (R2, R8).
+- **Saved positions**: what a zero is, what activating one changes, and how to
+  get back to the datum (D12).
+- **Reading the screen honestly**: what MOVING, SETTLING and HOLDING mean; what
+  the unverified-reference warning means; what a blank position means and what
+  it does not.
+- **The travel window**: ±90 output degrees, 0.06° per step, and what a refusal
+  as out-of-travel is telling them.
+- **Pulling the data**: the export, the time range, and the graphs — the thing
+  the receiving team will be doing at the end of their run.
+- **What not to do**, with reasons rather than prohibitions.
+
+**Write it after the batch-1 and batch-4 work, not before** — several of the
+things it must describe are the things being changed. A manual describing the
+current error messages would be wrong within a week.
+
+**Acceptance:** somebody who has never seen the system can run a normal working
+session from this document alone, without asking a developer.
+
+**Related:** T10 (the emergency half), D12, D17, R2, R5.
 
 ---
 

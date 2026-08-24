@@ -345,6 +345,16 @@ class SyntheticOperator:
         self._name: str = name
         self._random: random.Random = random.Random(seed)
         self._deadline: float = deadline
+        self._stop: threading.Event = threading.Event()
+        self._last_state_at: float = time.monotonic()
+
+    def stop(self) -> None:
+        """Signals background threads to stop.
+
+        Returns:
+            None
+        """
+        self._stop.set()
 
     def _request(self, action: str, path: str,
                  payload: Optional[dict[str, Any]] = None,
@@ -394,54 +404,70 @@ class SyntheticOperator:
             self._metrics.record_failure(action)
             return None
 
-    def poll_state_forever(self) -> None:
-        """Polls state once a second until the deadline, as app.js does.
+    def stream_forever(self) -> None:
+        """Reads the SSE stream forever.
 
         Returns:
             None
         """
-        poller = PersistentPoller(self._host, self._port, self._metrics,
-                                  "state")
-        while time.monotonic() < self._deadline:
-            state = poller.get("/api/v1/servo/state")
-            if state is not None:
-                self._metrics.record_reading(
-                    state.get("reading_valid", True), state.get("output_deg"))
-            time.sleep(POLL_STATE_SECONDS)
-        poller.close()
+        while (time.monotonic() < self._deadline) and (not self._stop.is_set()):
+            try:
+                conn = http.client.HTTPConnection(self._host, self._port, timeout=30)
+                self._metrics.record_connection_opened("stream")
+                conn.request("GET", "/api/v1/stream", 
+                            headers={"Accept": "text/event-stream"})
+                resp = conn.getresponse()
+                if resp.status != 200:
+                    raise http.client.HTTPException(f"{resp.status}")
+                
+                current_event = None
+                current_data = None
+                # Read line by line from the chunked response
+                for raw_line in resp:
+                    if self._stop.is_set() or time.monotonic() >= self._deadline:
+                        conn.close()
+                        return
+                    line = raw_line.decode("utf-8").rstrip("\n").rstrip("\r")
+                    if line.startswith("event: "):
+                        current_event = line[7:]
+                    elif line.startswith("data: "):
+                        current_data = line[6:]
+                    elif line == "":
+                        if current_event and current_data:
+                            self._handle_sse_event(current_event, current_data)
+                        current_event = None
+                        current_data = None
+            except (http.client.HTTPException, OSError, json.JSONDecodeError):
+                self._metrics.record_failure("stream")
+                self._stop.wait(3.0)  # reconnect delay
 
-    def poll_zeros_forever(self) -> None:
-        """Polls the zero list every 15s, on its own connection.
+    def _handle_sse_event(self, event: str, data: str) -> None:
+        """Processes one SSE event from the stream.
 
-        A separate `setInterval` in app.js, not the same timer as state or
-        events - so it can be in flight at the same moment either is.
+        Args:
+            event (str): The event type.
+            data (str): The raw JSON payload.
 
         Returns:
             None
         """
-        poller = PersistentPoller(self._host, self._port, self._metrics,
-                                  "zeros_poll")
-        while time.monotonic() < self._deadline:
-            poller.get("/api/v1/zeros")
-            time.sleep(POLL_ZEROS_SECONDS)
-        poller.close()
+        now = time.monotonic()
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError:
+            self._metrics.record_failure("stream")
+            return
 
-    def poll_events_forever(self) -> None:
-        """Polls the event list every 15s, on its own connection.
-
-        Same period as poll_zeros_forever but a genuinely independent timer,
-        matching app.js:742-744 - the two drift relative to each other over
-        a multi-hour run rather than firing in lockstep.
-
-        Returns:
-            None
-        """
-        poller = PersistentPoller(self._host, self._port, self._metrics,
-                                  "events_poll")
-        while time.monotonic() < self._deadline:
-            poller.get("/api/v1/system/events?limit=50")
-            time.sleep(POLL_EVENTS_SECONDS)
-        poller.close()
+        if event == "state":
+            elapsed = now - self._last_state_at
+            self._metrics.record_success("state", elapsed)
+            self._metrics.record_reading(
+                payload.get("reading_valid", True), payload.get("output_deg"))
+            self._last_state_at = now
+        elif event == "zeros":
+            self._metrics.record_success("zeros_poll", 0.0)
+        elif event == "events":
+            self._metrics.record_success("events_poll", 0.0)
 
     def act_forever(self) -> None:
         """Performs deliberate actions with human pauses until the deadline.
@@ -449,7 +475,7 @@ class SyntheticOperator:
         Returns:
             None
         """
-        while time.monotonic() < self._deadline:
+        while (time.monotonic() < self._deadline) and (not self._stop.is_set()):
             self._perform_one_action()
             think = self._random.uniform(THINK_SECONDS_MIN,
                                          THINK_SECONDS_MAX)
@@ -509,7 +535,7 @@ class SyntheticOperator:
         limit = time.monotonic() + MOVE_SETTLE_TIMEOUT_SECONDS
         moving = True
         while (moving is True) and (time.monotonic() < limit) \
-                and (time.monotonic() < self._deadline):
+                and (time.monotonic() < self._deadline) and (not self._stop.is_set()):
             time.sleep(POLL_STATE_SECONDS)
             # Deliberately a separate action name from the persistent
             # "state" poll stream: this one-off, fresh-connection check
@@ -660,12 +686,13 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
     print(f"soak: started at {time.strftime('%H:%M:%S')}, "
           f"ends about {time.strftime('%H:%M:%S', time.localtime(started_at + minutes * 60.0))}")
 
+    operator_instances: list[SyntheticOperator] = []
     for index in range(operators):
         operator = SyntheticOperator(host, port, metrics,
                                      f"operator-{index + 1}",
                                      seed=1000 + index, deadline=deadline)
-        for target in (operator.poll_state_forever, operator.poll_zeros_forever,
-                      operator.poll_events_forever, operator.act_forever):
+        operator_instances.append(operator)
+        for target in (operator.stream_forever, operator.act_forever):
             thread = threading.Thread(target=target, daemon=True)
             threads.append(thread)
             thread.start()
@@ -700,6 +727,8 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
         signal.signal(signal.SIGTERM, previous_sigterm)
         if checkpointer is not None:
             checkpointer.stop()
+        for operator in operator_instances:
+            operator.stop()
 
     if interrupted:
         print()

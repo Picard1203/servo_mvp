@@ -21,7 +21,7 @@ ZeroDep = Annotated[ZeroService, Depends(get_zero_service)]
 
 
 @router.get("/state", response_model=ServoStateResponse)
-async def get_state(state: StateDep) -> ServoStateResponse:
+def get_state(state: StateDep) -> ServoStateResponse:
     """Returns the full state snapshot for the client.
 
     Args:
@@ -44,7 +44,7 @@ async def get_state(state: StateDep) -> ServoStateResponse:
 
 
 @router.post("/move", status_code=202, response_model=MoveAcceptedResponse)
-async def post_move(request: MoveRequest,
+def post_move(request: MoveRequest,
                     motion: MotionDep) -> MoveAcceptedResponse:
     """Starts a move; domain errors are mapped to HTTP by the app.
 
@@ -61,7 +61,7 @@ async def post_move(request: MoveRequest,
 
 
 @router.post("/stop", response_model=StopResponse)
-async def post_stop(motion: MotionDep) -> StopResponse:
+def post_stop(motion: MotionDep) -> StopResponse:
     """Stops the current move.
 
     Args:
@@ -75,7 +75,7 @@ async def post_stop(motion: MotionDep) -> StopResponse:
 
 
 @router.post("/lock", response_model=LockResponse)
-async def post_lock(request: LockRequest,
+def post_lock(request: LockRequest,
                     motion: MotionDep) -> LockResponse:
     """Changes the digital lock state.
 
@@ -91,7 +91,7 @@ async def post_lock(request: LockRequest,
 
 
 @router.post("/calibrate", status_code=201, response_model=ZeroResponse)
-async def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
+def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
     """Captures the current physical position as the calibration datum.
 
     Call when the mechanism is physically at the documented reference
@@ -112,7 +112,7 @@ async def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
 
 
 @router.post("/recover", response_model=RecoverResponse)
-async def post_recover(motion: MotionDep) -> RecoverResponse:
+def post_recover(motion: MotionDep) -> RecoverResponse:
     """Clears a tripped overload fault by re-commanding the position.
 
     Args:

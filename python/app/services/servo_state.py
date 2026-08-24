@@ -183,7 +183,7 @@ class ServoStateStore:
                                   if active is not None else "factory"})
         return ServoStateView(
             output_deg=(round(self._to_output_deg(reading.raw_counts, active),
-                              2) if reading.valid else None),
+                              2) if (reading.valid is True and reading.raw_counts is not None) else None),
             raw_counts=reading.raw_counts if reading.valid else None,
             reading_valid=reading.valid,
             moving=reading.moving,

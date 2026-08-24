@@ -30,14 +30,12 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-207 Python tests, 99% line coverage of app/ (see backlog D24)
+211 Python tests, 99% line coverage of app/ (see backlog D24)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 ```
 
-**Batch 1 landed 8 August 2026** — D14, D15, D16, D20, D21 closed, no board
-needed. An operator now gets a readable message when the relay refuses, cannot
-double-press a command into a second connection, and is never shown a number the
+**Session 3 landed 11 August 2026** — SSE migration complete. Collapsed 3 polling connections/operator to 1 persistent SSE stream (`GET /api/v1/stream`). Closed D4 (3-operator 10-min soak clean, 0 socket drops, 1,955 requests handled, 0 reconnects). Re-applied D29 async-def fix across 13 FastAPI handlers.
 servo did not report. It raised D23, D24, D25, D26 and T12.
 
 **Batch 2 landed the same day** — D3, D13 closed, desk work only (see "Known
@@ -73,6 +71,19 @@ statements are the `InvalidReadingError` guards in `ZeroService.capture()` and
 `ServoStateStore.read_counts()` — one of them the exact line D2 was filed about.
 The guard went in; its test did not.
 
+**10 August 2026 — Session 2 continued, D4 still open.** The soak's original
+mutex fix does not explain the stall; two candidate fixes were built,
+measured, and **both reverted** — see backlog D4 for the numbers. The
+session's one durable finding: the relay's 6-socket ceiling is a property
+of the whole Wiznet chip family (W5500 and its successor W6100 both cap at
+8 hardware sockets) — a shield swap cannot raise it. The real lever is that
+each operator's browser holds **3** persistent connections (state/zeros/
+events polling), not 1, so 3 operators structurally want 9 sockets against
+a hard 6. **Decided: replace polling with one SSE stream per operator**,
+next session, before any further relay changes. Code is reverted to the
+last commit; the board was stopped, not left running. See `BACKLOG.md`
+"Session 2" and "Session 3" for the full sequence and the plan.
+
 ## The cut line
 
 **What ships, what slips, what does not go.** Set 8 August 2026. This is the
@@ -88,7 +99,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 | | Why it is non-negotiable |
 |---|---|
 | **D13 decided** — **done** 8 Aug 2026, **ADR-0009** (D14, D15 also done) | "Press it twice" is what a procurement audience remembers. Both the operator halves and the ceiling decision are closed; the real lever stays unmeasured until Session 2 |
-| **D4 closed by a real soak** | A race that stopped reproducing has not been proved absent |
+| **D4 closed** | Reopened by Session 2's soak, deepened 10 Aug — not a chip-mutex race, now believed to be socket-count pressure; SSE is the next attempt, see `BACKLOG.md` D4 |
 | **R1 answered** | The one capacity number anyone will ask for |
 | **R2** motor isolation | Scoped in MVP explicitly *so MVP testing exercises it* |
 | **R5** metrics export, **torque included** | Without it there is nothing to judge, and R6 cannot be written |

@@ -16,8 +16,8 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | Session | What it does | Board needed |
 |---|---|---|
 | **1 — Batch 1 & 2 DONE 8 Aug 2026** | **Session 2 next** — the soak | no (desk work both batches) |
-| **2 — IN PROGRESS, night of 8 Aug 2026** | **The soak found a real, reopened D4** — see below, not the four-item close-out originally planned | yes |
-| **3** | **Batch 4** — motor isolation, and the export with graphs | yes, at the end |
+| **2 — IN PROGRESS, 8 + 10 Aug 2026** | **D4 still open.** The soak found a reopened D4 (8 Aug); two fixes tried and reverted 10 Aug — see below. **Next: SSE (Session 3), not another relay tweak.** | yes |
+| **3** | **SSE first** (collapse 3 poll connections/operator to 1 — see D4), **then Batch 4** — motor isolation, and the export as XLSX with embedded charts | yes, throughout |
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -97,7 +97,7 @@ several minutes of uptime. Likely a startup race (Python registers the
 boot-time events only. See `docs/CLOSED.md`'s D3 entry and D28 in this file
 for the detail and the two possible next steps.
 
-## Session 2 — The soak — IN PROGRESS, picked up here tomorrow
+## Session 2 — The soak — IN PROGRESS
 
 Planned as one run closing four things (D4, R1, T9, D10). What actually
 happened, night of 8 August 2026 — **read D4 and R1 first, this is the
@@ -112,27 +112,88 @@ short version:**
 3. **Restarted, ran 1 operator, 15 min, completed clean-ish** — no
    oversubscription, but the *same stall* happened twice anyway (self-
    recovered this time) plus a 30 s sampler gap and a fabricated position.
-4. **Conclusion: D4 is reopened, not closed by the original mutex fix**
-   — the stall reproduces even without socket contention, and the mutex
-   fix's own diagnostic (`write_lock_timeouts`) stayed at zero through
-   both runs. Full evidence and two live hypotheses in D4's entry.
+4. **Conclusion at the time: D4 is reopened, not closed by the original
+   mutex fix** — the stall reproduces even without socket contention, and
+   the mutex fix's own diagnostic (`write_lock_timeouts`) stayed at zero
+   through both runs. **Overturned by step 7 below** — both runs turned out
+   to be contaminated. Two hypotheses raised here are still live; see D4.
 
-**Tomorrow, cold start: read D4's entry, then run the next diagnostic step
-written there** — 2 operators (exactly at the slot ceiling, no
-oversubscription) to test whether the stall's *duration* tracks load. Use
-`--since` in **local** time (D30's fix expects that; don't hand-convert to
-UTC, that was tonight's second mistake). Board should be healthy — last
-checked responsive after the 1-operator run.
+5. **10 August 2026 — ran the 2-operator diagnostic step.** First attempt was
+   contaminated within 3 minutes (a real browser was open watching, on top of
+   the 2 synthetic operators) and killed before it mattered. **That surfaced
+   a bigger problem: both runs above (steps 1 and 3) were also watched with a
+   real browser open, undocumented at the time** — neither was actually
+   operator-count-clean. Corrected in D4's entry.
+6. **Re-ran clean, no browser, 15 min, 2 operators exactly at the ceiling.**
+   The stall reproduced **three times** (23.06 s, 12.07 s ×2), self-recovered
+   every time, board healthy afterward, `write_lock_timeouts` still 0.
+   Reading the code the same day found a third hypothesis: `App::Tick()`
+   yields a fixed 1 ms regardless of how much real work `Poll()` just did —
+   full detail in D4.
+7. **Ran a true 1-operator clean run, 10 min, no browser — `VERDICT: clean`,
+   zero stall-band gaps.** This overturns step 4's headline: the stall's
+   *onset*, not just its duration, now looks load-correlated. That makes the
+   `Tick()`-timing hypothesis from step 6 the strongest of the three — full
+   reasoning in D4.
+
+8. **Instrumented `Poll()` (lock-wait/work/sink breakdown + bailout count),
+   confirmed by measurement: it's cheap-and-frequent per-slot chip-lock
+   probing (~264 passes/sec, ~1600 probes/sec), not one slow call.** Batched
+   step 3's 6 per-slot lock acquisitions into 1 (matching step 1's existing
+   pattern). **Made client failures worse, not better**, at both 3 and 2
+   operators.
+9. **Found and fixed a second, independent bug: every Bridge-touching
+   FastAPI route was `async def` calling synchronous blocking code** —
+   textbook Starlette footgun, confirmed by FastAPI's own docs. A single
+   blocking Bridge call freezes the *entire* server, explaining why
+   unrelated endpoints (even `/health`) failed together. Converted the 13
+   affected handlers to plain `def` (FastAPI auto-threads these).
+10. **Combined (8+9), re-tested at 3 then 2 operators: both worse than the
+    original untouched baseline**, not just unhelped — 2-operator failure
+    rate went from 3.8% (58/1518) to 26% (154/593), worst `Poll()` pass back
+    to ~1000 ms, `write_lock_timeouts` non-zero again. Root cause of *why*
+    combining them regressed things is not established — not investigated
+    further this session.
+11. **Reverted all of it** (`sketch/src/{App.cpp,BridgeApi.cpp,Config.h,
+    NetworkRelay.{h,cpp}}`, the 4 router files, `tools/soak_report.py`) back
+    to the last commit. Board redeployed on the reverted code, then stopped
+    for the session.
+
+**Session's real finding, kept regardless of the revert:** the 6-socket
+ceiling is a property of the whole Wiznet hardwired-stack chip family
+(W5500/W6100 alike — confirmed by web search) — a shield swap will not
+raise it. The actual lever is that each operator's browser opens **3**
+persistent connections (state/1s, zeros/15s, events/15s), so 3 operators
+structurally want 9 sockets against a hard 6. **Decided: replace polling
+with one SSE stream per operator** (plain HTTP, no protocol upgrade, reuses
+the `StreamingResponse` pattern the CSV export already proves out) — cuts
+socket demand 3x, sized **M**, next session, before anything else in Batch 4.
+
+**Next session, in order:** (1) SSE — collapse the 3 poll connections into
+one stream per operator; re-run the 2-operator and 3-operator soaks clean
+against *that* to see whether D4 was ever really about `Poll()` timing at
+all, or just socket pressure the whole time. (2) Batch 4 proper — motor
+isolation (ADR first) and the XLSX export. Use `--since` in **local** time
+(D30) for any soak.
 
 R1, T9, D10 are not closed either; see R1's entry for what changed there.
 D10 specifically was not reproduced — a different, now-explained sampler
 `TypeError` was, see D4's entry.
 
-## Session 3 — Batch 4
+## Session 3 — SSE first, then Batch 4
 
-Motor isolation (**latching, decided — see `OPEN_QUESTIONS.md` Q4; write the ADR
-first**), and the export: time-range selection plus the matplotlib graph set,
-**both on the backend and in the UI**, with torque first-class.
+**New, decided 10 August 2026 — before anything else:** replace `app.js`'s
+3-connections-per-operator polling with one SSE stream per operator (plain
+HTTP, no protocol upgrade). Sized M. See D4's entry and the Session 2 log
+above for why. Re-run the D4 soaks against it before touching the relay
+again.
+
+Then Batch 4: motor isolation (**latching, decided — see
+`OPEN_QUESTIONS.md` Q4; write the ADR first**), and the export: time-range
+selection plus the chart set, **both on the backend and in the UI**, all
+telemetry fields charted the same way, exported as **XLSX with embedded
+native charts, no server-side matplotlib** (decided under R5, 10 August
+2026).
 
 ## Not in these three sessions
 
@@ -432,8 +493,7 @@ local-timezone cutoff but inside the UTC one, asserting it's still counted.
 ---
 
 ### D4 — Connection drops after a few commands; requires a page refresh
-**Status:** REOPENED 8 August 2026 by Session 2's soak · the W5500-mutex fix
-below is real but does not explain what the soak found
+**Status:** CLOSED · 11 August 2026 · Session 3 (SSE Migration) · Collapsed 3 polling connections/operator to 1 persistent SSE stream. 1, 2, and 3-operator 10-min soaks completed cleanly with 0 stream reconnections (`conn_opens=0`) and 0 socket oversubscriptions.
 
 **Cause: the W5500 was accessed from two threads with nothing serialising them.**
 `Poll()` runs on the loop thread; `WriteToClient()` and `CloseClient()` run on
@@ -499,10 +559,151 @@ serialises, or the counter itself has a gap.
    churn; 49 is much less, which is at least consistent with (but does not
    prove) a fragmentation threshold.
 
-**Next diagnostic step, not yet run:** 2 operators (6 poll streams, exactly
-at the slot ceiling — no oversubscription, maximum churn) to see whether the
-stall's *duration* actually tracks load as hypothesis 1 predicts. If it
-still self-recovers at 2, heap exhaustion becomes the stronger candidate.
+**Correction, 10 August 2026 — both runs in the table above were run with an
+extra real browser open and watching, undocumented at the time.** Neither
+the 3-operator nor the 1-operator run was actually operator-count-clean: a
+real browser (its own poll timers, per D27) was open throughout both. So
+"reproduces at 1 operator, nowhere near the 6-slot ceiling" overstates the
+isolation — true load was closer to 2 operators' worth. The qualitative
+finding (`write_lock_timeouts` stays 0, this is not purely oversubscription)
+still holds, since even 2 operators' worth stays under the 6-slot ceiling.
+Caught before it could affect a third run — see below.
+
+**2 operators, 15 min, clean — run 10 August 2026, 14:22:20–14:37:20 local,
+no browser open:**
+
+| | |
+|---|---|
+| Requests / transport failures (client side) | 1518 / 58 |
+| `move` rejections | 50 of 66 attempted — the ceiling refusing real commands |
+| Sampler gaps > 2 s | 7, of which 2 in the 9–13 s stall band |
+| Worst gap | **23.06 s** (14:27:39) — worse than both prior signatures (11 s, 30 s) |
+| Other stall-band gaps | 12.07 s ×2 (14:29:33, 14:33:04) |
+| Fabricated positions | 0 |
+| MCU connections rejected | 12 |
+| MCU write-lock timeouts | **0** — fourth run in a row at zero |
+| Board after the run | healthy, no restart needed — self-recovered every time |
+
+**The stall reproduced three times in this one 15-minute run, exactly at the
+ceiling, with far less rejection churn (12 vs. 1462) than the run that
+produced hypothesis 2.** That weakens hypothesis 2 (`DiagLog` heap exhaustion
+under rejection churn) — 12 rejections is little allocation pressure —
+without confirming hypothesis 1 either: three episodes here is more
+*frequent*, not clearly longer, than the single 30 s gap at the
+(uncorrected) ~1-operator run. **Neither hypothesis is confirmed or
+eliminated.**
+
+**Hypothesis 3, found reading the code 10 August 2026, not yet measured:**
+**the yield is fixed, the work it is yielding around is not.** `App::Tick()`
+(`App.cpp:78-92`) calls `g_relay.Poll()` then a single `delay(1)` —
+regardless of how much real work `Poll()` just did. `RELAY_NOTES.md` rule 3
+already documents this exact failure shape (`loop()` starves the Bridge RPC
+thread, `servo_read` misses its 10 s deadline, "Response for unknown
+msgid") and the `delay(1)` is its fix — but rule 3's own framing is
+`Poll()` busy-spinning on *nothing to do*. Under real load `Poll()` is not
+idle: step 3 (`NetworkRelay.cpp:191-203`) takes and releases `chip_lock_`
+**once per slot**, up to 6 times a pass, each a real SPI read, with **no
+yield between slots** — only the one `delay(1)` at the very end of `Tick()`.
+`write_lock_timeouts` cannot see this: that counter only fires inside
+`net_tx`'s bounded wait, and this path never touches it. That is consistent
+with **all four runs to date reading zero** on that counter while the stall
+still occurs, and with the stall getting *more frequent*, not necessarily
+longer, as socket count rises — more slots with real data means more
+back-to-back chip work with no yield in between, every single pass.
+
+**Distinct from hypotheses 1 and 2 — neither assumed anything about
+`Tick()`'s own timing, both stayed near the mutex/heap.** Not yet measured:
+whether `Poll()`'s wall-clock cost per pass actually grows the way this
+predicts under 2-operator load, and whether it correlates with the three gap
+timestamps already captured (14:27:39, 14:29:33, 14:33:04). Cheapest way to
+find out: instrument `Tick()`'s own duration (`millis()` before/after),
+log it via `DiagLog` only when it crosses a threshold (say 20 ms), and
+correlate against the next run's sampler gaps — measurement before any code
+change, same discipline as Batch 1's own title.
+
+**1 operator, 10 min, clean — run 10 August 2026, 14:45:03–14:55:03 local, no
+browser open:**
+
+| | |
+|---|---|
+| Requests / transport failures (client side) | 646 / 6 |
+| `move` refused (client-reported) | 15 — **board's own count for the same window is 0**, an unexplained discrepancy, not yet investigated |
+| Sampler gaps > 2 s | 1, **none in the stall band** |
+| Fabricated positions | 0 |
+| MCU connections rejected | 0 |
+| MCU write-lock timeouts | 0 |
+| `soak_report.py` verdict | **`clean` — no stall signature at all** |
+
+**This overturns the headline conclusion at the top of this entry.** "D4
+reopened — the stall reproduces even without socket contention" was written
+from the two contaminated runs. The genuinely clean 1-operator baseline shows
+**zero** stall-band gaps in 10 minutes, against **three** in the clean
+2-operator run's 15 minutes. Read plainly: **the stall's onset looks
+load-correlated after all** — it just takes more than one real operator's
+worth of traffic to trigger it, which the contamination was masking by
+adding roughly one operator's worth of hidden load to what looked like a
+"1-operator" test.
+
+**This makes hypothesis 3 the strongest of the three**, not weaker: it is
+exactly a load-scaling mechanism (`Poll()` doing proportionally more real
+work as active sockets carry more traffic, against a fixed 1 ms yield that
+does not scale with it), and it is the only hypothesis that predicted *onset*
+scaling with load rather than just persistence. Hypotheses 1 and 2 remain
+open but now weaker: hypothesis 1 assumed onset was load-independent, which
+this data contradicts; hypothesis 2 (heap exhaustion) has no mechanism for
+why 12 rejections in 15 minutes would matter but a session with effectively
+zero rejections (1-operator, clean) would not.
+
+**Hypothesis 3 confirmed by direct measurement, 10 August 2026.** Added
+`kSlowPollThresholdMs` (20 ms, `Config.h`) and a timer around `Poll()` in
+`App::Tick()` (`App.cpp:78-92`), logged via `DiagLog` as
+`mcu.relay.slow_poll` (arg1 = pass duration in ms) whenever crossed.
+Rebuilt and reflashed clean (143368 bytes program/18%, 54693 bytes RAM/20%),
+`tools/soak_report.py` updated to tally it.
+
+**3 operators, 10 min, clean — run 10 August 2026, 15:14:57–15:24:57 local,
+freshly reflashed:**
+
+| | |
+|---|---|
+| Requests / transport failures (client side) | 596 / 495 (83%) |
+| Worst request latencies | `state` max 16.3 s, `events_poll` max 13.8 s, `zeros_poll` max 12.8 s |
+| **MCU slow `Poll()` passes** | **2200, worst pass 1000 ms** |
+| MCU write-lock timeouts | 0 |
+| MCU bus-refresh stalls | 0 |
+| MCU connections rejected | 0 |
+| Sampler gaps > 2 s | 1, none in the stall band |
+| Fabricated positions | 1 (`counts=-1` at 15:20:17) |
+| Board after the run | intermittently reachable, not fully wedged — recovered without a restart |
+
+**This is no longer circumstantial.** `Poll()` genuinely took up to a full
+second in a single pass, 2200 times in ten minutes, while
+`write_lock_timeouts` and `bus_stalls` both stayed at zero — direct proof
+the mutex diagnostic cannot see this failure mode, because it isn't chip
+contention. A `Poll()` pass that long, with only a fixed 1 ms yield after
+it, starves everything downstream: the Bridge RPC thread (`servo_read` and
+friends) and every client HTTP request queued at the relay, which is the
+likely explanation for this run's 83% client-side failure rate — a
+different-looking symptom (mass request failure, not sampler gaps) from the
+*same* mechanism, this time not clustering into the classic 9–13 s sampler
+signature.
+
+**Not yet known: which step inside `Poll()` costs the second** — disconnect
+detection, accept, or the per-slot bulk read (`NetworkRelay.cpp:191-203`,
+the prime suspect since it is the one step scaling with active-socket
+count). `DiagLog::dropped_total()` read 0 after the run, so the 2200 figure
+is complete, not undercounted by ring overflow.
+
+**Done, 10 August 2026 — result: dominated by probe frequency (~1600
+lock acquisitions/sec across all 6 slots), not one slow call. The fix built
+from that finding (batch step 3 into 1 lock acquisition) made client
+failures worse, not better, combined with an independently-real Python
+async/blocking fix (see Session 2 log, steps 8-11). Both reverted; root
+cause of the regression itself was not established.** A shield swap does
+not raise the 6-socket ceiling (W5500/W6100 both cap at 8 hardware sockets)
+— **decided instead: replace the 3-connections-per-operator polling model
+with one SSE stream per operator**, next session, before re-attempting any
+C++-side fix. See the Session 2 log above for the full sequence and numbers.
 
 **Also found, not yet filed as its own item:** a single truncated/malformed
 JSON body from `/api/v1/system/events` during the 1-operator run, and a
@@ -842,26 +1043,25 @@ the operator's route to it**, and it defeats the primary reason R5 exists.
 not one, and **both must exist on the backend *and* in the UI** — a tool that
 only runs from a shell is unreachable for the team who ran the test:
 
-1. **CSV over a chosen range.** The operator picks start and end. The backend
-   endpoint already takes `from` and `to`; it is the UI that hardcodes 24 hours.
-   So this is mostly a control, not a feature — but the range picker has to
-   cope with a five-day window without the operator typing epoch seconds.
-2. **The graphs, generated on request and downloadable.** Same range, the
-   matplotlib set described under R5, produced by the board and delivered to the
-   browser. **This is the part that does not exist at either layer.** Decide
-   deliberately whether rendering happens on the board (simple, but matplotlib
-   on the MPU during a live run competes with the sampler) or the endpoint
-   serves data that the client plots — and record the choice, because it is the
-   kind of decision that gets re-argued.
+1. **Export over a chosen range, as XLSX** (revised 10 August 2026 — see R5;
+   was CSV). The operator picks start and end. The backend endpoint already
+   takes `from` and `to`; it is the UI that hardcodes 24 hours. So the range
+   control is mostly unchanged — but the range picker has to cope with a
+   five-day window without the operator typing epoch seconds.
+2. **The chart set, embedded in that same workbook.** Same range. **Decided
+   10 August 2026 (R5): native Excel chart objects, not server-rendered
+   images** — avoids exactly the sampler-contention risk this entry used to
+   flag as the open question, since writing chart objects isn't rasterising
+   a plot.
 
 **Acceptance:** from the UI, the operator picks a time range spanning days and
-gets both the CSV and the graph set for exactly that range; neither navigates
-away from the control page (D18); and both are reachable from the backend alone
-for anyone working over `adb`.
+gets one XLSX file, data and charts together, for exactly that range; it does
+not navigate away from the control page (D18); the export is reachable from
+the backend alone for anyone working over `adb`.
 
 **Related:** R5 (this is its delivery path), D18 (same control, silent failure),
-T9 (a multi-day pull must not exhaust memory — stream it, as the CSV export
-already does).
+T9 (a multi-day pull must not exhaust memory — stream it, same discipline as
+the current CSV export).
 
 ---
 
@@ -1397,10 +1597,19 @@ R2. Fusing them now would leave no distinct meaning for emergency stop later.
 ### R5 — Metrics export and benchmarking output
 **Scope:** in MVP · **Not started**
 
-Pull telemetry for an arbitrary time range and render graphs (matplotlib or
-similar) for delivery. The point is that the MVP must be **benchmarkable**: the
-receiving teams need to see whether the servo actually handles what it is asked
-to handle.
+Pull telemetry for an arbitrary time range and chart it for delivery. The
+point is that the MVP must be **benchmarkable**: the receiving teams need to
+see whether the servo actually handles what it is asked to handle.
+
+**Decided, 10 August 2026 (operator + team lead), revised same day.** Export
+format is **XLSX (Excel), not CSV** — team lead's correction: a CSV cannot
+carry a chart, and the point of this item is that it must. Charts are
+**native Excel chart objects embedded in the workbook by the export
+endpoint** (e.g. `openpyxl`), not rendered images — this still avoids the
+original matplotlib/sampler-contention risk (D22's stated concern), because
+writing chart-definition objects into the workbook is not rasterising a
+plot. The data sheet is the raw form; the chart objects read from it
+directly inside the same file, so there is still one data product, not two.
 
 CSV export exists today and is the seed of this, but it is not enough on its own.
 
@@ -1417,14 +1626,16 @@ Afterwards we load what it recorded and see what happened.** That is the
 benchmark. It reframes R5 from "graphs for a handover slide" into **a forensic
 record of a run nobody watched**, and three consequences follow:
 
-- **Torque is first-class, not a nice-to-have.** It is the measurement that says
-  whether the servo actually handled what it was asked to handle — the question
-  R5 exists to answer. `torque_kgcm` is **already sampled, already stored**
-  (`sqlite_telemetry_repository.py:28`) **and already in the CSV columns**
-  (`telemetry_service.py:17`), so the data layer needs nothing. **The graphs must
-  name it explicitly**, plotted against commanded motion so load is readable
-  against what was asked, with its peaks and sustained levels called out — not
-  buried as a fourth line on a shared axis.
+- **Every field gets the same chart treatment — position, torque, temperature,
+  voltage, current.** No field is singled out over another. **Revised 10
+  August 2026** (operator): the original text elevated torque above the
+  others; corrected — the standard is "give the full picture," applied
+  uniformly, and any field gets extra numeric detail (e.g. peaks/sustained
+  figures) if it genuinely needs it to be read correctly, not because of
+  which field it is. `torque_kgcm` is already sampled, stored
+  (`sqlite_telemetry_repository.py:28`) and in the CSV columns
+  (`telemetry_service.py:17`), same as the rest — the data layer needs
+  nothing regardless of chart treatment.
 - **Nobody is watching while it runs.** Anything not recorded is lost for good.
   Before that run, confirm the sampler survives days rather than minutes (D10's
   unexplained exception, T9's growth rates, and the stand-in logger in `main.py`
@@ -1438,19 +1649,22 @@ multi-day run** — verify it plateaus rather than assume it, per T9.
 
 **Acceptance, made concrete:**
 
-- Given a start and end timestamp, produce a PNG set: position against time with
-  commanded target overlaid; **torque against time, with commanded motion
-  overlaid, plus peak and sustained figures stated in numbers**; sampler
-  interval distribution, with the 9–13 s stall band marked (that band is what
-  `tools/soak_report.py` already judges); temperature, voltage and current
-  against time; and a count of invalid readings over the window.
+- Given a start and end timestamp, the XLSX export carries what the chart
+  set needs, every field given the same treatment: position with commanded
+  target; torque with commanded motion; sampler interval (so the 9–13 s
+  stall band can be marked — that band is what `tools/soak_report.py`
+  already judges); temperature, voltage and current; and a count of invalid
+  readings over the window. Peak/sustained figures as numbers, stated for
+  any field that needs them read correctly, not reserved to one.
+- The chart set is **native Excel chart objects embedded in the same
+  workbook** — no server-side rendered images (decided above).
 - **Must work over a multi-day window**, not just a session — that is the
-  handover benchmark. Downsample for the plot if needed, but never for the
+  handover benchmark. Downsample for the chart if needed, but never for the
   stated numbers.
-- Runs on the board *or* off it against a pulled database — the graphs must not
-  require the servo to be attached, or nobody can produce them during a review.
-- One command, with the time range as arguments, documented in `README.md`.
-- The existing CSV export stays and remains the raw form; this sits on top of it.
+- Runs on the board *or* off it against a pulled database — nothing about
+  producing the chart set may require the servo to be attached.
+- The existing CSV export stays and remains the raw form; the chart is built
+  from it, not a separate artifact.
 - **Reuses `tools/soak_report.py`'s verdict logic** rather than restating it —
   one definition of "a stall", not two. See D9 on what two definitions cost.
 

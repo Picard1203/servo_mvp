@@ -17,7 +17,7 @@ from app.core.exceptions import (ActiveZeroError, DatumZeroError,
                                  InvalidReadingError, LockedError,
                                  MovingError, NotFoundError,
                                  OutOfTravelError, StepError)
-from app.routers import servo, system, telemetry, zeros
+from app.routers import servo, stream, system, telemetry, zeros
 
 
 def create_app() -> FastAPI:
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.version)
     app.include_router(servo.router)
+    app.include_router(stream.router)
     app.include_router(zeros.router)
     app.include_router(telemetry.router)
     app.include_router(system.router)

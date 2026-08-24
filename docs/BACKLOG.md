@@ -19,11 +19,12 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **2 — DONE, 8 + 10 Aug 2026** | D4 closed via SSE in Session 3 | yes |
 | **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
-| **5 — next** | **R5's UX gap table** (under R5): unreadable timestamp column, no actual day/range chart selector, over-compressed flags column, LCARS styling wanted. **Plus D10's real root cause** (a real stack trace exists now) **and Batch 4's motor isolation (R2)**, still not started. **Plus the "Not yet slotted" table** (end of the Ordering section) — ten items (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13) an audit found with no batch at all; not triaged, just surfaced so this session doesn't silently skip them the way earlier sessions did. | yes, for a real cross-app open-and-look each time a chart/layout change is made — this session's whole lesson was that "it opens in one lenient tool" is not validation |
+| **5 — next** | **R5's UX gap table** (under R5): unreadable timestamp column, no actual day/range chart selector, over-compressed flags column, LCARS styling wanted. **Plus D10's real root cause** (a real stack trace exists now) **and Batch 4's motor isolation (R2)**, still not started. | yes, for a real cross-app open-and-look each time a chart/layout change is made — this session's whole lesson was that "it opens in one lenient tool" is not validation |
+| **6 — after Session 5** | **T14** — the maintenance pass: triage the ten items an audit found with no batch at all (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13 — the "Not yet slotted" table, end of the Ordering section), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
 
-**Read `docs/BACKLOG.md` R5's entry and the "Not yet slotted" table (end of
-the Ordering section) in full before starting Session 5** — both are the
-actual punch list, this row is just the pointer to them.
+**Read `docs/BACKLOG.md` R5's entry in full before starting Session 5, and
+T14's entry in full before starting Session 6** — both are the actual punch
+lists, these rows are just pointers to them.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -927,16 +928,18 @@ recurring tax on the work. Started 8 August 2026: closed items moved to
 `docs/CLOSED.md` and Batch 1's own entries cut, taking `BACKLOG.md` from 15,223
 words to ~10,600.
 
-**Not yet done.** The remaining bloat is in entries written before this rule:
+**Not yet done.** The remaining bloat is in entries written before this rule
+(`D4` and `D22`, both previously listed here, were moved to `docs/CLOSED.md`
+whole on 23 August 2026 rather than distilled in place — relocation, not this
+item's kind of work; `D13` was already closed and moved before this table was
+last checked, and was never actually bloat in *this* file at all. Both classes
+of drift removed from this table accordingly):
 
 | | words |
 |---|---|
-| `D4` | 687 |
-| `D13` | 522 |
 | `R2` | 520 |
 | `R5`'s "use case" section | 459 |
 | `T11` | 425 |
-| `D22` | 388 |
 | `D10`, `D8`, `T10`, `D5`, `T9` | ~300 each |
 
 Also worth a pass: `docs/WORKFLOWS.md` (1,754) and `CONVENTIONS.md` (1,350).
@@ -949,6 +952,41 @@ dropped.
 **Acceptance:** no open entry states the same thing twice, and every one keeps
 its numbers, paths, decisions and honest statements of what was not tested. The
 rule itself is in `CLAUDE.md` §4.
+
+---
+
+### T14 — Triage the unslotted items; audit backlog and doc hygiene deliberately
+**Status:** open · **Severity:** medium · **Raised by:** the operator, 23 August 2026
+
+Two things this session found by accident — noticed only because the work
+happened to touch nearby text — not by any process that catches them
+reliably:
+
+1. **Ten open items had no batch assignment at all** (see the "Not yet
+   slotted" table, end of the Ordering section): D8, D23, D24, D25, D26,
+   D28, D29, D30, T12, T13.
+2. **The Closed index table** (just below Ordering) was missing four items
+   already moved whole to `docs/CLOSED.md`.
+
+Both were only caught because the operator asked directly whether the
+backlog was actually complete. **This item is that check, done once,
+deliberately, instead of by accident** — distinct from T13, which is about
+entries being too long; this is about entries (or index rows) being wrong
+or absent.
+
+**Scope:**
+1. Give each of the ten unslotted items a real batch/session, or an explicit
+   "not scheduled, because —", per the Ordering section's existing convention.
+2. Sweep every summary/index table in the docs (the Closed index, the
+   Ordering batches, `PROJECT_STATE.md`'s status blocks) for the same class
+   of drift — an item closed or moved without every place that lists it
+   being updated to match.
+
+**Acceptance:** every open item in `BACKLOG.md` has a batch or a stated
+reason it doesn't; every index table matches what is actually in the file
+it indexes.
+
+**Related:** T13 (overlaps in spirit, not in scope — see above).
 
 ---
 

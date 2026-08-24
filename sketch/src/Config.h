@@ -40,7 +40,7 @@ constexpr uint16_t kApiPort       = 8000;   // the Linux side serves here
 // Bytes per Bridge message. MUST match relay_chunk_bytes on the Python side.
 // The working relay used 256; at 128 every payload costs twice as many Bridge
 // round trips. Raise both together when you want that back.
-constexpr uint16_t kRelayChunkBytes = 128;
+constexpr uint16_t kRelayChunkBytes = 224;
 // The W5500 has 8 hardware sockets and the listener consumes one.
 constexpr uint8_t  kMaxRelaySockets = 6;
 

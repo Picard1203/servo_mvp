@@ -52,16 +52,59 @@ servo bus.
 
 `kRelayChunkBytes` here and `relay_chunk_bytes` in the backend settings are
 one number in two places. It is bytes per Bridge message: halving it doubles
-the number of Bridge round trips for identical payload. 256 is the value the
-working relay used.
+the number of Bridge round trips for identical payload.
 
-**Contested, 7 August 2026.** The operator recalls 256 *failing* at the very
-first demo. Both statements cannot be the whole truth, and nobody has the
-measurement. Treat 256 as an experiment with a recorded result, not as a
-known-good value to restore. Note also that any chunk-size measurement taken
-before rule 7 was applied is worthless: a larger chunk means a longer SPI
-transaction, so it changed the width of the race window rather than the
-throughput. See backlog D6.
+**Settled, 23 August 2026 — the 256 question is closed for good, with a cause,
+not just a result.** `256` is not a race-window casualty (rule 7 was already
+shipped when this was tested) and not a mystery — it is a hard structural
+overflow. Every Bridge RPC message, in both directions, is encoded into a
+fixed-size buffer defined by the vendored library itself:
+
+    Arduino_RPClite/src/Arduino_RPClite.h:
+      #define DECODER_BUFFER_SIZE     1024
+      #define DEFAULT_RPC_BUFFER_SIZE (DECODER_BUFFER_SIZE / 4)   // = 256
+    Arduino_RouterBridge/src/bridge.h:
+      #define BRIDGE_RPC_BUFFER_SIZE  DEFAULT_RPC_BUFFER_SIZE      // = 256
+
+That 256 bytes is the *entire* message — MsgPack framing (method name, msg_id,
+argument headers) plus payload, not payload alone. `BRIDGE_RPC_BUFFER_SIZE`
+applies to every RPC call through this library, including our own `net_tx` —
+we don't use RouterBridge's built-in `TcpClient` facade, so its exact
+`TCP_RESPONSE_HEADER_SIZE - 20` accounting (giving **236**) is precise for a
+code path we don't take, not for ours. It is still the right order of
+magnitude — our own MsgPack framing for `net_tx(slot, data)` costs a similar
+handful of bytes (method name, msg_id, slot argument, binary-payload header) —
+but treat 236 as an estimate we're comfortably under, not an exact figure for
+this call shape. A `kRelayChunkBytes` of 256 raw payload bytes, plus any framing
+on top, cannot fit in a 256-byte total buffer regardless — it was never going
+to work, at any chunk timing, on any board. That is what the operator saw at
+the first demo.
+
+**Not pursued, but the next lever if 224 is ever not enough**: `bridge.h`
+sends `notify(SET_BUF_METHOD, BRIDGE_RPC_BUFFER_SIZE)` — a `$/setMaxMsgSize`
+negotiation with the Linux-side Router, "no effect if Router is not exposing
+[it]" per the library's own comment. `DECODER_BUFFER_SIZE` (1024, of which
+`BRIDGE_RPC_BUFFER_SIZE` is a fixed 1/4) is the ceiling on any negotiated
+value. Untested whether this board's Router actually honors it — check that
+before re-deriving chunk-size math from scratch.
+
+**`kRelayChunkBytes = 224` is the validated value**, chosen with headroom under
+the ~236-byte estimated ceiling. Board-measured, 23 August 2026, full-range
+telemetry export (44,827 rows, 806,898 bytes): clean transfer, zero connection
+churn, zero dropped exports, throughput ~4.5 KB/s → ~6.7 KB/s (≈49% faster
+than 128, fewer round trips for the same payload). **Also validated under the
+exact condition that broke 256** — the 256 failure showed as churn on *other*
+connections (the SSE stream), not the export itself, so 224 was re-tested with
+2 SSE streams held open concurrently with a full export running: both streams
+continuous and undisturbed (23,184 / 23,180 bytes, zero drops) for the whole
+transfer. 256 itself, re-tested the same
+session on the same rule-7-fixed relay, reproduced instant export failures
+(0 rows served) and repeating ~3-second connect/disconnect churn — confirming
+the overflow theory directly, not just historically.
+
+Do not raise this past 230 without re-deriving the MsgPack framing overhead for
+whatever call shape is in use at the time — the 236-byte figure is exact, the
+margin is not.
 
 ## 7. Serialise access to the W5500 across threads
 

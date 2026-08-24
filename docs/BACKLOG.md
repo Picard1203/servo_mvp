@@ -21,7 +21,7 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
 | **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
 | **6 — D10 half DONE, 24 Aug 2026; R2 next, can start fresh** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** This can start in a new chat; nothing from Session 6's D10 work is a prerequisite for it. | R2: yes, for the operator-visible part |
-| **7 — after Session 6** | **T14** — the maintenance pass: triage the unslotted items ("Not yet slotted" table, end of the Ordering section — now twelve: the original ten plus **D32** and **T15**, both raised 24 August 2026 during Session 6), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
+| **7 — after Session 6** | **T14** — the maintenance pass: triage the unslotted items ("Not yet slotted" table, end of the Ordering section — now fourteen: the original ten plus **D32**, **T15**, **D33** and **D34**, all raised 24 August 2026 during Session 6), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
 
 **Read `docs/BACKLOG.md` T14's entry in full before starting Session 7** — the
 actual punch list, this row is just a pointer to it.
@@ -396,6 +396,8 @@ just surfaced so the next planning pass starts from the truth:
 | T13 | medium | Distil the remaining documents |
 | D32 | unknown | Arrow keys on Angle/Speed inputs step by an odd amount — raised 24 Aug, not yet reproduced |
 | T15 | medium | Code-level docs/comments called unprofessional and token-costly — contradicts current `CONVENTIONS.md`, needs a decision first |
+| D33 | low | Recent Activity timestamps show UTC, not local time — same class as D30, unconfirmed |
+| D34 | low | Move log rounds a 0.06 deg commanded angle to 0.1 deg — possibly D21 resurfacing elsewhere |
 
 **What is not in any batch is as important as what is:** if a batch slips, the
 cut line in `PROJECT_STATE.md` says what ships anyway.
@@ -542,6 +544,42 @@ presses. Needs a live repro with an exact press-by-press value log before
 diagnosing.
 
 **Related:** none identified yet — first pass needed.
+
+---
+
+### D33 — Recent Activity timestamps display in UTC, not local time
+**Status:** open, not yet investigated · **Severity:** low · **Raised by:**
+the operator, 24 August 2026, pending the post-R2 triage session
+
+The operator's screenshot of the Recent Activity panel showed entries several
+hours behind the actual local time. `app.js:639` (`eventTime()`) does
+`new Date(e.timestamp)` then formats with `toLocaleTimeString` — that call
+does convert UTC to the browser's local zone, but only if the source string
+carries an explicit UTC marker (`Z`/offset). If the backend serializes event
+timestamps without one, JS parses the string as already-local, so no
+conversion happens and the raw UTC value is shown as-is. This is the same
+species of defect as D30 (a UTC value read as local, there in
+`soak_report.py`), just a different location. Not confirmed — needs a check
+of what `EventService` actually serializes before concluding this is the
+cause.
+
+**Related:** D30 (same UTC/local class, different code path).
+
+---
+
+### D34 — Move Recent Activity log rounds the commanded angle to 0.1 deg
+**Status:** open, not yet investigated · **Severity:** low · **Raised by:**
+the operator, 24 August 2026, pending the post-R2 triage session
+
+The operator commanded a move to 0.06 deg (the documented minimum step, per
+`skills/uno-q-st3215/SKILL.md`) and the Recent Activity entry read "move to
+0.1 deg" — the logged/displayed value lost the actual commanded precision.
+Possibly a resurfacing of D21 (closed: the UI claimed a 0.1 deg step when
+the real step is 0.06 deg) in a different display location, or a distinct
+rounding point in how the move event gets formatted for the log. Not yet
+traced to a specific line.
+
+**Related:** D21 (closed, same 0.1-vs-0.06 discrepancy, different location).
 
 ---
 

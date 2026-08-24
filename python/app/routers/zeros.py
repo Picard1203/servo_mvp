@@ -15,7 +15,7 @@ ZeroDep = Annotated[ZeroService, Depends(get_zero_service)]
 
 
 @router.get("", response_model=list[ZeroResponse])
-async def list_zeros(zeros: ZeroDep) -> list[ZeroResponse]:
+def list_zeros(zeros: ZeroDep) -> list[ZeroResponse]:
     """Lists all zero references, newest first.
 
     Args:
@@ -31,7 +31,7 @@ async def list_zeros(zeros: ZeroDep) -> list[ZeroResponse]:
 
 
 @router.post("/capture", status_code=201, response_model=ZeroResponse)
-async def capture_zero(request: ZeroCaptureRequest,
+def capture_zero(request: ZeroCaptureRequest,
                        zeros: ZeroDep) -> ZeroResponse:
     """Captures the current position as a named zero.
 
@@ -49,7 +49,7 @@ async def capture_zero(request: ZeroCaptureRequest,
 
 
 @router.post("/{zero_id}/activate", response_model=ZeroActionResponse)
-async def activate_zero(zero_id: int, zeros: ZeroDep) -> ZeroActionResponse:
+def activate_zero(zero_id: int, zeros: ZeroDep) -> ZeroActionResponse:
     """Sets one zero as the active baseline.
 
     Args:
@@ -64,7 +64,7 @@ async def activate_zero(zero_id: int, zeros: ZeroDep) -> ZeroActionResponse:
 
 
 @router.delete("/{zero_id}", response_model=ZeroActionResponse)
-async def delete_zero(zero_id: int, zeros: ZeroDep) -> ZeroActionResponse:
+def delete_zero(zero_id: int, zeros: ZeroDep) -> ZeroActionResponse:
     """Deletes a non-active zero reference.
 
     Args:

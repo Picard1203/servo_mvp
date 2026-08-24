@@ -14,7 +14,7 @@ TelemetryDep = Annotated[TelemetryService, Depends(get_telemetry_service)]
 
 
 @router.get("/export")
-async def export_csv(telemetry: TelemetryDep,
+def export_csv(telemetry: TelemetryDep,
                      ts_from: Annotated[float, Query(alias="from")],
                      ts_to: Annotated[float, Query(alias="to")]
                      ) -> StreamingResponse:

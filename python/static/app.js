@@ -1,16 +1,13 @@
-/* Servo Control — frontend logic (revision 2).
-   Same-origin client of the FastAPI backend. Polls /state every second and
-   renders it EXACTLY as read, posts commands, refreshes zeros + events on a
-   slower cycle. */
+/* Servo Control — frontend logic (revision 3).
+   Same-origin client of the FastAPI backend. Receives live state, zeros,
+   and events through a single SSE stream (/api/v1/stream); posts commands
+   over individual HTTP requests. Replaces the three-connection polling
+   model (revision 2) to stay within the W5500's 6-socket ceiling. */
 
 "use strict";
 
 const API = "/api/v1";
-const POLL_STATE_MS = 1000;
-/* Saved positions and the activity feed change rarely, and every poll is a
-   whole TCP connection through the MCU relay. Polling them as often as the
-   live state tripled the connection rate for almost no benefit. */
-const POLL_LISTS_MS = 15000;
+
 
 /* counts per output degree, display-only (saved-position degrees).
    The backend owns all real motion math. */
@@ -59,7 +56,7 @@ const state = {
   selectedZeroId: null,
   acceleration: 50,      /* fixed sensible default; not exposed to the user */
   online: false,
-  pollFailures: 0,       /* consecutive failed polls */
+  streamFailures: 0,     /* consecutive SSE connection errors */
   readFailures: 0,       /* consecutive invalid servo readings */
   lastKnownDeg: null,    /* last position actually measured */
   lastMeasured: null,    /* last state the servo actually answered */
@@ -325,19 +322,65 @@ function flash(el) {
   setTimeout(() => el.classList.remove("flash"), 400);
 }
 
-/* ---------------- state polling + render ---------------- */
+/* ---------------- SSE stream + on-demand fetches ---------------- */
 
-async function pollState() {
-  try {
-    const s = await apiGet("/servo/state");
-    state.lastState = s;
-    state.pollFailures = 0;
-    setOnline(true);
-    renderState(s);
-  } catch (_) {
-    state.pollFailures += 1;
-    if (state.pollFailures >= FAILURES_BEFORE_ALARM) setOnline(false);
+/* The single persistent connection that replaces the three polling
+   timers. EventSource handles reconnection automatically; its retry
+   interval defaults to ~3 s which is appropriate for this relay.
+   One connection per operator instead of three cuts socket demand 3x
+   against the W5500's hard 6-socket ceiling (ADR-0009). */
+let eventSource = null;
+
+function connectStream() {
+  if (eventSource !== null) {
+    eventSource.close();
   }
+  eventSource = new EventSource(API + "/stream");
+
+  eventSource.addEventListener("state", function (msg) {
+    try {
+      const s = JSON.parse(msg.data);
+      state.lastState = s;
+      state.streamFailures = 0;
+      setOnline(true);
+      renderState(s);
+    } catch (_) { /* malformed event — next one arrives in ~1 s */ }
+  });
+
+  eventSource.addEventListener("zeros", function (msg) {
+    try {
+      state.zeros = JSON.parse(msg.data);
+      renderZeros();
+    } catch (_) { /* next push arrives in ~15 s */ }
+  });
+
+  eventSource.addEventListener("events", function (msg) {
+    try {
+      renderEvents(JSON.parse(msg.data));
+    } catch (_) { /* next push arrives in ~15 s */ }
+  });
+
+  eventSource.onopen = function () {
+    state.streamFailures = 0;
+    setOnline(true);
+  };
+
+  eventSource.onerror = function () {
+    state.streamFailures += 1;
+    if (state.streamFailures >= FAILURES_BEFORE_ALARM) {
+      setOnline(false);
+    }
+    /* EventSource reconnects automatically */
+  };
+}
+
+/* On-demand fetch — used after write commands where the operator
+   expects immediate feedback (zero list changes). The SSE stream
+   delivers regular updates; this is for the gap between a write and
+   the next scheduled push. */
+async function fetchZeros() {
+  try { state.zeros = await apiGet("/zeros"); renderZeros(); }
+  catch (_) { /* stream will deliver zeros shortly; ignore */ }
 }
 
 function setOnline(online) {
@@ -481,11 +524,6 @@ function faultName(s) {
 
 /* ---------------- zeros (saved positions) ---------------- */
 
-async function pollZeros() {
-  try { state.zeros = await apiGet("/zeros"); renderZeros(); }
-  catch (_) { /* offline handled by state poll */ }
-}
-
 function renderZeros() {
   const list = $("zeroList");
   const active = state.zeros.find((z) => z.is_active) || null;
@@ -542,22 +580,22 @@ function eventTime(e) {
     ? raw.split("T")[1] : String(raw != null ? raw : "");
 }
 
-async function pollEvents() {
-  try {
-    const data = await apiGet("/system/events?limit=50");
-    const list = $("eventList");
-    list.innerHTML = "";
-    data.events.forEach((e) => {
-      const row = document.createElement("div");
-      row.className = "ev";
-      const label = EVENT_LABELS[e.event] || e.event.split(".").pop();
-      row.innerHTML =
-        '<span class="tm">' + eventTime(e) + "</span>" +
-        '<span class="nm">' + escapeHtml(label) + "</span>" +
-        '<span class="ds">' + escapeHtml(e.message || "") + "</span>";
-      list.appendChild(row);
-    });
-  } catch (_) { /* offline handled by state poll */ }
+/* Renders the events list from data pushed by the SSE stream.
+   The data shape matches EventListResponse: { events: [...] }. */
+function renderEvents(data) {
+  const items = data.events || data;
+  const list = $("eventList");
+  list.innerHTML = "";
+  items.forEach((e) => {
+    const row = document.createElement("div");
+    row.className = "ev";
+    const label = EVENT_LABELS[e.event] || e.event.split(".").pop();
+    row.innerHTML =
+      '<span class="tm">' + eventTime(e) + "</span>" +
+      '<span class="nm">' + escapeHtml(label) + "</span>" +
+      '<span class="ds">' + escapeHtml(e.message || "") + "</span>";
+    list.appendChild(row);
+  });
 }
 
 /* ---------------- commands ---------------- */
@@ -579,12 +617,11 @@ async function doMove() {
       acceleration: state.acceleration,
     });
     /* success: no notice */
-    pollState();
   } catch (err) { sayError(err); }
 }
 async function doStop() {
   clearNotice();
-  try { await apiPost("/servo/stop"); /* success: no notice */ pollState(); }
+  try { await apiPost("/servo/stop"); /* success: no notice */ }
   catch (err) { sayError(err); }
 }
 async function toggleLock() {
@@ -593,7 +630,6 @@ async function toggleLock() {
   try {
     await apiPost("/servo/lock", { locked: !current });
     /* success: no notice */
-    pollState();
   } catch (err) { sayError(err); }
 }
 async function doCalibrate() {
@@ -609,12 +645,12 @@ async function doCalibrate() {
   try {
     await apiPost("/servo/calibrate");
     /* success: no notice */
-    pollState(); pollZeros();
+    fetchZeros();
   } catch (err) { sayError(err); }
 }
 async function doRecover() {
   clearNotice();
-  try { await apiPost("/servo/recover"); /* success: no notice */ pollState(); }
+  try { await apiPost("/servo/recover"); /* success: no notice */ }
   catch (err) { sayError(err); }
 }
 async function doSave() {
@@ -622,13 +658,13 @@ async function doSave() {
   const name = await askText("Save position",
     "Name this position so it can be recalled later.", "Save");
   if (!name) return;
-  try { await apiPost("/zeros/capture", { name: name }); /* success: no notice */ pollZeros(); }
+  try { await apiPost("/zeros/capture", { name: name }); /* success: no notice */ fetchZeros(); }
   catch (err) { sayError(err); }
 }
 async function doUse() {
   clearNotice();
   if (state.selectedZeroId == null) { say("select a position first", true); return; }
-  try { await apiPost("/zeros/" + state.selectedZeroId + "/activate"); /* success: no notice */ pollZeros(); pollState(); }
+  try { await apiPost("/zeros/" + state.selectedZeroId + "/activate"); /* success: no notice */ fetchZeros(); }
   catch (err) { sayError(err); }
 }
 async function doRemove() {
@@ -640,7 +676,7 @@ async function doRemove() {
       'Remove "' + zero.name + '" from saved positions?', "Remove");
     if (!ok) return;
   }
-  try { await apiDelete("/zeros/" + state.selectedZeroId); state.selectedZeroId = null; /* success: no notice */ pollZeros(); }
+  try { await apiDelete("/zeros/" + state.selectedZeroId); state.selectedZeroId = null; /* success: no notice */ fetchZeros(); }
   catch (err) { sayError(err); }
 }
 function doExport() {
@@ -738,10 +774,7 @@ function initUi() {
 
 function start() {
   initUi();
-  pollState(); pollZeros(); pollEvents();
-  setInterval(pollState, POLL_STATE_MS);
-  setInterval(pollZeros, POLL_LISTS_MS);
-  setInterval(pollEvents, POLL_LISTS_MS);
+  connectStream();
 }
 
 document.addEventListener("DOMContentLoaded", start);

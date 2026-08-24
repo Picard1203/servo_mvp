@@ -22,7 +22,7 @@ _START_TIME = monotonic()
 
 
 @router.get("/health", response_model=HealthResponse)
-async def get_health(settings: SettingsDep,
+def get_health(settings: SettingsDep,
                      relay: RelayDep) -> HealthResponse:
     """Returns service health including the MCU status line.
 
@@ -50,7 +50,7 @@ async def get_health(settings: SettingsDep,
 
 
 @router.get("/events", response_model=EventListResponse)
-async def get_events(events: EventDep,
+def get_events(events: EventDep,
                      limit: Annotated[int, Query(ge=1, le=200)] = 50
                      ) -> EventListResponse:
     """Returns recent structured events, newest first.

@@ -63,6 +63,8 @@ that moves capacity far more than the single spare socket does.
 **Follow-up raised — see Q9.** The on-site answer may take that session off the
 relay budget altogether, which would change this arithmetic completely.
 
+**Update, 11 August 2026 (Session 3):** Replaced polling model with one persistent SSE stream per operator (`GET /api/v1/stream`). Reduced per-operator connection footprint from 4 sockets to 2 sockets (1 SSE + 1 mover). Three concurrent operators (6 sockets total) now fit 100% within the 6-socket ceiling with 0 connection drops.
+
 ### Q3 — When the machine misbehaves on site, what do you want to be able to do? `answered`
 **Answered by the operator, 8 August 2026.**
 

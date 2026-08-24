@@ -164,9 +164,10 @@ fixes.
 **Skill:** `user-stories` (from the embedded skills set) to force acceptance
 criteria, then build the export.
 
-"Stable" is currently an adjective, not a number. R5 (time-range telemetry pull
-plus matplotlib graphs) is what turns it into one, and it is also what the
-receiving teams need to judge procurement.
+"Stable" is currently an adjective, not a number. R5 (time-range telemetry
+pull exported as XLSX with native embedded charts, no server-side
+matplotlib) is what turns it into one, and it is also what the receiving
+teams need to judge procurement.
 
 ---
 

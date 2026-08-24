@@ -77,13 +77,14 @@ class MotionService:
             self._servo.command_move(target_counts, speed_counts,
                                      acceleration)
 
+        from_deg = round(start_deg, 1) if start_deg is not None else None
         self._events.record("servo.move.accepted",
                             f"move to {target_deg:.1f} deg",
-                            {"from_deg": round(start_deg, 1),
+                            {"from_deg": from_deg,
                              "to_deg": target_deg})
         logger.info("move accepted",
                     metadata={"event": "servo.move.accepted",
-                              "from_deg": round(start_deg, 1)},
+                              "from_deg": from_deg},
                     extra={"to_deg": target_deg, "speed_dps": speed_dps,
                            "acceleration": acceleration})
 
@@ -94,7 +95,8 @@ class MotionService:
             None.
         """
         self._servo.command_stop()
-        at_deg = round(self._state.current_output_deg(), 1)
+        deg = self._state.current_output_deg()
+        at_deg = round(deg, 1) if deg is not None else None
         self._events.record("servo.stop", "stop commanded",
                             {"at_deg": at_deg})
         logger.info("stop commanded",

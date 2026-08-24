@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     version: str = "0.2.0"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
-    relay_chunk_bytes: int = 128
+    relay_chunk_bytes: int = 224
     db_path: str = "/home/arduino/servo_mvp.db"
     log_file: str = "/home/arduino/logs/app.jsonl"
     log_level: str = "INFO"

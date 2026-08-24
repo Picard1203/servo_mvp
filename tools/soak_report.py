@@ -211,6 +211,17 @@ def _tally_record(record: dict[str, Any], cutoff: str,
         })
 
 
+def _mcu_log_unavailable() -> dict[str, Any]:
+    """Findings shape for when mcu.jsonl could not be pulled (backlog D28).
+
+    Returns:
+        dict[str, Any]: Same keys as report_mcu_log, zeroed and flagged.
+    """
+    return {"available": False, "records": 0, "write_lock_timeouts": 0,
+            "rejected": 0, "dropped": 0, "bus_stalls": 0, "warnings": 0,
+            "errors": []}
+
+
 def report_mcu_log(mcu_log_path: str, since: float) -> dict[str, Any]:
     """Counts the MCU-side diagnostic events that matter (backlog D3).
 
@@ -223,6 +234,7 @@ def report_mcu_log(mcu_log_path: str, since: float) -> dict[str, Any]:
     """
     cutoff = datetime.datetime.fromtimestamp(since).isoformat()
     findings: dict[str, Any] = {
+        "available": True,
         "records": 0,
         "write_lock_timeouts": 0,
         "rejected": 0,
@@ -301,12 +313,18 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
     print(f"errors               {len(log['errors'])}")
     print(f"relay churn lines    {log['relay_churn']}")
     print()
-    print(f"MCU write-lock timeouts (D4 signature)  "
-          f"{mcu_log['write_lock_timeouts']}")
-    print(f"MCU bus-refresh stalls                  {mcu_log['bus_stalls']}")
-    print(f"MCU connections rejected                {mcu_log['rejected']}")
-    print(f"MCU warnings / errors                   "
-          f"{mcu_log['warnings']} / {len(mcu_log['errors'])}")
+    if mcu_log["available"]:
+        print(f"MCU write-lock timeouts (D4 signature)  "
+              f"{mcu_log['write_lock_timeouts']}")
+        print(f"MCU bus-refresh stalls                  "
+              f"{mcu_log['bus_stalls']}")
+        print(f"MCU connections rejected                "
+              f"{mcu_log['rejected']}")
+        print(f"MCU warnings / errors                   "
+              f"{mcu_log['warnings']} / {len(mcu_log['errors'])}")
+    else:
+        print("MCU-side log         not present on the board (backlog D28) "
+              "- write-lock/rejection counts not confirmed this run")
 
     if hours > 0.0:
         print()
@@ -317,9 +335,11 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
         print(f"log       {log_bytes / 1_048_576:.1f} MB now, "
               f"{log_bytes / 1_048_576 / hours:.2f} MB/hour "
               f"-> {log_bytes / 1_048_576 / hours * 24 * 30:.0f} MB/month")
-        print(f"mcu log   {mcu_log_bytes / 1_048_576:.1f} MB now, "
-              f"{mcu_log_bytes / 1_048_576 / hours:.2f} MB/hour "
-              f"-> {mcu_log_bytes / 1_048_576 / hours * 24 * 30:.0f} MB/month")
+        if mcu_log["available"]:
+            print(f"mcu log   {mcu_log_bytes / 1_048_576:.1f} MB now, "
+                  f"{mcu_log_bytes / 1_048_576 / hours:.2f} MB/hour "
+                  f"-> {mcu_log_bytes / 1_048_576 / hours * 24 * 30:.0f} "
+                  f"MB/month")
 
     for gap in telemetry["gaps"]:
         print(f"  gap at {gap['at']}: {gap['seconds']}s")
@@ -333,14 +353,20 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
               f"[{error['event']}]")
 
     print()
-    if (telemetry["stall_band_gaps"] == 0) and \
-            (len(telemetry["impossible_positions"]) == 0) and \
-            (len(log["errors"]) == 0) and \
-            (mcu_log["write_lock_timeouts"] == 0) and \
-            (mcu_log["bus_stalls"] == 0) and \
-            (len(mcu_log["errors"]) == 0):
+    linux_side_clean = (telemetry["stall_band_gaps"] == 0) and \
+        (len(telemetry["impossible_positions"]) == 0) and \
+        (len(log["errors"]) == 0)
+    mcu_side_clean = mcu_log["available"] and \
+        (mcu_log["write_lock_timeouts"] == 0) and \
+        (mcu_log["bus_stalls"] == 0) and \
+        (len(mcu_log["errors"]) == 0)
+    if linux_side_clean and mcu_side_clean:
         print("VERDICT: clean - no stall signature, no fabricated positions, "
               "no errors.")
+        return 0
+    if linux_side_clean and not mcu_log["available"]:
+        print("VERDICT: clean on the Linux side, but the MCU side was never "
+              "checked (D28) - do not report this as a full clean.")
         return 0
     print("VERDICT: something to look at - see the lines above.")
     return 1
@@ -375,16 +401,20 @@ def main() -> int:
     mcu_log_path = arguments.mcu_log
     if mcu_log_path is None:
         mcu_log_path = pull_from_board("mcu.jsonl", workspace)
-    if (db_path is None) or (log_path is None) or (mcu_log_path is None):
+    if (db_path is None) or (log_path is None):
         return 2
 
     since = parse_since(arguments.since)
     telemetry = report_telemetry(db_path, since)
     log = report_log(log_path, since)
-    mcu_log = report_mcu_log(mcu_log_path, since)
+    if mcu_log_path is None:
+        mcu_log = _mcu_log_unavailable()
+        mcu_log_bytes = 0
+    else:
+        mcu_log = report_mcu_log(mcu_log_path, since)
+        mcu_log_bytes = os.path.getsize(mcu_log_path)
     return print_verdict(telemetry, log, mcu_log, os.path.getsize(db_path),
-                         os.path.getsize(log_path),
-                         os.path.getsize(mcu_log_path))
+                         os.path.getsize(log_path), mcu_log_bytes)
 
 
 if __name__ == "__main__":

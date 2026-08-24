@@ -44,7 +44,7 @@ pointed at them. Pass this rule to every sub-agent you dispatch.
 5. **Baseline the numbers** before touching anything:
 
 ```bash
-cd python && pytest                      # expect 192
+cd python && pytest                      # expect 198
 cd sketch/tests/native && make           # expect 164
 python3 tools/check_bridge_contract.py   # expect "both sides agree"
 ```
@@ -63,7 +63,7 @@ order and in plain language:
    or, for a defect, what stops happening. If you cannot write this sentence, the
    item is not understood yet.
 2. **Which files change**, with paths.
-3. **What gets tested, and what is only assumed.** Say it plainly. 100% line
+3. **What gets tested, and what is only assumed.** Say it plainly. 99% line
    coverage did not prevent the six defects in `AUDIT.md`, nor D9, where the
    correct rule and its violation sat twelve lines apart in one file, both
    covered, both green.

@@ -17,15 +17,22 @@ the consequence into the item it blocks, and say who answered.
 
 ## For the operators
 
-### Q1 — What screen will you actually use? `open`
-**Blocks:** D7, and the layout half of every UI defect (D14, D15, D17).
+### Q1 — What screen will you actually use? `half answered`
+**Blocks:** D7, and the layout half of D17. **No longer blocks D15.**
 
-The mechanical/ops discussion mentioned an iPad-class size; the exact model was
-never recorded. The layout has only ever been eyeballed through devtools.
+**The touch half is answered by the operator, 8 August 2026: it is not a touch
+screen.** D15 was therefore designed for a pointer — the busy control uses
+`disabled` plus a hover-safe pulse, and `style.css` carries a note saying what
+to revisit if that ever changes. Recorded because it is the kind of assumption
+that gets silently inherited.
 
-*Needed:* the device, or failing that the viewport in pixels, and whether it is
-touch. Touch changes D15's answer — a busy control that cannot be pressed again
-is a different design with a finger than with a mouse.
+**The viewport half is still open, and D7 is still blocked on it.** The
+mechanical/ops discussion mentioned an iPad-class size; the exact model was
+never recorded, and "not touch" does not settle the pixels — a wall-mounted
+panel and a laptop are both pointer-driven and lay out nothing alike. The
+layout has still only ever been eyeballed through devtools.
+
+*Still needed:* the device, or failing that the viewport in pixels.
 
 ### Q2 — How many operators at once, really, and doing what? `answered`
 **Answered by the operator, 8 August 2026.**

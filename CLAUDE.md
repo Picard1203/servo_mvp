@@ -54,6 +54,7 @@ Read in this order. Each answers a different question.
 | 4 | `CONTEXT.md` | What do the words mean? (glossary only) |
 | 5 | `CONVENTIONS.md` | How must the code look? |
 | 6 | `docs/adr/` | Why is it built this way? |
+| 6b | `docs/CLOSED.md` | How was a closed item solved? (the record, not work) |
 | 7 | `docs/AUDIT.md` | What went wrong before? (frozen, historical) |
 | 8 | `sketch/src/RELAY_NOTES.md` | Before touching the relay. Non-negotiable. |
 
@@ -62,10 +63,20 @@ the top.** It names the current session, what is in it, and where every item
 lives — so nothing has to be rediscovered. It is the only file listing open
 items; nothing else in the repo is a to-do list.
 
-**Note on §3 below:** the Python suite needs a venv that the development machine
-does not currently have. That is known. Verify with the native checks and the
-bridge contract, and **say plainly that the suite did not run** — do not go
-hunting for the missing 192.
+**The venv lives in the working copy at `.venv/`** (gitignored). `pytest` is not
+on the system path — use it:
+
+```bash
+cd python && ../.venv/bin/python -m pytest
+```
+
+If it is ever missing, rebuild with **`--copies`**: the working copy is an sshfs
+mount of the board (§6) and the mount refuses the symlinks a normal venv wants.
+
+```bash
+python3 -m venv --copies .venv
+./.venv/bin/pip install -r python/requirements-dev.txt   # ~1 min, 50 MB
+```
 
 **Three skills drive the work** (`skills/`, installed to `~/.claude/skills/`;
 see `WORKFLOWS.md` W8):
@@ -85,15 +96,15 @@ is a defect — fix it rather than updating one copy.
 Run all three. Note the numbers.
 
 ```bash
-cd python && pytest                      # 192 tests
+cd python && ../.venv/bin/python -m pytest    # 198 tests
 cd sketch/tests/native && make           # 164 checks
 python3 tools/check_bridge_contract.py   # "both sides agree"
 ```
 
 Run them again after. **If the numbers do not match, stop and say so.**
 
-The Python suite needs `pip install -r python/requirements-dev.txt` in a venv;
-the board's own environment is provisioned by App Lab.
+The venv recipe is in §2. The board's own runtime environment is provisioned
+by App Lab and is a different thing.
 
 ---
 
@@ -102,8 +113,18 @@ the board's own environment is provisioned by App Lab.
 - **Read the written reasoning before rewriting anything.** Several bugs came
   from re-deriving solved behaviour instead of porting it.
 - **Never bundle unrelated changes into a fix.**
-- **Say plainly what was actually tested versus assumed.** 100% line coverage did
-  not prevent any of the six defects in `AUDIT.md`.
+- **Write every document distilled to its meaning.** Facts, decisions, numbers,
+  and the one line that stops a decision being re-litigated. Not narrative, not
+  emphasis, not the same point restated. These files are re-read at the start of
+  **every** session, so an inflated paragraph is paid for again each time, out of
+  the same budget as the work. A closed backlog entry is 3–6 lines. Prefer a
+  table row to a paragraph. Batch doc edits to the end of a task rather than
+  rewriting an entry three times.
+- **Say plainly what was actually tested versus assumed.** Near-total line
+  coverage did not prevent any of the six defects in `AUDIT.md` — and the
+  figure itself turned out to be 99%, quoted as 100% in seven live documents for
+  months because nothing measured it (backlog D24). Numbers nobody checks rot
+  exactly like comments nobody checks.
 - **Use the glossary's words** (`CONTEXT.md`) in commits, tests and issues —
   `timestamp` never `ts`, `count` never `tick`, `datum` never `home`.
 - **If your change contradicts an ADR, surface it** rather than silently

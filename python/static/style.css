@@ -86,6 +86,11 @@ button{font-family:inherit}
 .chip.alarm{background:var(--alarm);color:#fff}
 .track{height:12px;background:var(--panel2);border-radius:6px;margin:16px 0 0;overflow:hidden}
 .track > i{display:block;height:100%;width:0;background:var(--tangerine);border-radius:6px}
+/* Not reporting, as distinct from reporting zero. An empty track is
+   what the datum looks like, so the unknown state has to say so on its
+   own (D16). */
+.track.unknown{background:repeating-linear-gradient(135deg,
+  var(--panel2) 0 6px,var(--line) 6px 12px);opacity:.7}
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
 .m{background:var(--panel2);border-radius:12px;padding:13px 15px;min-width:0}
 .m .k{font-size:12px;letter-spacing:1.3px;color:var(--faint);margin-bottom:5px;
@@ -102,6 +107,10 @@ button{font-family:inherit}
 .fault.on{background:var(--alarm);color:#fff}
 .fault.on .s{color:#fff}
 .fault.on .okdot{display:none}
+/* Nothing was reported, which is not the same as "no fault reported".
+   A green OK dot is a claim about the hardware (D16). */
+.fault.unknown{opacity:.5}
+.fault.unknown .s{color:var(--faint)}
 #recoverwrap{margin-top:16px}
 .btn.alarmfix{background:var(--tangerine);color:var(--action-ink);width:100%}
 
@@ -159,11 +168,36 @@ button{font-family:inherit}
   border:2px solid var(--line);text-transform:uppercase;text-align:center;line-height:1.2;
   user-select:none;padding:8px;transition:background .15s ease,border-color .15s ease,
   transform .05s ease}
-.cube:hover{background:var(--tanoi)}
-.cube:active{transform:translateY(1px)}
+.cube:hover:not(:disabled){background:var(--tanoi)}
+.cube:active:not(:disabled){transform:translateY(1px)}
 .cube.locked,.cube.needcal{background:var(--warn-bg);border-color:var(--warn);
   color:var(--warn)}
 .cube.flash{animation:flash .4s ease}
+
+/* ---------- a control that is waiting for an answer ---------- */
+/* Busy is not the same as unavailable. .btn:disabled dims to .45, which
+   reads as "you cannot use this"; what the operator needs to see is
+   "this is working". The press is blocked by `disabled` on the element
+   either way - this is only about what that looks like (D15).
+   Assumes a pointer, not a finger: confirmed 8 August 2026. If that ever
+   changes, the note in app.js at bind() says what to revisit — a tap
+   leaves hover state stuck, so this styling would have to stand alone. */
+.cube:disabled{cursor:not-allowed}
+.cube:disabled:not(.busy){opacity:.45}
+/* .btn is declared border:0, so a border-colour cue is invisible on the
+   six .btn controls - Engage among them. The ring is drawn with an
+   inset box-shadow instead, which needs no border to sit on.
+ *
+ * The animation must also START bright. `animation` is one property, so
+ * .busy's rule replaces .flash's and the 400 ms press flash never plays
+ * while busy; a pulse beginning at brightness(1) therefore left the
+ * primary control looking untouched for the first half-second of a
+ * command that can run ten. Each cycle now opens at the flash value and
+ * decays, so the press reads instantly and the repeat reads as work. */
+.btn.busy,.cube.busy{opacity:1;cursor:progress;
+  box-shadow:inset 0 0 0 2px var(--tangerine);
+  animation:working 1.1s ease-out infinite}
+@keyframes working{0%{filter:brightness(1.25)}100%{filter:brightness(1)}}
 
 /* ---------- saved positions ---------- */
 .z{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:13px;

@@ -67,7 +67,32 @@ The API contract stays honest underneath it.
 - Clients must render `null` as unknown. Anything that formats it as a number is
   reintroducing the defect at the last hop.
 
+## Extended, 8 August 2026 — `valid` governs the whole snapshot
+
+The decision above was written about the **position** and implemented for the
+position alone. Too narrow: a failed read does not return a bad position inside
+a good snapshot, it returns a **zeroed struct**. `temperature_c`, `voltage_v`,
+`current_a` and `torque_kgcm` all arrived as `0.0` beside a position that
+correctly said unknown — and **0.00 V reads as a servo that has lost power**, a
+worse false statement than any position. That was backlog D16.
+
+`ServoStateResponse` and `ServoStateView` now report `null` for all four when
+the read failed, as they already did for `output_deg` and `raw_counts`.
+
+Two deliberate limits:
+
+- **The boolean flags are not covered.** `moving` and the six fault flags are
+  still `false` on a failed read, stating "not moving, no faults" about a servo
+  that said nothing. `bool | None` ripples into the CSV and every consumer, so
+  it is a separate decision — **backlog D23**, which amends this ADR again.
+- **Display pacing is still not the API's business.** The client holds the last
+  measured readings through a blip and blanks them once the read is genuinely
+  unknown, on the position's debounce. The contract stays honest every second.
+
 ## Status
 
 Accepted, 7 August 2026. Decided by the operator when the alternatives were put
 side by side. Implemented in commit `c903182`; six tests cover it.
+
+**Extended 8 August 2026** (backlog D16) to the four telemetry readings; four
+further tests. **Still open: the boolean flags — backlog D23.**

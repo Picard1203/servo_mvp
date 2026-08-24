@@ -28,7 +28,7 @@ in the name of not moving it.
 ## What this review is NOT gated on
 
 **Coverage.** Do not report a coverage number as a verdict, and do not accept one
-as evidence. This project runs 192 tests at 100% line coverage of `app/`. That
+as evidence. This project runs 198 tests at 99% line coverage of `app/`. That
 did not prevent the six defects in `AUDIT.md`, and it did not prevent D9, where
 the correct rule and its violation sat twelve lines apart in the same file — the
 correct one carrying a six-line docstring explaining precisely why a baseline of

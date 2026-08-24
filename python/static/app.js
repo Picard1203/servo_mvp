@@ -42,6 +42,15 @@ const TOAST_MS = 5000;
  * ADR-0008. A real stall lasts ten seconds and still shows plainly. */
 const FAILURES_BEFORE_ALARM = 3;
 
+/* How long a command may go unanswered before the UI says so.
+ *
+ * A servo_read can take up to the Bridge's 10 s timeout, and the only
+ * feedback used to be a 400 ms flash - so for the following nine
+ * seconds a working command looked exactly like one that did nothing,
+ * and the operator pressed again (D15). Well short of the timeout, so
+ * the notice arrives while they are still deciding whether to. */
+const SLOW_COMMAND_MS = 2500;
+
 const $ = (id) => document.getElementById(id);
 
 const state = {
@@ -53,28 +62,74 @@ const state = {
   pollFailures: 0,       /* consecutive failed polls */
   readFailures: 0,       /* consecutive invalid servo readings */
   lastKnownDeg: null,    /* last position actually measured */
+  lastMeasured: null,    /* last state the servo actually answered */
 };
 
 /* ---------------- HTTP helpers ---------------- */
 
+/* Reason code for a failure that never reached the backend at all.
+   Not a backend code - the backend cannot report that it was never
+   asked. Kept alongside them so every failure path carries a reason
+   and sayError() has one shape to handle. */
+const UNREACHABLE = "unreachable";
+
+/* Single door for every request, because the interesting failure
+   happens before there is a response to read.
+ *
+ * fetch() REJECTS when the connection itself fails - refused, dropped,
+ * or stalled. asApiError() is never reached, so err.reason was
+ * undefined and sayError() fell through to the browser's own words:
+ * "error: Failed to fetch". That is the single most likely failure in
+ * this system - the relay has six W5500 slots and refuses politely
+ * when they are spent (D13, measured at 5 refusals in 10 back-to-back
+ * requests) - and it produced the least intelligible message in the
+ * whole UI. The end users are not programmers. */
+/* `notify` says whether a slow answer is worth telling the operator
+   about. Commands: yes - they pressed something and are waiting. Polls:
+   no - they run every second in the background, and a poll that takes
+   2.5 s is the UI's problem, not theirs. Announcing those would put a
+   toast on screen nobody asked for. */
+async function request(path, init, notify) {
+  let dismissSlow = null;
+  const slow = notify ? setTimeout(() => {
+    dismissSlow = say("still working — the controller has not answered yet",
+                      false);
+  }, SLOW_COMMAND_MS) : null;
+  try {
+    let response;
+    try {
+      response = await fetch(API + path, init);
+    } catch (_) {
+      const err = new Error("the controller did not answer");
+      err.status = 0;
+      err.reason = UNREACHABLE;
+      throw err;
+    }
+    if (!response.ok) throw await asApiError(response);
+    return await response.json();
+  } finally {
+    /* clearTimeout only cancels a notice that has not appeared yet. One
+       that HAS appeared must be taken down, or the screen goes on
+       saying the controller has not answered while the servo is
+       visibly moving - and success is deliberately silent, so nothing
+       else would contradict it. */
+    if (slow !== null) clearTimeout(slow);
+    if (dismissSlow) dismissSlow();
+  }
+}
+
 async function apiGet(path) {
-  const response = await fetch(API + path);
-  if (!response.ok) throw await asApiError(response);
-  return response.json();
+  return request(path, undefined, false);
 }
 async function apiPost(path, body) {
-  const response = await fetch(API + path, {
+  return request(path, {
     method: "POST",
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!response.ok) throw await asApiError(response);
-  return response.json();
+  }, true);
 }
 async function apiDelete(path) {
-  const response = await fetch(API + path, { method: "DELETE" });
-  if (!response.ok) throw await asApiError(response);
-  return response.json();
+  return request(path, { method: "DELETE" }, true);
 }
 async function asApiError(response) {
   let detail = response.statusText, reason = "";
@@ -125,6 +180,8 @@ function toast(message, level) {
     setTimeout(() => el.remove(), 200);
   }
   close.addEventListener("click", dismiss);
+  /* handed back so a notice that has been superseded can be taken down
+     rather than left to run out its timer (the slow-command notice). */
   el.addEventListener("mouseenter", () => {
     clearTimeout(timer);
     remaining -= Date.now() - startedAt;   /* keep the real time left */
@@ -135,10 +192,12 @@ function toast(message, level) {
     el.classList.remove("paused");
     timer = setTimeout(dismiss, Math.max(400, remaining));
   });
+
+  return dismiss;
 }
 
 function say(message, isError) {
-  toast(message, isError ? "warn" : null);
+  return toast(message, isError ? "warn" : null);
 }
 function clearNotice() {
   /* a new action makes any pending notice irrelevant - dismiss them now
@@ -217,15 +276,45 @@ function askText(title, body, okLabel) {
   });
 }
 
+/* Refusals whose wording is ours: the backend's phrasing for these is
+   written for a developer, and the operator gains nothing from it. */
+const REFUSALS = {
+  locked: "refused — servo is locked",
+  moving: "refused — servo is moving",
+  active_zero: "refused — position is in use as the baseline",
+  datum_zero: "refused — the reference cannot be removed",
+  invalid_reading: "refused — the servo did not answer, so its position "
+                 + "is not known",
+  unreachable: "the controller is busy or did not answer — wait a moment "
+             + "and try again",
+};
+
+/* Refusals that carry a NUMBER derived from configuration. Their
+   message is the backend's to write, because a copy here goes stale
+   the moment the configuration is retuned - which is exactly what
+   happened: this mapped `step` to a hardcoded "multiple of 0.1°" while
+   config.py and motion_service.py enforced 0.06° (D21). The correct
+   figure travelled all the way from config.py and was discarded on
+   arrival. */
+const BACKEND_WORDED = ["step", "out_of_travel"];
+
 function sayError(err) {
-  const reasons = {
-    locked: "refused — servo is locked",
-    moving: "refused — servo is moving",
-    step: "refused — angle must be a multiple of 0.1°",
-    active_zero: "refused — position is in use as the baseline",
-    datum_zero: "refused — the reference cannot be removed",
-  };
-  say(reasons[err.reason] || ("error: " + err.message), true);
+  if (BACKEND_WORDED.indexOf(err.reason) !== -1) {
+    say("refused — " + err.message, true);
+    return;
+  }
+  const refusal = REFUSALS[err.reason];
+  if (refusal) { say(refusal, true); return; }
+  /* No reason code. Three outcomes, kept distinct because they call for
+     different things from the operator: try again, tell someone, or
+     stop. Never the browser's own text (D14). */
+  if (!err.status) {
+    say(REFUSALS[UNREACHABLE], true);
+  } else if (err.status >= 500) {
+    say("the controller reported a fault — " + err.message, true);
+  } else {
+    say("refused — " + err.message, true);
+  }
 }
 
 /* instant press feedback that reverts */
@@ -273,39 +362,70 @@ function renderState(s) {
   if (measured) {
     state.readFailures = 0;
     state.lastKnownDeg = s.output_deg;
+    state.lastMeasured = s;
   } else {
     state.readFailures += 1;
   }
   const known = measured || ((state.readFailures < FAILURES_BEFORE_ALARM)
                              && (state.lastKnownDeg !== null));
   const deg = measured ? s.output_deg : state.lastKnownDeg;
-  $("posN").textContent = known ? deg.toFixed(1) : "--";
+  $("posN").textContent = known ? deg.toFixed(1) : "—";
   const pct = known ? Math.min(100, Math.max(0, (deg / 360) * 100)) : 0;
   $("posBar").style.width = pct + "%";
+  /* An empty track is what a genuine reading at the datum looks like,
+     so collapsing the bar to 0 on an unknown read says "at zero" in
+     exactly the way the numeric readout is careful not to. The track
+     itself has to show that it is not reporting. */
+  $("posTrack").classList.toggle("unknown", !known);
 
-  $("vTemp").textContent = s.temperature_c.toFixed(1);
-  $("vVolt").textContent = s.voltage_v.toFixed(2);
-  $("vCur").textContent = s.current_a.toFixed(2);
-  $("vTorq").textContent = s.torque_kgcm.toFixed(1);
+  // Everything below this line describes the SERVO, and on a failed read
+  // the servo described nothing. temperature, voltage, current and
+  // torque arrive as 0.0 from the empty snapshot, and `moving` and the
+  // six fault flags arrive as false - so an unanswered read used to
+  // render "0.00 V" and "HOLDING" with every lamp reading OK, next to a
+  // position that honestly said unknown. It looked like a servo that had
+  // lost power while sitting still and healthy, and none of it was
+  // measured (D16).
+  //
+  // The API now sends null for the four readings. Rendering follows the
+  // position's own pacing rather than inventing a second rule: hold the
+  // last MEASURED values through a blip, blank once the reading is
+  // genuinely unknown. D9 is what two definitions of one baseline cost.
+  const shown = measured ? s : (known ? state.lastMeasured : null);
+  const num = (value, places) =>
+    (shown && value !== null && value !== undefined)
+      ? value.toFixed(places) : "—";
 
-  const anyFault = s.overload || s.overcurrent || s.overheat ||
-                   s.voltage_fault || s.sensor_fault || s.angle_fault;
+  $("vTemp").textContent = num(shown && shown.temperature_c, 1);
+  $("vVolt").textContent = num(shown && shown.voltage_v, 2);
+  $("vCur").textContent = num(shown && shown.current_a, 2);
+  $("vTorq").textContent = num(shown && shown.torque_kgcm, 1);
+
+  const anyFault = !!shown && (shown.overload || shown.overcurrent ||
+                   shown.overheat || shown.voltage_fault ||
+                   shown.sensor_fault || shown.angle_fault);
   const chip = $("movechip");
-  if (anyFault) { chip.className = "chip alarm"; chip.textContent = "FAULT"; }
-  else if (s.moving) { chip.className = "chip moving"; chip.textContent = "MOVING"; }
+  if (!shown) { chip.className = "chip"; chip.textContent = "—"; }
+  else if (anyFault) { chip.className = "chip alarm"; chip.textContent = "FAULT"; }
+  else if (shown.moving) { chip.className = "chip moving"; chip.textContent = "MOVING"; }
   else if (s.settling) { chip.className = "chip"; chip.textContent = "SETTLING"; }
   else { chip.className = "chip holding"; chip.textContent = "HOLDING"; }
 
-  setFault("fOverload", s.overload);
-  setFault("fOvercurrent", s.overcurrent);
-  setFault("fOverheat", s.overheat);
-  setFault("fVoltage", s.voltage_fault);
-  setFault("fSensor", s.sensor_fault);
-  setFault("fAngle", s.angle_fault);
-  $("mTemp").classList.toggle("alarm", s.overheat);
-  $("mVolt").classList.toggle("alarm", s.voltage_fault);
-  $("mCur").classList.toggle("alarm", s.overcurrent || s.overload);
-  $("recoverwrap").hidden = !s.overload;
+  /* null, not false: "no fault reported" and "nothing was reported" are
+     different things, and a green OK lamp is a claim either way. */
+  const flag = (name) => shown ? shown[name] : null;
+  setFault("fOverload", flag("overload"));
+  setFault("fOvercurrent", flag("overcurrent"));
+  setFault("fOverheat", flag("overheat"));
+  setFault("fVoltage", flag("voltage_fault"));
+  setFault("fSensor", flag("sensor_fault"));
+  setFault("fAngle", flag("angle_fault"));
+  $("mTemp").classList.toggle("alarm", flag("overheat") === true);
+  $("mVolt").classList.toggle("alarm", flag("voltage_fault") === true);
+  $("mCur").classList.toggle("alarm",
+                             flag("overcurrent") === true ||
+                             flag("overload") === true);
+  $("recoverwrap").hidden = flag("overload") !== true;
 
   const lock = $("lockCube");
   lock.classList.toggle("locked", s.locked);
@@ -318,8 +438,8 @@ function renderState(s) {
   const slot = $("alarmslot");
   if (anyFault) {
     slot.className = "alarmslot alarm";
-    slot.textContent = "\u25a0 ALARM \u00b7 " + faultName(s) +
-      (s.overload ? " \u2014 torque cut back" : "");
+    slot.textContent = "\u25a0 ALARM \u00b7 " + faultName(shown) +
+      (shown.overload ? " \u2014 torque cut back" : "");
   } else if (!known) {
     // Ranks above the unverified warning: an unset reference means the
     // shown angle may be wrong, a lost reading means there is no angle.
@@ -336,11 +456,16 @@ function renderState(s) {
   }
 }
 
+/* `on` is true, false, or null for "the servo did not report".
+   A green OK dot is a claim about the hardware; it must not be shown
+   for a read that never answered (D16). */
 function setFault(id, on) {
   const el = $(id);
-  el.classList.toggle("on", on);
+  el.classList.toggle("on", on === true);
+  el.classList.toggle("unknown", on === null);
   const s = el.querySelector(".s");
-  if (on) s.textContent = "TRIP";
+  if (on === true) s.textContent = "TRIP";
+  else if (on === null) s.textContent = "—";
   else s.innerHTML = '<span class="okdot"></span>OK';
 }
 
@@ -408,8 +533,7 @@ const EVENT_LABELS = {
 /* backend timestamp is an ISO string ("2026-07-22T14:22:07"); parse as Date,
    fall back to the raw time part if parsing ever fails. */
 function eventTime(e) {
-  /* backend field is `timestamp` (ISO string); tolerate legacy `timestamp` too */
-  const raw = e.timestamp != null ? e.timestamp : e.timestamp;
+  const raw = e.timestamp;
   const d = new Date(raw);
   if (!isNaN(d.getTime())) {
     return d.toLocaleTimeString("en-GB", { hour12: false });  /* 24-hour */
@@ -536,9 +660,52 @@ function nudge(inputId, delta) {
   input.value = stepped.toFixed(2);
 }
 
+/* Wires a control, and refuses a second press until the first answers.
+ *
+ * Every handler below awaits an HTTP round trip that can take up to the
+ * Bridge's 10 s timeout. The only feedback was flash()'s 400 ms blink,
+ * and success is deliberately silent - so for the remaining nine
+ * seconds a command in flight looked exactly like one that had done
+ * nothing. The operator pressed again, and the second press opened
+ * another connection, spending another of the relay's six W5500 slots.
+ * The UI's answer to slowness was feeding its cause (D15, D13).
+ *
+ * The guard lives here rather than in the handlers because this is the
+ * one place all nine are wired, so a tenth added later inherits it.
+ * `disabled` is what stops the press: it blocks the event outright
+ * rather than relying on the handler to check, and it is what the
+ * browser already renders as "not available now".
+ *
+ * The screen is a mouse-driven operator screen, confirmed 8 August
+ * 2026 - so hover affordances are safe here. Revisit if that changes:
+ * on a touch screen a tap leaves hover state stuck and the busy
+ * styling would have to stand on its own.
+ *
+ * The guard covers the WHOLE handler, dialogs included, so a second
+ * press cannot open a second confirm dialog on top of the first.
+ *
+ * The slow-command notice is NOT here. It belongs to the request, not
+ * to the press: three of these handlers open a dialog first, so a timer
+ * started on the click announced "the controller has not answered"
+ * while the operator was still reading the confirmation - and the thing
+ * that had not answered was the operator. It lives in request(). */
 function bind(id, handler) {
   const el = $(id);
-  el.addEventListener("click", () => { flash(el); handler(); });
+  let inFlight = false;
+  el.addEventListener("click", async () => {
+    if (inFlight) return;              /* the second press never leaves */
+    inFlight = true;
+    el.disabled = true;
+    el.classList.add("busy");
+    flash(el);
+    try {
+      await handler();
+    } finally {
+      el.disabled = false;
+      el.classList.remove("busy");
+      inFlight = false;
+    }
+  });
 }
 
 function initUi() {
@@ -559,7 +726,14 @@ function initUi() {
       nudge(btn.dataset.nudge, parseFloat(btn.dataset.d)));
   });
 
-  $("inAngle").addEventListener("keydown", (e) => { if (e.key === "Enter") doMove(); });
+  /* Enter in the angle field is the tenth entry point, and it must go
+     through the SAME guard as the button - it was the one path that
+     escaped it. keydown auto-repeats, so holding Enter streamed moves
+     onto the wire and spent a W5500 slot per repeat: the keyboard
+     reproduced D15 exactly while the mouse was fixed. */
+  $("inAngle").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("moveBtn").click(); }
+  });
 }
 
 function start() {

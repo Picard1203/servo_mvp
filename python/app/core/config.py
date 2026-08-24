@@ -132,8 +132,8 @@ class Settings(BaseSettings):
     fine_approach_enabled: bool = False
     fine_approach_overshoot_deg: float = 1.0
     fine_approach_timeout_seconds: float = 30.0
-    sampler_interval_seconds: float = 1.0
-    telemetry_retention_days: int = 60
+    sampler_interval_seconds: float = 0.5
+    telemetry_retention_days: int = 30
     telemetry_purge_interval_seconds: float = 3600.0
     export_max_rows: int = 50_000
 

@@ -5,7 +5,7 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/app.py": {
-    "mtime": 1787573334.0,
+    "mtime": 1787573334.7474365,
     "ast_hash": "c57c333ef19d50763f1c7e45a4551116",
     "semantic_hash": ""
   },
@@ -15,14 +15,14 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/core/config.py": {
-    "mtime": 1787573334.0,
+    "mtime": 1787573334.827439,
     "ast_hash": "c37f95177cc3f8e114203e29fae2e3f3",
     "semantic_hash": ""
   },
   "python/app/core/events.py": {
-    "mtime": 1785832116.0,
-    "ast_hash": "31240ffbc47bfda5dcfec5db14799a21",
-    "semantic_hash": "31240ffbc47bfda5dcfec5db14799a21"
+    "mtime": 1787583110.520725,
+    "ast_hash": "4ff422eae97e83e89ea0ddfae20d5a2f",
+    "semantic_hash": ""
   },
   "python/app/core/exceptions.py": {
     "mtime": 1786048312.0,
@@ -40,12 +40,12 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/db/database.py": {
-    "mtime": 1787573574.0,
+    "mtime": 1787573574.545273,
     "ast_hash": "2152c87eeeba97ff5e884943fa8f4e64",
     "semantic_hash": ""
   },
   "python/app/deps.py": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.1180243,
     "ast_hash": "49f4402028e38c8c5b25f997f3166807",
     "semantic_hash": ""
   },
@@ -55,7 +55,7 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/models/entities.py": {
-    "mtime": 1787573486.0,
+    "mtime": 1787573486.2515311,
     "ast_hash": "afc25d7a3ae4ec2973d6f34352b3333a",
     "semantic_hash": ""
   },
@@ -65,7 +65,7 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/relay/bridge_relay.py": {
-    "mtime": 1787573334.0,
+    "mtime": 1787573334.9074416,
     "ast_hash": "891d91d43a8f942dc1e02827ffeec89c",
     "semantic_hash": ""
   },
@@ -80,12 +80,12 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/repositories/abstract/servo_repository.py": {
-    "mtime": 1786136838.0,
+    "mtime": 1786136838.1068695,
     "ast_hash": "9cd9ae897aa9604321c09c56bc4d0787",
     "semantic_hash": ""
   },
   "python/app/repositories/abstract/telemetry_repository.py": {
-    "mtime": 1787573335.0,
+    "mtime": 1787573335.0234456,
     "ast_hash": "0bb8d32fdf22d512527feb089b584312",
     "semantic_hash": ""
   },
@@ -100,22 +100,22 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/repositories/concrete/bridge_servo_repository.py": {
-    "mtime": 1786136840.0,
+    "mtime": 1786136840.178882,
     "ast_hash": "af8f8412a8416516f2aeb959b90feb66",
     "semantic_hash": ""
   },
   "python/app/repositories/concrete/simulated_servo_repository.py": {
-    "mtime": 1786136850.0,
+    "mtime": 1786136850.398943,
     "ast_hash": "e691d758d91ddab343a71536f6920df7",
     "semantic_hash": ""
   },
   "python/app/repositories/concrete/sqlite_telemetry_repository.py": {
-    "mtime": 1787573574.0,
+    "mtime": 1787573574.9132795,
     "ast_hash": "6900f765431bd49f84dc3f217228ed57",
     "semantic_hash": ""
   },
   "python/app/repositories/concrete/sqlite_zero_repository.py": {
-    "mtime": 1787573574.0,
+    "mtime": 1787573574.9852808,
     "ast_hash": "4f773bdde478c97da60e2a6156bf1ebc",
     "semantic_hash": ""
   },
@@ -125,22 +125,22 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/routers/servo.py": {
-    "mtime": 1787573486.0,
+    "mtime": 1787573486.7555425,
     "ast_hash": "c02e040a6e382f6016c514b9d03e6d32",
     "semantic_hash": ""
   },
   "python/app/routers/system.py": {
-    "mtime": 1787573085.0,
+    "mtime": 1787573085.1044605,
     "ast_hash": "931e0c51317b57a26894b7b23c2e0451",
     "semantic_hash": ""
   },
   "python/app/routers/telemetry.py": {
-    "mtime": 1787573335.0,
+    "mtime": 1787573335.2074513,
     "ast_hash": "b438e55414ddbfca9adb2c1ed7ba4315",
     "semantic_hash": ""
   },
   "python/app/routers/zeros.py": {
-    "mtime": 1787573085.0,
+    "mtime": 1787573085.2604694,
     "ast_hash": "0d85d54436a067c4fbf8aa84a9b4d80f",
     "semantic_hash": ""
   },
@@ -150,7 +150,7 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/schemas/servo.py": {
-    "mtime": 1787573493.0,
+    "mtime": 1787573493.9397,
     "ast_hash": "ad103a226881e697ff74daa0823c23f7",
     "semantic_hash": ""
   },
@@ -170,27 +170,27 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/services/motion_service.py": {
-    "mtime": 1787573494.0,
-    "ast_hash": "324e0d0bc65218aef5b98226fc095d0e",
+    "mtime": 1787583429.0892944,
+    "ast_hash": "000aeb81c4cba28f2cacc9f9d058be5c",
     "semantic_hash": ""
   },
   "python/app/services/servo_state.py": {
-    "mtime": 1787573496.0,
+    "mtime": 1787573496.2597501,
     "ast_hash": "cc6d9cd485b40aab96ec72cc166b8204",
     "semantic_hash": ""
   },
   "python/app/services/telemetry_service.py": {
-    "mtime": 1787573496.0,
+    "mtime": 1787573496.9877658,
     "ast_hash": "99e03e57323d1d6d233e3889614abeb9",
     "semantic_hash": ""
   },
   "python/app/services/zero_service.py": {
-    "mtime": 1786136823.0,
+    "mtime": 1786136823.5947826,
     "ast_hash": "be380f6075bf56a4bd007b3a2ab97ea0",
     "semantic_hash": ""
   },
   "python/main.py": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.2140312,
     "ast_hash": "9fba8f29a678c36d9350a86fa1d66f19",
     "semantic_hash": ""
   },
@@ -200,8 +200,8 @@
     "semantic_hash": "12406d28aec8d097fed06de20b60cce7"
   },
   "python/static/app.js": {
-    "mtime": 1787573498.0,
-    "ast_hash": "7a9cfbb7e372255bd15486b1544aff4a",
+    "mtime": 1787583554.3674386,
+    "ast_hash": "c0dd0320b1904c40591de7149bb04c72",
     "semantic_hash": ""
   },
   "python/tests/__init__.py": {
@@ -210,7 +210,7 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/tests/conftest.py": {
-    "mtime": 1786140335.0,
+    "mtime": 1786140335.437049,
     "ast_hash": "9bac3f5fc1233f9a2d71741cc137bccf",
     "semantic_hash": ""
   },
@@ -225,7 +225,7 @@
     "semantic_hash": "f342a752931babb8f5d65dd085911d77"
   },
   "python/tests/e2e/test_operator_scenario.py": {
-    "mtime": 1787573502.0,
+    "mtime": 1787573502.0598743,
     "ast_hash": "15390fa5a9de7984894424079ba96972",
     "semantic_hash": ""
   },
@@ -245,7 +245,7 @@
     "semantic_hash": "6eeed8377b7df8c3a8041d4a4ce93058"
   },
   "python/tests/integration/test_servo_routes.py": {
-    "mtime": 1787573503.0,
+    "mtime": 1787573503.3879025,
     "ast_hash": "1ec5efaa448021e123eefc598338c9c7",
     "semantic_hash": ""
   },
@@ -255,7 +255,7 @@
     "semantic_hash": "63d10fdf5981f5fc61a1a6d1a61bc629"
   },
   "python/tests/integration/test_telemetry_routes.py": {
-    "mtime": 1787573505.0,
+    "mtime": 1787573505.7959533,
     "ast_hash": "11bc670df6526b5477f50acd2ff41707",
     "semantic_hash": ""
   },
@@ -275,7 +275,7 @@
     "semantic_hash": "cde87209ad3139e455c70811129f879f"
   },
   "python/tests/unit/test_bridge_servo_repository.py": {
-    "mtime": 1786136916.0,
+    "mtime": 1786136916.4393377,
     "ast_hash": "aa00622771aaa3afca34497d35a6b7fc",
     "semantic_hash": ""
   },
@@ -285,14 +285,14 @@
     "semantic_hash": "5eb88265457d091b3c89de34f04d6e58"
   },
   "python/tests/unit/test_database.py": {
-    "mtime": 1787573575.0,
+    "mtime": 1787573575.113283,
     "ast_hash": "724eb3467029ab18bd4fb5de2c7268cb",
     "semantic_hash": ""
   },
   "python/tests/unit/test_events.py": {
-    "mtime": 1785832022.0,
-    "ast_hash": "00a22652ba70137cd5386df60c77a5dd",
-    "semantic_hash": "00a22652ba70137cd5386df60c77a5dd"
+    "mtime": 1787583063.6199262,
+    "ast_hash": "42b29223526169022cd33872e4b4c830",
+    "semantic_hash": ""
   },
   "python/tests/unit/test_logging_setup.py": {
     "mtime": 1785832022.0,
@@ -300,12 +300,12 @@
     "semantic_hash": "5562a5ad3d0be287df6b8bb5d1f461bb"
   },
   "python/tests/unit/test_motion_service.py": {
-    "mtime": 1787573506.0,
-    "ast_hash": "fcf8f819fef3ed4b92ead9117ca33872",
+    "mtime": 1787583360.7788022,
+    "ast_hash": "150066540a067fe38e31fb67189c44e8",
     "semantic_hash": ""
   },
   "python/tests/unit/test_servo_state.py": {
-    "mtime": 1787573506.0,
+    "mtime": 1787573506.6799717,
     "ast_hash": "11f9913cb08c8685c522b2cf742b901d",
     "semantic_hash": ""
   },
@@ -330,7 +330,7 @@
     "semantic_hash": "99c535ee75fad68ec695db4383bc99fd"
   },
   "python/tests/unit/test_telemetry_service.py": {
-    "mtime": 1787573506.0,
+    "mtime": 1787573506.7479732,
     "ast_hash": "fa9e126edb309936926ec9495205e4ae",
     "semantic_hash": ""
   },
@@ -345,7 +345,7 @@
     "semantic_hash": "1bb31341a900a557375c7fa580a96f84"
   },
   "sketch/src/App.cpp": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.3180387,
     "ast_hash": "ad438d161a74ed1024559a1aa2e78cc6",
     "semantic_hash": ""
   },
@@ -355,32 +355,32 @@
     "semantic_hash": "893f752020a989e6416458db34491f63"
   },
   "sketch/src/BridgeApi.cpp": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.378043,
     "ast_hash": "eca7f915019fe3b115a1b6d3d1045f3e",
     "semantic_hash": ""
   },
   "sketch/src/BridgeApi.h": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.4220462,
     "ast_hash": "babb9843c6db6c0437aa5c8df7fe82fc",
     "semantic_hash": ""
   },
   "sketch/src/Config.h": {
-    "mtime": 1787573152.0,
+    "mtime": 1787573152.9320846,
     "ast_hash": "fad6c2ca800c4a213b8fc53eec370caf",
     "semantic_hash": ""
   },
   "sketch/src/NetworkRelay.cpp": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.7220676,
     "ast_hash": "b718c645abae34c295ca266e73cbf2c2",
     "semantic_hash": ""
   },
   "sketch/src/NetworkRelay.h": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.7620704,
     "ast_hash": "1bb4186a26405c37b2df109425bc07e6",
     "semantic_hash": ""
   },
   "sketch/src/ServoBus.cpp": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.9620848,
     "ast_hash": "ccd6656fdecf0be7a85ed6b28aed8073",
     "semantic_hash": ""
   },
@@ -390,7 +390,7 @@
     "semantic_hash": "adbfc7fc555bd721acc64bf83d7000ac"
   },
   "sketch/src/ServoController.cpp": {
-    "mtime": 1787572986.0,
+    "mtime": 1787572986.0380902,
     "ast_hash": "1dfb3129a77ed3eeaa0d31f3b6170a12",
     "semantic_hash": ""
   },
@@ -435,7 +435,7 @@
     "semantic_hash": "50a75cf2fc563a749876be1c5021f368"
   },
   "sketch/tests/native/test_pure_logic.cpp": {
-    "mtime": 1787572986.0,
+    "mtime": 1787572986.566128,
     "ast_hash": "aaf05c342f1e403dff165d05fb21fb06",
     "semantic_hash": ""
   },
@@ -445,17 +445,17 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1787573483.0,
-    "ast_hash": "9715d8d05f65398656b0eb6dd5f7ccb3",
+    "mtime": 1787579978.5470161,
+    "ast_hash": "5ddc97ab6c834e7f2c4a6fd574a6bc7a",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
-    "mtime": 1787573483.0,
+    "mtime": 1787573483.1354618,
     "ast_hash": "0e6882a754a1f3000ec42fc2f5d031da",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1787573081.0,
+    "mtime": 1787573081.152232,
     "ast_hash": "51cf8de65c13b29bbfa87e2c14e9dcb3",
     "semantic_hash": ""
   },
@@ -465,22 +465,22 @@
     "semantic_hash": "c35705e386e30676eec0befdeb6a5223"
   },
   "docs/AUDIT.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.811277,
     "ast_hash": "f85940ec655103ef6353ad7f9b019550",
     "semantic_hash": "f85940ec655103ef6353ad7f9b019550"
   },
   "docs/FILE_REGISTRY.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.8512769,
     "ast_hash": "1680558f28bf32352cabbce952f68274",
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1787573574.0,
+    "mtime": 1787573574.4612718,
     "ast_hash": "18447dfe602c583bccc290240b8ca53b",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
-    "mtime": 1786133662.0,
+    "mtime": 1786133662.0072773,
     "ast_hash": "b6ebe8ab053beea863d91a0e615a3844",
     "semantic_hash": "b6ebe8ab053beea863d91a0e615a3844"
   },
@@ -490,17 +490,17 @@
     "semantic_hash": "f133bc0d393c42ad9a82836591718be1"
   },
   "python/requirements-dev.txt": {
-    "mtime": 1787573335.0,
+    "mtime": 1787573335.3394556,
     "ast_hash": "c6b1a8c1c61dba51d48d3d13e77e3fa8",
     "semantic_hash": ""
   },
   "python/requirements.txt": {
-    "mtime": 1787496025.0,
+    "mtime": 1787496025.565884,
     "ast_hash": "c51d4469ba4d7eb82d0bce0bfdb18eb4",
     "semantic_hash": ""
   },
   "python/static/index.html": {
-    "mtime": 1787573499.0,
+    "mtime": 1787573499.4318182,
     "ast_hash": "d5dfe81817f31829f573315449dc5c82",
     "semantic_hash": ""
   },
@@ -510,1942 +510,1942 @@
     "semantic_hash": "5928f90926905aaf97760b2f369448c1"
   },
   "sketch/README.md": {
-    "mtime": 1787572891.0,
+    "mtime": 1787572891.7626193,
     "ast_hash": "905ca1ce73e0e39b7cd81bd5120741db",
     "semantic_hash": ""
   },
   "sketch/sketch.yaml": {
-    "mtime": 1786134684.0,
+    "mtime": 1786134684.8474462,
     "ast_hash": "290ce1a6ddf6938a000a6683d3c3d04a",
     "semantic_hash": ""
   },
   "sketch/src/RELAY_NOTES.md": {
-    "mtime": 1787573153.0,
+    "mtime": 1787573153.0160887,
     "ast_hash": "f1d76e222113966db7b5e3f8bdb268c2",
     "semantic_hash": ""
   },
   "CONVENTIONS.md": {
-    "mtime": 1786133661.0,
-    "ast_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a",
-    "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
+    "mtime": 1787575149.8145218,
+    "ast_hash": "189d357be0ae3a629352567be82ea023",
+    "semantic_hash": ""
   },
   "docs/BACKLOG.md": {
-    "mtime": 1787573574.0,
-    "ast_hash": "d7f80111a445c3525b698eeac97a1977",
+    "mtime": 1787584416.8444386,
+    "ast_hash": "e5a4e8c1dc63e2e103990e42a191091a",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.907277,
     "ast_hash": "f2aa35a8c86dad32a6ae51e7023c9874",
     "semantic_hash": "f2aa35a8c86dad32a6ae51e7023c9874"
   },
   "docs/adr/0002-no-frontend-framework.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.9192772,
     "ast_hash": "4b8603d4d6b10533b9afbbf343bc9ac7",
     "semantic_hash": "4b8603d4d6b10533b9afbbf343bc9ac7"
   },
   "docs/adr/0003-travel-window-plus-minus-90-output-degrees.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.931277,
     "ast_hash": "1317f08b26ee75c9d45f0e6fc92ab01d",
     "semantic_hash": "1317f08b26ee75c9d45f0e6fc92ab01d"
   },
   "docs/adr/0004-repository-abstraction-and-simulated-backend.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.9432771,
     "ast_hash": "968009c96be54bdc05b847fe68a4c0aa",
     "semantic_hash": "968009c96be54bdc05b847fe68a4c0aa"
   },
   "docs/adr/0005-air-gapped-by-default-development.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.9552772,
     "ast_hash": "5c9a46f290dd188ff9baa6f1de5cafcf",
     "semantic_hash": "5c9a46f290dd188ff9baa6f1de5cafcf"
   },
   "docs/adr/0006-csv-bridge-payloads.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.9672773,
     "ast_hash": "5c83780edec23cdfc854c9a94bbd1d0b",
     "semantic_hash": "5c83780edec23cdfc854c9a94bbd1d0b"
   },
   "docs/adr/0007-moves-are-permitted-while-position-is-unverified.md": {
-    "mtime": 1786133661.0,
+    "mtime": 1786133661.9792774,
     "ast_hash": "bea0d98de4277553515e44516298ba3c",
     "semantic_hash": "bea0d98de4277553515e44516298ba3c"
   },
   "docs/adr/README.md": {
-    "mtime": 1786139543.0,
+    "mtime": 1786139543.3851886,
     "ast_hash": "e43d2629bf6068f36fb0a2b43ecf2183",
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1787573081.0,
+    "mtime": 1787573081.7002637,
     "ast_hash": "6c533bce9530cdf5c8f98c8040f7ec9e",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.eslintrc.js": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.315286,
     "ast_hash": "9850a9f93ddbde609428c55d413df473",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.prettierrc.json": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.4992864,
     "ast_hash": "5c0348fa0c35ecfdfe053c4abdfdcef6",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/bridge/arduino-agent-bridge.js": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.683287,
     "ast_hash": "63cb9dac3f034f6afd84ae1c2e67f68d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/package.json": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.0352876,
     "ast_hash": "e2623cf133cd55f61bd138b66062eabd",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/browser/arduino-mcp-frontend-module.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.0712879,
     "ast_hash": "33166ea42b609a2a2f98e5792fc68b54",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/browser/mcp-frontend-contribution.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.087288,
     "ast_hash": "65938606b2546a1d73efd1de50c1c96d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/browser/mcp-preferences.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.103288,
     "ast_hash": "4ff5d90c1cc728b8bd2d5510987497ad",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/common/mcp-instructions.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.1272879,
     "ast_hash": "f08a8f784a1734d2b7dba61b697e55fb",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/common/mcp-prompts.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.143288,
     "ast_hash": "f604782c8c648769fc80a224d8e47658",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/common/mcp-service.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.155288,
     "ast_hash": "a728ed1785cc67313e5d239cf84835fe",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/common/mcp-tool-router.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.207288,
     "ast_hash": "daa6fd7855151bc0091e5a6f8a186937",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/common/mcp-tools.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.2232883,
     "ast_hash": "7880f4751fc6bc0e4d66745c286aa28e",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/common/mcp-types.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.2352881,
     "ast_hash": "1931eb37bc7ea6cc24f08c665aaa23be",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/arduino-mcp-backend-module.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.2552884,
     "ast_hash": "439fe295d80c5ceb5d98e107eadd43c2",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/mcp-arduino-services.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.2712884,
     "ast_hash": "d061dd78a209ebefd047d97e009bc69a",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/mcp-contribution.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.2832882,
     "ast_hash": "b949bdd384c17d9c191a1f4b58f1bb63",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/mcp-logger.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.2952883,
     "ast_hash": "0a90b36039120c081a87a20041694cb3",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/mcp-serial-manager.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.3152883,
     "ast_hash": "c14fbbf1b9ca7ebdd24c6ed519562605",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/mcp-server.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.3512886,
     "ast_hash": "a8a7a9cc430708cf2e7bc5cc61c952b3",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/src/node/mcp-service-impl.ts": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.4072886,
     "ast_hash": "1cc54a4f2bd755daae9183eecc2a0d4d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/test/manual/smoke-test.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.4432888,
     "ast_hash": "ad1102a0dc6ea0a5fcaab78643b5f50d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/tsconfig.json": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.455289,
     "ast_hash": "d4c84fce7819de9de533147ecc61ba71",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/lerna.json": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.4672887,
     "ast_hash": "5d01d0d8cc91da856aae3ed0cf46fc37",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/package.json": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.4832888,
     "ast_hash": "294259f42ad5de0efb42ce392b0e264d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/bundle-agent-examples.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.507289,
     "ast_hash": "9f448d2ae47e64cbe01baba1a33e7c62",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/i18n/transifex-pull.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.531289,
     "ast_hash": "a73307c723cc82fbbef8cc37a85989aa",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/i18n/transifex-push.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.543289,
     "ast_hash": "e0ef4f5630c863541f1c0ed5b910deb5",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/i18n/transifex.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.559289,
     "ast_hash": "f0c33d41c27c040047adbb59b23c67d2",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/merge-channel-files.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.571289,
     "ast_hash": "2d27297b5e2d4a43d6f4f059e6683e04",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/package.sh": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.5832891,
     "ast_hash": "5f31439c86bf7fe9c4d754a431c16b00",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/prepare-build-shims.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.595289,
     "ast_hash": "776d0f78fbd1f52fad62c22a132a0699",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/sort-dependencies": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.6112893,
     "ast_hash": "4226063cda8a2b3a288f42f9e2a5d1aa",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/themes/theme-generator.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.6312892,
     "ast_hash": "9d1e7a907de3ab096945c53c28de95eb",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/themes/theme-tokens-pull.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.643289,
     "ast_hash": "d55fc5a579948fb5950972af628c7391",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/scripts/update-version.js": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.6552894,
     "ast_hash": "b59afc5441d904e029603a54f5e3d7dd",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/.claude/settings.json": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.9832902,
     "ast_hash": "1182a7c9d9ce5ce63336be2a568d65a4",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/.claude-plugin/marketplace.json": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.0152926,
     "ast_hash": "67454c4ac62c687e17430dddf492545c",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/.claude-plugin/plugin.json": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.031293,
     "ast_hash": "a0c5bd196c2a02c58e5f7b4663695477",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/scripts/detect-board.sh": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.1592932,
     "ast_hash": "c264ce57b48e82c5b742a0f8e3a9b2f8",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/scripts/ensure-core.sh": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.1752932,
     "ast_hash": "6a0bc4e089e111554d6a4ac6e2590b8f",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/scripts/list-boards.sh": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.187293,
     "ast_hash": "6c802d093f441e9e4a4034d1cc28280a",
     "semantic_hash": ""
   },
   "skills/superpowers/.agents/plugins/marketplace.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.151298,
     "ast_hash": "8b615c64a36f4a57fc94b4c22260a0d6",
     "semantic_hash": ""
   },
   "skills/superpowers/.claude-plugin/marketplace.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.171298,
     "ast_hash": "3f92f7627fdf4a3e1e3ea36848813c7f",
     "semantic_hash": ""
   },
   "skills/superpowers/.claude-plugin/plugin.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.187298,
     "ast_hash": "76786b99a10153702fd08eddc5adc7bc",
     "semantic_hash": ""
   },
   "skills/superpowers/.codex-plugin/plugin.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.203298,
     "ast_hash": "8e5222551d6f154f5414d2be011e3783",
     "semantic_hash": ""
   },
   "skills/superpowers/.cursor-plugin/plugin.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.2272983,
     "ast_hash": "08525b1d95bf19cb43aa5cb2d5cdada8",
     "semantic_hash": ""
   },
   "skills/superpowers/.kimi-plugin/plugin.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.3672986,
     "ast_hash": "ea091364deb732171264b6b5338d964b",
     "semantic_hash": ""
   },
   "skills/superpowers/.opencode/plugins/superpowers.js": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.4152987,
     "ast_hash": "70aae1bc363a4624aac6c4d4c1bfdde5",
     "semantic_hash": ""
   },
   "skills/superpowers/.pi/extensions/superpowers.ts": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.4472988,
     "ast_hash": "582030f6c4d712301c7e59ef58d05ba6",
     "semantic_hash": ""
   },
   "skills/superpowers/.version-bump.json": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.4672987,
     "ast_hash": "756442d86336b02650ba3e815ed54029",
     "semantic_hash": ""
   },
   "skills/superpowers/gemini-extension.json": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.759302,
     "ast_hash": "e8cdc84b456694a26820293f22346e6d",
     "semantic_hash": ""
   },
   "skills/superpowers/hooks/hooks-cursor.json": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.7793021,
     "ast_hash": "ad3db7a506ea39ec2ba4796d8587e01b",
     "semantic_hash": ""
   },
   "skills/superpowers/hooks/hooks.json": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.7953022,
     "ast_hash": "1124533950edfebb5466c31a8e5a887d",
     "semantic_hash": ""
   },
   "skills/superpowers/hooks/session-start": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.819302,
     "ast_hash": "e8ab5edc9285a6cde5bc5fb44fb79126",
     "semantic_hash": ""
   },
   "skills/superpowers/package.json": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.8313022,
     "ast_hash": "61e7c71037d7dbd4f6ca67ec0c1cde0e",
     "semantic_hash": ""
   },
   "skills/superpowers/scripts/bump-version.sh": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.8553023,
     "ast_hash": "617116554a324ae2e70b1754c223dad3",
     "semantic_hash": ""
   },
   "skills/superpowers/scripts/lint-shell.sh": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.8673024,
     "ast_hash": "6c6a767174d556af7c22a4985c0cfbb6",
     "semantic_hash": ""
   },
   "skills/superpowers/scripts/package-codex-plugin.sh": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.8833025,
     "ast_hash": "60f1fd97c5096161fa3c087896b5bcf5",
     "semantic_hash": ""
   },
   "skills/superpowers/scripts/sync-to-codex-plugin.sh": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.8953023,
     "ast_hash": "132f81fe7a204e0f03441a7fe91930c6",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/scripts/helper.js": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.9753027,
     "ast_hash": "09675b2c59e99fda34683b4d1da5a447",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/scripts/server.cjs": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.9953027,
     "ast_hash": "8a3f2a627f887d08a3514a03133a2eb4",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/scripts/start-server.sh": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.0113027,
     "ast_hash": "99b51415f11ae9efe2a1936e8fdf5c91",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/scripts/stop-server.sh": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.0233028,
     "ast_hash": "d7910763449edd43eed6da82c195ceb6",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/scripts/review-package": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.563304,
     "ast_hash": "7cd6b337abc0589ca277b964ee7b8480",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/scripts/sdd-workspace": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.5793042,
     "ast_hash": "a9c672c398afd341ffadd720d3b1814f",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/scripts/task-brief": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.591304,
     "ast_hash": "1010d3602ce59a8461801e42838e05ea",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/condition-based-waiting-example.ts": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.6633043,
     "ast_hash": "8e502a8c1e9c7de15967202615d241d5",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/find-polluter.sh": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7033043,
     "ast_hash": "6bc3c264a76bd77f191f9a6226805b98",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-skills/render-graphs.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.0993054,
     "ast_hash": "e9d8be9caa34d327cac6f746f947cee0",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/antigravity/run-tests.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.1473055,
     "ast_hash": "6287cf3274c7ea70363677055eccb10f",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/antigravity/test-antigravity-tools.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.1593056,
     "ast_hash": "218452c81707658b5bc8f3989cc0e404",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/auth.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.1833055,
     "ast_hash": "e60c5220c305cbaac710d7b4ebf0771d",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/branding.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.1953056,
     "ast_hash": "e678d886d81474defb9b5c289eb17b3f",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/browser-launcher.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.2073057,
     "ast_hash": "3ff90e5d4f67c881cf16b40a7b872d0c",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/helper.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.2193055,
     "ast_hash": "e9cca2aedf005acc6220a009778e18a0",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/lifecycle.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.2393057,
     "ast_hash": "0cd8fa9a936d54ea0e32e946f2eef092",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/package.json": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.2593057,
     "ast_hash": "a340945b5fe8e2f6e9d8e9f6db96bc18",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/server.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.2793057,
     "ast_hash": "1e57440d581bdceb82b47c64b2c8949c",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/start-server.test.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.2913058,
     "ast_hash": "3e6c8fa6e1b3fc7c9aaf4f937593e70f",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/stop-server.test.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.3073058,
     "ast_hash": "c0ea3e5d64721893c30ec624934e21ee",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/windows-lifecycle.test.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.319306,
     "ast_hash": "956450f9f3238caef9eb9765e6bcc5e0",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/brainstorm-server/ws-protocol.test.js": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.335306,
     "ast_hash": "545617db5b9e09a1dc23b41fe32e5a42",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/analyze-token-usage.py": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.371306,
     "ast_hash": "59483504d46710f0e2df0683c9b3367c",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/run-skill-tests.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.3873062,
     "ast_hash": "fa9b221fd85e161a652d36d61671f8e5",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/test-helpers.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.399306,
     "ast_hash": "b95655b3001248632577cab13835b230",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/test-sdd-workspace.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.4113061,
     "ast_hash": "328900610db35a97397255e0b71a88bb",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/test-subagent-driven-development-integration.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.423306,
     "ast_hash": "7906274caf849016139498d81885acc9",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/test-subagent-driven-development.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.4393063,
     "ast_hash": "1549fb7bcda19507311e841adb7ab33e",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/test-worktree-native-preference.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.451306,
     "ast_hash": "835f0f40d8add2dc840b4b2069199d95",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/test-worktree-path-policy.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.4673064,
     "ast_hash": "f4a93b5c32e57dac497a019b5709e196",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/codex-plugin-sync/test-sync-to-codex-plugin.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.4913063,
     "ast_hash": "99e59917f6a7db10c944977a8d3afc77",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/codex/test-marketplace-manifest.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.5113063,
     "ast_hash": "eef3197de95ff0154ef3b7251839cdaf",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/codex/test-package-codex-plugin.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.5273063,
     "ast_hash": "feac90f9454f816878c2985d3c6ddb73",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/run-all.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9793074,
     "ast_hash": "5ee76ad3aeda3d9dad9bda64985fa432",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/run-extended-multiturn-test.sh": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9913075,
     "ast_hash": "1648b73af912b0e20248f20160ca9597",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/run-haiku-test.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.0033076,
     "ast_hash": "a8774ea108dcd07d1bde56a565e52db5",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/run-multiturn-test.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.0153077,
     "ast_hash": "606a5bb5dc6d8f7df8b86bd2b6cb0ff6",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/run-test.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.0273075,
     "ast_hash": "aea7b1f15dbd79194497e555f003ee05",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/hooks/test-session-start.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.0553076,
     "ast_hash": "f531a3323b0e8c8915c32b5c64ff7993",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/kimi/run-tests.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.0753076,
     "ast_hash": "a53ef82cbd10ac2d20b84bd5a98dc3b9",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/kimi/test-plugin-manifest.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.0913079,
     "ast_hash": "67641e3137400aa14163410cb57505b6",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/run-tests.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.1153078,
     "ast_hash": "e0b0c2a3d12dfc844ce0a462ae590877",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/setup.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.127308,
     "ast_hash": "d4feb648cf014dfd3d807e0f1dff2b95",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/test-bootstrap-caching.mjs": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.143308,
     "ast_hash": "5cdb9ad803473a69a3136b2ab604a6f5",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/test-bootstrap-caching.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.159308,
     "ast_hash": "68b0c4e05c445338e43beab5109afc43",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/test-plugin-loading.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.175308,
     "ast_hash": "183b7ffa2f6418bfc930c480b4745c09",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/test-priority.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.187308,
     "ast_hash": "a5de71e46b2d599641ed258595d74ca3",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/opencode/test-tools.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.199308,
     "ast_hash": "0941a8dc852e7a39d62f7b5e2a8c76a2",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/pi/test-pi-extension.mjs": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.223308,
     "ast_hash": "45d17ee353c9ec6077be7a19ea65afd4",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/shell-lint/test-lint-shell.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.2473083,
     "ast_hash": "6a73c5dee4870fc3eaff974ba0d18607",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/systematic-debugging/test-find-polluter.sh": {
-    "mtime": 1786133674.0,
+    "mtime": 1786133674.2713082,
     "ast_hash": "36574c8478ff6d52682a859fb0a8513e",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/ISSUE_TEMPLATE/bug-report.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.355286,
     "ast_hash": "5c6f8536be4fe3d5904737a5d75a0dfd",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/ISSUE_TEMPLATE/config.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.371286,
     "ast_hash": "222c674820cafb347e5ce75dc36eaf8a",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/ISSUE_TEMPLATE/feature-request.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.383286,
     "ast_hash": "ddca4734e9ca53f985c1a8e4e2f7a020",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/PULL_REQUEST_TEMPLATE.md": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.395286,
     "ast_hash": "a45c649eb129e7e2744500a8467a38af",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/dependabot.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.4072862,
     "ast_hash": "f967ae0272f3f27e7d20eff50a73bf7d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/label-configuration-files/labels.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.4272861,
     "ast_hash": "de9b66e6aff40835497cd4784e1fd93b",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/workflows/check-mcp-extension.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.4472861,
     "ast_hash": "40030c9c182ee61f3aba25a78b2c63df",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.github/workflows/release.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.4672863,
     "ast_hash": "17ee81313392d94e56ceb4868e260d04",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.yarnrc.yml": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.5392864,
     "ast_hash": "59c80d1857cbce1ec413c62bdf5210e6",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/BUILDING.md": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.5512865,
     "ast_hash": "dbd20292c40ee6cbed668be6313e823e",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/CLAUDE.md": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.5632865,
     "ast_hash": "8b056b5b662ce8459590a2569520ac6b",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/LICENSE.txt": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.5832865,
     "ast_hash": "eb1e647870add0502f8f010b19de32af",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/README.md": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.6192865,
     "ast_hash": "df04841725eca0dfd65c6297f2d0d33e",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/README.md": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.6432867,
     "ast_hash": "7299030014f86b51a8618dabde501dbe",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/arduino-mcp-extension/bridge/README.md": {
-    "mtime": 1786133665.0,
+    "mtime": 1786133665.6672869,
     "ast_hash": "5970e6923a45336ab58612e40ae75d96",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/skills/arduino-agent/SKILL.md": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.6872895,
     "ast_hash": "9e20709b263bd0dbd098f7906caf17c8",
     "semantic_hash": ""
   },
   "skills/README.md": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.95129,
     "ast_hash": "f0b024a00e6bf5304fe07191103baf42",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/CLAUDE.md": {
-    "mtime": 1786133666.0,
+    "mtime": 1786133666.99929,
     "ast_hash": "82efb97a359f5c7290bf2513d14686be",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/domain-modeling/ADR-FORMAT.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.319291,
     "ast_hash": "bb327bab674f400796f64b6e2ef5850c",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/domain-modeling/CONTEXT-FORMAT.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.335291,
     "ast_hash": "c2f41ffc931955b2b8d01322273d75fa",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/domain-modeling/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.347291,
     "ast_hash": "ef92f0dcd9f2007e71a319a3af54d2b1",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/domain-modeling/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.363291,
     "ast_hash": "e68374ca79182d08c013ce592a4b429c",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.4032912,
     "ast_hash": "bef80a2eecb6efb4e3763afc3778a1ac",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/add-watch.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.4632914,
     "ast_hash": "d59d027fe449f06aa03905a01184e779",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/exports.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.4792914,
     "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/extraction-spec.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.4912913,
     "ast_hash": "42fef56a01698118f7fd722acdadea34",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/github-and-merge.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.5072913,
     "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/hooks.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.5192914,
     "ast_hash": "3f545db6ce646650bb9de588f5512a27",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/query.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.5352914,
     "ast_hash": "3c46f8ad006874260614ed8657d02307",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/transcribe.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.5472915,
     "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/graphify/references/update.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.5632915,
     "ast_hash": "9378bd03d56baaf78bd738ab3848f142",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/grill-with-docs/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.5912917,
     "ast_hash": "7c5095d1b2c2ed9483df63c4622d05ea",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/grill-with-docs/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.6152916,
     "ast_hash": "d50e6a6a53801a48192dde963945affc",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/grilling/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.6392918,
     "ast_hash": "9f7179e83f79d9a62d6ee9c250e46592",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/grilling/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.6632917,
     "ast_hash": "d419e97c73f1073f678e284cfdd904dc",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/improve-codebase-architecture/HTML-REPORT.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.6872919,
     "ast_hash": "751df2fdf436e9539123d6ebc70c1e86",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/improve-codebase-architecture/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.7072918,
     "ast_hash": "1e90da772a72db852cc314a1e0dd1e36",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/improve-codebase-architecture/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.731292,
     "ast_hash": "e73ee28ebe885ee90bec6f34554efdd1",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.7592921,
     "ast_hash": "a02e4473306cafa51411da7fea1cfa26",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.779292,
     "ast_hash": "a9d2c63bccc70831e36cc011557a6b38",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/domain.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.7952921,
     "ast_hash": "35089ed6a70a657c91fd100ade31b642",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/issue-tracker-github.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.8112922,
     "ast_hash": "bcc55d5bcb9418d73ca3cefc2af059d7",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/issue-tracker-gitlab.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.8232923,
     "ast_hash": "d0e61d524f7958689a8d6d7206c882b4",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/issue-tracker-local.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.8352923,
     "ast_hash": "8eef3dfb0cab4bf7e9e122ccad837f63",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/setup-matt-pocock-skills/triage-labels.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.8472922,
     "ast_hash": "22add54cb98451c55b20e6b7992d4a85",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/tdd/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.8712924,
     "ast_hash": "9987d8c8e3d6ccba08334d81622d8e3c",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/tdd/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.8952923,
     "ast_hash": "e37e499fa0b017cde536bacb0ebaae67",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/tdd/mocking.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.9152925,
     "ast_hash": "c5505e8da8f516c7dacebd01c58a4c2c",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/tdd/tests.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.9272926,
     "ast_hash": "0a462499661825df11a0852c42382f10",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/to-tickets/SKILL.md": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.9512925,
     "ast_hash": "17129aa76a67e96f192aeb8446cb71dd",
     "semantic_hash": ""
   },
   "skills/_global-claude-skills/to-tickets/agents/openai.yaml": {
-    "mtime": 1786133667.0,
+    "mtime": 1786133667.9832926,
     "ast_hash": "6c4d19c426617a41441e84aacf2786d6",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/README.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.0592928,
     "ast_hash": "74f329febe0f0df0ed8e3bb91d941d1f",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/commands/arduino-boards.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.079293,
     "ast_hash": "164412dda4af672da35ff60668f6d87d",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/commands/arduino-build.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.0952928,
     "ast_hash": "32de231fe8e5fa8129109c5044aaaf36",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/commands/arduino-libs.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.107293,
     "ast_hash": "b003b4cfd226bb778a1fd64d4c577770",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/commands/arduino-new.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.123293,
     "ast_hash": "4c0858fca158c7f4b8e74653fe6d8943",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/commands/arduino-upload.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.135293,
     "ast_hash": "3c4c9592a31906ecbc36ed4886b82d5c",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/skills/arduino-development/SKILL.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.219293,
     "ast_hash": "c779a1ba5dd8b0ed540f7dea863d1d36",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/skills/arduino-development/references/board-platforms.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.2432933,
     "ast_hash": "4a0ab6336b96d4a39a7bb40b4a163905",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/skills/arduino-development/references/project-patterns.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.2552934,
     "ast_hash": "c2b4ad90a33106d95af4ebe787616ef5",
     "semantic_hash": ""
   },
   "skills/arduino-cli-claude-plugin/skills/arduino-development/references/troubleshooting.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.2712934,
     "ast_hash": "c92a1e59bb4aa8476512e5880471933a",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/README.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.6272943,
     "ast_hash": "de532ef99640d660a7d02eb42b6f2bbb",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/config.template.yaml": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.6392944,
     "ast_hash": "39a32a4163b7cc385818f88b43b02174",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/requirements.txt": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.6472943,
     "ast_hash": "7cdad7423549f44f0b1633e1eb2de72f",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/arduino-framework.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.6672945,
     "ast_hash": "50a387a884ca55385d7dbfdba2399c25",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/bmp180.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.6832943,
     "ast_hash": "4e16bb1e70bab10e77ece9a17c715275",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/dht11.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.6952944,
     "ast_hash": "f81088f94b4ca936808bf8ad811d1096",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/ds1307.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7032945,
     "ast_hash": "8d79f6073477884415148a48dc27f40f",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/ds18b20.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7152946,
     "ast_hash": "19b25c3641a77b73def7051059d46bbf",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/esp-idf-framework.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7312944,
     "ast_hash": "57aa97f003bd82ca5c3f479ce1aa13bc",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/fingerprint-sensor.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7432945,
     "ast_hash": "8a569b2cc3b68a23c24450ddbdcbdb22",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/ina219.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7552946,
     "ast_hash": "3df98722e21c43547941a46c9dccd114",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/joystick.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7672946,
     "ast_hash": "c3ca9ff1045ebfb13c9166ac475b1689",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/lcd1602-hd44780.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7792945,
     "ast_hash": "d7ded22fcaa51915b8a7d9d46e59b404",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/line-follower-sensor-3ch.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.7912948,
     "ast_hash": "79ff48fe0082cbf4092d264019c1b7dd",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/ltr390.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.8032947,
     "ast_hash": "11fb731576ab5b9ef9430819146b3b04",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/max30101-max32664.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.8152947,
     "ast_hash": "89484a5cfadf1e072d7cd05fe2253119",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/microsd.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.8272948,
     "ast_hash": "9b52930a482367d1dde8c99dbd0a23dc",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/mpu6050.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.839295,
     "ast_hash": "2e23f537a9b91d697229ac319a7510e8",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/mq2.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.8512948,
     "ast_hash": "a7c92d3b975cb775022e208b0d9c044b",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/pa1616s.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.8672948,
     "ast_hash": "ad209bfffb1aabb8a0dac98d6579c16b",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/photoresistor-sensor.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.8792949,
     "ast_hash": "30907a001035527234c86c1c1a4f3b16",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/pmsa003i.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.891295,
     "ast_hash": "48c09c2220a6fccd488c5cd7de492001",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/pn532.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.9032948,
     "ast_hash": "8b1e32a770c66f11bb4e65de38365b04",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/rotary-encoder.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.915295,
     "ast_hash": "662594e44646047556b3a267ea81a25c",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/sg90.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.927295,
     "ast_hash": "35d4efcd70502b395a05a7d26b70f59a",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/sgp40.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.939295,
     "ast_hash": "ee0fc29538fb1dd2409456d7fdba030c",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/sound-sensor.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.9472952,
     "ast_hash": "c18c5f6ae531175db7e0c951a07bbda5",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/tactile-switch.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.959295,
     "ast_hash": "e1229d24ce0171be881eee8ab60d4ce4",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/tb6612.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.975295,
     "ast_hash": "d7f227166aa15ba6031c79ae3b7f2e99",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/ultrasonic-distance-sensor.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.9872952,
     "ast_hash": "0bf468e3bd6e64af6d5f5269f4213558",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/vl53l0x.md": {
-    "mtime": 1786133668.0,
+    "mtime": 1786133668.9992952,
     "ast_hash": "d63edb9afc01fe2081e728d5bbce7670",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/ws2812b.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.0112953,
     "ast_hash": "5f554e7ad682dd53927833003aacc3e6",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-human-expert/zephyr-framework.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.0232952,
     "ast_hash": "f7f908d3c377be725a2c553497416f75",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/README.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.0472953,
     "ast_hash": "c8cf8617456f208529e1e2817539f392",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/adc-reading-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.0672953,
     "ast_hash": "2cc4e76147805bce070ebbdcb3e8b0b1",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/ds1307-rtc.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.0792954,
     "ast_hash": "b3da1d79fa4ad7966cad9b5d2f5c5580",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/fingerprint-sensor-uart.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.0952954,
     "ast_hash": "0f0ba01cf53c24c55e651386c2008b3f",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/gpio-and-timers-nrf52840-zephyr.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.1112955,
     "ast_hash": "76a0ce7f0a556f9de611aab26e71aa27",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/gpio-interrupts-atmega2560-arduino.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.1232955,
     "ast_hash": "823671c07ccea9eaa1a78e8fd12eeb7c",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/gpio-interrupts-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.1392956,
     "ast_hash": "80a9f3feb6089386360c705c235cecbb",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/gps-nmea-uart.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.1592956,
     "ast_hash": "c8e71beb4256ca367d9608b168f6c090",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/hardware-timers-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.2192957,
     "ast_hash": "80c41f6e40cba4bb332e546225c66ff2",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/i2c-communication-atmega2560-arduino.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.2312958,
     "ast_hash": "c4a4d6d033e10543b39f92ed1b046836",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/i2c-communication-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.2472959,
     "ast_hash": "1813b1677e155c9b854c4d58013e30fd",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/i2c-communication-nrf52840-zephyr.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.263296,
     "ast_hash": "632b3909f9edd3ac8f7e625ad34e88d7",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/ina219-power-sensor.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.275296,
     "ast_hash": "32dca1b8b5f2a24ac614741ab544645b",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/lcd1602-i2c.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.2872958,
     "ast_hash": "ee51bf6b46bf8694bc46e42ecb75f4d3",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/ltr390-uv-sensor.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.3032959,
     "ast_hash": "7948c6630845195d163482e308ea106f",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/matrix-keypad-scanning-generic.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.315296,
     "ast_hash": "128aea515f690174ac79ac0e2cc3eff9",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/max30101-heart-rate.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.331296,
     "ast_hash": "c2ffd77c2e9222027e73861da814bbb2",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/microsd-spi.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.3512962,
     "ast_hash": "7ea3d429381aa5fcdf4284b9c613d111",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/pmsa003i-air-quality.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.3672962,
     "ast_hash": "e1fb4d35763ec3446bb092dc54d6121d",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/pn532-nfc-rfid.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.383296,
     "ast_hash": "da544d3f5fe0078caf774f93f8376cc1",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/pwm-control-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.395296,
     "ast_hash": "6e25490f715fad2eae1bbe128344a5bf",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/relay-gpio-control.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4112961,
     "ast_hash": "107708c4cd08690a39e7aa09d0950691",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/sgp40-voc-sensor.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4232962,
     "ast_hash": "230afcf328313bd1b3fcbf19a2fa269d",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/software-debouncing-pattern.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4352963,
     "ast_hash": "9649cf806d84b1fd7ef2e1e0e73d93c9",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/speaker-buzzer-output.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4512963,
     "ast_hash": "427acd04860983ce928bcd9c0850c3e5",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/spi-communication-atmega2560-arduino.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4672964,
     "ast_hash": "869215ad13a5b7d863fd019d274b143e",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/spi-communication-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4792964,
     "ast_hash": "e9303e421cb905d89df03053d2fd70d0",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/spi-communication-nrf52840-zephyr.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.4912963,
     "ast_hash": "197ffc0fef84c4507978272f85ebe96b",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/uart-communication-atmega2560-arduino.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.5032964,
     "ast_hash": "6b0153f532499d4770cf8394e000a706",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/uart-communication-esp32-esp-idf.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.5152965,
     "ast_hash": "f2c4440b5b58619e2fa26a4c7b4e2788",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/uart-communication-nrf52840-zephyr.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.5312965,
     "ast_hash": "9df187aa14d41894d2df7e1eb11f81a9",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/ultrasonic-hcsr04-generic.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.5472965,
     "ast_hash": "de562dc328cbee0c7588342e471b5e0e",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/skills-llm-generated/vl53l0x-tof-sensor.md": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.5592966,
     "ast_hash": "8e3aa5f3ae462091a6b46f73f60b38b7",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level1/level1-ATmega2560-Arduino.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.5912967,
     "ast_hash": "4e354469d12afd69ac53bf982edd5d08",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level1/level1-ESP32S3-ESPIDF.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.6032968,
     "ast_hash": "f0a34f2d7b8f76842559841c6f8fdb01",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level1/level1-nRF52840-Zephyr.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.6152966,
     "ast_hash": "59d452398bda807f6fe4c149c3e838b6",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level2/level2-ATmega2560-Arduino.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.9392974,
     "ast_hash": "41c456ace7a84a336024008da4ca724d",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level2/level2-ESP32S3-ESPIDF.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.9552977,
     "ast_hash": "cf6292a4502d42b6c2752dd98a277f9c",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level2/level2-nRF52840-Zephyr.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.9632976,
     "ast_hash": "d9678dcc09c005bdd041cf6790ca9f2d",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level3/level3-ATmega2560-Arduino.txt": {
-    "mtime": 1786133669.0,
+    "mtime": 1786133669.9872978,
     "ast_hash": "c32ae9c017f340640e98a8b65c59cd9c",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level3/level3-ESP32S3-ESPIDF.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.0032978,
     "ast_hash": "be3f79bdbf04d9e918abe5f556dfe08e",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/level3/level3-nRF52840-Zephyr.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.0192976,
     "ast_hash": "d3bd6d283441cfb0849f8966a4abb234",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks/single/tmp_task.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.0392978,
     "ast_hash": "a43bc9b12541bc15b9a51317c2d17c25",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks_new/level1/level1-ATmega2560-Arduino.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.071298,
     "ast_hash": "8af4cfefbbb03a2342f23b4b4a399732",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks_new/level1/level2-ATmega2560-Arduino.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.083298,
     "ast_hash": "df26eda303c2419f056651206a8a32ca",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks_new/level1/level3-ATmega2560-Arduino.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.0952978,
     "ast_hash": "f690dc5a007dfe34377c09576bb1813e",
     "semantic_hash": ""
   },
   "skills/iot-skillsbench/tasks_new/tasks_new.txt": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.111298,
     "ast_hash": "9510192815d718db0ad31e8704a60bba",
     "semantic_hash": ""
   },
   "skills/superpowers/.github/FUNDING.yml": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.2592983,
     "ast_hash": "3c7599c974fe15274c0a6a2b0ea676c7",
     "semantic_hash": ""
   },
   "skills/superpowers/.github/ISSUE_TEMPLATE/bug_report.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.2792983,
     "ast_hash": "e60911f4ee29360ed021ebaf37a6a08a",
     "semantic_hash": ""
   },
   "skills/superpowers/.github/ISSUE_TEMPLATE/config.yml": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.2952983,
     "ast_hash": "94da1c7f1f7be785fe6b4f6c1fea3c45",
     "semantic_hash": ""
   },
   "skills/superpowers/.github/ISSUE_TEMPLATE/feature_request.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.3072984,
     "ast_hash": "81a20d6daa1745a76e1f2459b819aee3",
     "semantic_hash": ""
   },
   "skills/superpowers/.github/ISSUE_TEMPLATE/platform_support.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.3192985,
     "ast_hash": "af10670849b2a1caec60bb67ce165ce2",
     "semantic_hash": ""
   },
   "skills/superpowers/.github/PULL_REQUEST_TEMPLATE.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.3312986,
     "ast_hash": "aaefbd9ddd2be9fe3a5bf3e96525caa6",
     "semantic_hash": ""
   },
   "skills/superpowers/.opencode/INSTALL.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.3912988,
     "ast_hash": "38371a18af4bbdb9ca3ec7c44c40eaef",
     "semantic_hash": ""
   },
   "skills/superpowers/.pre-commit-config.yaml": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.455299,
     "ast_hash": "e076433aae20d728141655e6378cb61b",
     "semantic_hash": ""
   },
   "skills/superpowers/AGENTS.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.487299,
     "ast_hash": "350406f46cd934544e190de1f319b9a3",
     "semantic_hash": ""
   },
   "skills/superpowers/CLAUDE.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.487299,
     "ast_hash": "350406f46cd934544e190de1f319b9a3",
     "semantic_hash": ""
   },
   "skills/superpowers/CODE_OF_CONDUCT.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.503299,
     "ast_hash": "da1204c8006d4bd6c8be5b1852c73aaf",
     "semantic_hash": ""
   },
   "skills/superpowers/GEMINI.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.515299,
     "ast_hash": "230c5bf044db5f542711b1c6745e3505",
     "semantic_hash": ""
   },
   "skills/superpowers/README.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.539299,
     "ast_hash": "930f2ac2ba096d9bc81e3b121a06bbd5",
     "semantic_hash": ""
   },
   "skills/superpowers/RELEASE-NOTES.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.575299,
     "ast_hash": "b772c16199f9f89f7c32ad1b189a52f3",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/README.kimi.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.6792994,
     "ast_hash": "12b599834a3b1bd66d923e71a353fab5",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/README.opencode.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.6952994,
     "ast_hash": "e65f2e1b3fe704e267f5265245fb9c50",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/plans/2025-11-22-opencode-support-design.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.7112994,
     "ast_hash": "0d3fdbb784e9c779d121b586dd1fc388",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/plans/2025-11-22-opencode-support-implementation.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.7312994,
     "ast_hash": "583e0b9e5ec9abaf44d6d9aca813bd78",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/plans/2025-11-28-skills-improvements-from-user-feedback.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.7472994,
     "ast_hash": "fde1c66b332befd7be209b70f3858563",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/plans/2026-01-17-visual-brainstorming.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.7632997,
     "ast_hash": "cd479bbd44ed558cf55ea3ef4cafd14f",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/porting-to-a-new-harness.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.7912996,
     "ast_hash": "77fd1eb41b84ec3484b63e9cc570a453",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-01-22-document-review-system.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.8272996,
     "ast_hash": "67adba36e0a07b62c10450b8f982684d",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-02-19-visual-brainstorming-refactor.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.8432999,
     "ast_hash": "73a7beba849def6b7d20a500a1afda64",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-03-11-zero-dep-brainstorm-server.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.8593,
     "ast_hash": "bd9edfe0cac4da5662b671247c2b93b2",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-03-23-codex-app-compatibility.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.8753,
     "ast_hash": "b637794597e7d738371327e85159b83e",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-04-06-worktree-rototill.md": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.8953,
     "ast_hash": "f702856574ee6e9adb66d5e722158e97",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-05-06-lift-drill-into-evals.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.2553008,
     "ast_hash": "eb3bee979561e83c3b42131980faae09",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-05-07-pi-extension-and-evals.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.2713008,
     "ast_hash": "ffc5d0f3dca6318caf3664e3c5822a62",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-06-09-sdd-task-scoped-review-dispatch.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.291301,
     "ast_hash": "cc01e1dfa2764c20efb9de45a68c88a7",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-06-09-visual-companion-issues.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.3073008,
     "ast_hash": "31b3a118c520c927e2435887fdfd00a4",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-06-10-visual-companion-auth-hardening.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.323301,
     "ast_hash": "e97caf2790ff3bc3a219ac008063c937",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-06-11-visual-companion-final-hardening-fixup.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.343301,
     "ast_hash": "b3a13f5a6f6cc9b0fe80f179b18c6149",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-07-06-sdd-plan-scoped-workspace.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.367301,
     "ast_hash": "5ac03a608a244ca5ecdf7ea4069b0035",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/plans/2026-07-15-sdd-fix-loop-redesign.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.3993013,
     "ast_hash": "a240cc04d73afe092f3d33fd7366dbe1",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-01-22-document-review-system-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.4233012,
     "ast_hash": "a6baf8c9eea08844a389b961bb0ef4f7",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-02-19-visual-brainstorming-refactor-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.4393013,
     "ast_hash": "f4833089c696e2144b80bacac752a710",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-03-11-zero-dep-brainstorm-server-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.4513013,
     "ast_hash": "2a081bda4c6e67b5a7b89eda115472bb",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-03-23-codex-app-compatibility-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.4673014,
     "ast_hash": "89e4dc233e77853d01bec03f5a709567",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-04-06-worktree-rototill-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.4833014,
     "ast_hash": "b83c8db3a213fe1c55c409a62874e864",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-05-05-platform-neutral-config-refs-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.4953015,
     "ast_hash": "a1f93b9c6824fd5eab30d6a8cac93400",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-05-05-platform-neutral-prose-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.5073013,
     "ast_hash": "70c4d1460e1c8944f32f3c03c8417311",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-05-05-platform-neutral-readme-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.5193014,
     "ast_hash": "6a47e8a760549b303a2306872312b551",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-05-06-lift-drill-into-evals-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.5353014,
     "ast_hash": "c5a4a960bcd3ba1c74eed78a447359b9",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-06-09-sdd-task-scoped-review-dispatch-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.5553014,
     "ast_hash": "de129ed42a71eb4985682c167e5bbb87",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-06-10-positive-instruction-redesign-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.6033018,
     "ast_hash": "0c49adef248641f8f8040cef48699321",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-06-10-strict-cost-sdd-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.6193018,
     "ast_hash": "b513735f53a2cc6be328c416368f71cd",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-06-10-visual-companion-auth-hardening-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.6353016,
     "ast_hash": "e7be2c55408604d16dababa663c55365",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-06-11-visual-companion-final-hardening-fixup-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.6513019,
     "ast_hash": "eb6ca0c4d6bef3d919a41c29defa75e5",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-07-06-sdd-plan-scoped-workspace-eval-results.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.6713018,
     "ast_hash": "0b52df64828f85d346aee5083ac9eee9",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-07-06-sdd-plan-scoped-workspace.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.6913018,
     "ast_hash": "c062351817e66482570b6cca1cacea63",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/superpowers/specs/2026-07-15-sdd-fix-loop-redesign-design.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.7073019,
     "ast_hash": "328225c691e9bfeb9abcbf5d5e8eb9fd",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/testing.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.723302,
     "ast_hash": "3a99b5ecaefbb6a9fbcf80a822baf236",
     "semantic_hash": ""
   },
   "skills/superpowers/docs/windows/polyglot-hooks.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.743302,
     "ast_hash": "54f6929464fe069eaec549fc55693212",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/SKILL.md": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.9353025,
     "ast_hash": "4d874bd6828d088f95aa67831eb6b257",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/scripts/frame-template.html": {
-    "mtime": 1786133671.0,
+    "mtime": 1786133671.9593024,
     "ast_hash": "c9ad9e4a9ace03e9af4fc1e5be104fa4",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/spec-document-reviewer-prompt.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.0393026,
     "ast_hash": "64a9f03fe422e92da8391e80673b6500",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/brainstorming/visual-companion.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.0553029,
     "ast_hash": "85ea99a0b41133bcf0adc0d678516d37",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/dispatching-parallel-agents/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.0793028,
     "ast_hash": "edb2e7e3219e926f5e6d00e69410f0fa",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/executing-plans/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.099303,
     "ast_hash": "c4230e0d014235b8741efc9ad75177a3",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/finishing-a-development-branch/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.123303,
     "ast_hash": "f35ff3a4f7441d7640cef021afb887df",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/receiving-code-review/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.147303,
     "ast_hash": "430edec5991576a4597f72250ceeac23",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/requesting-code-review/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.171303,
     "ast_hash": "785f9a749572ba6ee3c16f9016cd09b3",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/requesting-code-review/code-reviewer.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.187303,
     "ast_hash": "e0ac54991815226a7799386222bf70cd",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.2153032,
     "ast_hash": "e71bbbb678cceb9be03559145efb42f2",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/implementer-prompt.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.2273033,
     "ast_hash": "4c6b393cfefc28cce76adb409733aebc",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/re-review-prompt.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.3433034,
     "ast_hash": "5caaccb756f53059b8d74d68fac1a55a",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/subagent-driven-development/task-reviewer-prompt.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.607304,
     "ast_hash": "72e9e7f2d1b35457851edf1b351324c1",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/CREATION-LOG.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.6313043,
     "ast_hash": "b7ba553678c10cc2234dc9ae193d5347",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.6513042,
     "ast_hash": "fddf3bab43d22be55daa60a1175e7874",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/condition-based-waiting.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.6753044,
     "ast_hash": "c64d669f2490aa489c514304c9ad46d3",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/defense-in-depth.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.6913042,
     "ast_hash": "002a0c9e8bee8fc29f85d7a434916977",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/root-cause-tracing.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7153044,
     "ast_hash": "7e96b2fe346c89d4f2300341529178cc",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/test-academic.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7273045,
     "ast_hash": "272ab1d95e755a7ff9479d547168eef9",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/test-pressure-1.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7433045,
     "ast_hash": "3d8805e8946e3889d4de0e906af66c47",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/test-pressure-2.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7553046,
     "ast_hash": "237f40dfd0b48af48d239ab3af499f7b",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/systematic-debugging/test-pressure-3.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7673044,
     "ast_hash": "42ea1bd281ca8d837f5dd45143762b95",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/test-driven-development/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.7953045,
     "ast_hash": "29dbdf864b52d6fbc264f48a8e300647",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/test-driven-development/writing-good-tests.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.8113046,
     "ast_hash": "6ad4fc95be4e0ef741bb0a07d7ad9d06",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/using-git-worktrees/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.8393047,
     "ast_hash": "fe69b77dddcd8fb492fe08a7593b6bf1",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/using-superpowers/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.859305,
     "ast_hash": "49ffa86b53c14bb79d93ad3390399d7d",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/using-superpowers/references/antigravity-tools.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.8833048,
     "ast_hash": "e59b6ae94e905eb99c2116e2239524e3",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/using-superpowers/references/codex-tools.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.895305,
     "ast_hash": "2edbe6f4a589ea3bd236bba94964b1a2",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/using-superpowers/references/gemini-tools.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.907305,
     "ast_hash": "ff013e7bf3aeccf03dde0991a44cc05b",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/using-superpowers/references/pi-tools.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.9233048,
     "ast_hash": "eb8697d87b1f763f007cb2fdac3257a5",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/verification-before-completion/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.943305,
     "ast_hash": "11932f7afbf9f7b629d22ba438f1deba",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-plans/SKILL.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.971305,
     "ast_hash": "251db017c72337b5ff5f833298ec0881",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-plans/plan-document-reviewer-prompt.md": {
-    "mtime": 1786133672.0,
+    "mtime": 1786133672.9833052,
     "ast_hash": "62253134237279d1fb6f7c12eebac14f",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-skills/SKILL.md": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.0073051,
     "ast_hash": "bfa6ad869ec70e8afbc01d24c68510f5",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-skills/anthropic-best-practices.md": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.0353053,
     "ast_hash": "55a4739396c7d92883c92bdd73d1f75d",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-skills/examples/CLAUDE_MD_TESTING.md": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.0593052,
     "ast_hash": "2980791d97afe0f32c2eb4a6264fb8e6",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-skills/persuasion-principles.md": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.0873053,
     "ast_hash": "0439b2124b3ac2a895717a6cc8129f61",
     "semantic_hash": ""
   },
   "skills/superpowers/skills/writing-skills/testing-skills-with-subagents.md": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.1153054,
     "ast_hash": "3b7b7942a42cb0450896d4b48cd49ed0",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/claude-code/README.md": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.359306,
     "ast_hash": "2ad8042b7d820027949c1014efd5a1eb",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/action-oriented.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.8633072,
     "ast_hash": "3629a1f492bdb192f39eb6bb9214fb54",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/after-planning-flow.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.8793073,
     "ast_hash": "40823205486d865d64fb1af1006f2fa0",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/claude-suggested-it.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.8913074,
     "ast_hash": "7e09e20f1c5c42290b9381668110cd4b",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/i-know-what-sdd-means.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9033072,
     "ast_hash": "81f1bbf0e9672d38b2a6e3640593c6ac",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/mid-conversation-execute-plan.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9153073,
     "ast_hash": "3746f804cd316923020a26bff4e964b3",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/please-use-brainstorming.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9273074,
     "ast_hash": "8b070a03a6714d4bd440105c11aeca49",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/skip-formalities.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9393075,
     "ast_hash": "f1bdf6c0abb22430311866aae5542f87",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/subagent-driven-development-please.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9513073,
     "ast_hash": "97befcdbfdbf6b981e4a1cae46f1a4f7",
     "semantic_hash": ""
   },
   "skills/superpowers/tests/explicit-skill-requests/prompts/use-systematic-debugging.txt": {
-    "mtime": 1786133673.0,
+    "mtime": 1786133673.9633076,
     "ast_hash": "8fbb291006a51667dd2e437b8fcccc16",
     "semantic_hash": ""
   },
   "skills/uno-q-st3215/SKILL.md": {
-    "mtime": 1787572892.0,
+    "mtime": 1787572892.0066407,
     "ast_hash": "63c4b7cd6beb454a0683c4d83879ae01",
     "semantic_hash": ""
   },
   "skills/superpowers/assets/app-icon.png": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.6432993,
     "ast_hash": "104c8fd20089f1d243108b1e052416ce",
     "semantic_hash": ""
   },
   "skills/superpowers/assets/superpowers-small.svg": {
-    "mtime": 1786133670.0,
+    "mtime": 1786133670.6592994,
     "ast_hash": "8c39dc35e79dce44358f7602116c33d5",
     "semantic_hash": ""
   },
   "docs/adr/0008-a-failed-read-is-reported-as-unknown.md": {
-    "mtime": 1787572888.0,
+    "mtime": 1787572888.1863053,
     "ast_hash": "ca92af9c70500d722987b677671d159c",
     "semantic_hash": ""
   },
   "tools/soak_report.py": {
-    "mtime": 1787573206.0,
+    "mtime": 1787573206.858596,
     "ast_hash": "470cb71fb2021e0d1796963998b6d337",
     "semantic_hash": ""
   },
   "tools/synthetic_operator.py": {
-    "mtime": 1787573085.0,
+    "mtime": 1787573085.9885113,
     "ast_hash": "f65a964011032e0a1158994a1e32adf4",
     "semantic_hash": ""
   },
   "skills/deliver/SKILL.md": {
-    "mtime": 1787572891.0,
+    "mtime": 1787572891.8346255,
     "ast_hash": "48df89a762d04db5dd3d71ff54936174",
     "semantic_hash": ""
   },
   "skills/operator-lens/SKILL.md": {
-    "mtime": 1787572891.0,
+    "mtime": 1787572891.8906305,
     "ast_hash": "70a0bf9b5b8602131a9d233f210c3f56",
     "semantic_hash": ""
   },
   "skills/twin-review/SKILL.md": {
-    "mtime": 1787572891.0,
+    "mtime": 1787572891.942635,
     "ast_hash": "63398a6bedc17f4f5f56e4ff07577ec0",
     "semantic_hash": ""
   },
   "docs/OPEN_QUESTIONS.md": {
-    "mtime": 1787573081.0,
-    "ast_hash": "8848ebbdeea7ff757a3a228132fd1c1c",
+    "mtime": 1787579994.1985538,
+    "ast_hash": "9afc9a6496cf4342c4c913d888e4b67e",
     "semantic_hash": ""
   },
   "tools/check_client_behaviour.js": {
-    "mtime": 1787573506.0,
-    "ast_hash": "19d6af8e2f740c2e7b966a7611a612aa",
+    "mtime": 1787583654.9829905,
+    "ast_hash": "a12129b029bdcfcba02653c2d297299a",
     "semantic_hash": ""
   },
   "docs/CLOSED.md": {
-    "mtime": 1787573574.0,
-    "ast_hash": "7a08bc6e53abfbe5a315abbd180ebee7",
+    "mtime": 1787584397.605173,
+    "ast_hash": "fdac2b7e12240c29c64ea5ed9ad2ee82",
     "semantic_hash": ""
   },
   "python/app/relay/mcu_log.py": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.1620276,
     "ast_hash": "988c95a4bb03ae15f8843c031183817c",
     "semantic_hash": ""
   },
   "python/tests/unit/test_mcu_log.py": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.2620347,
     "ast_hash": "15a251519f5cc2a410432efad8b83c07",
     "semantic_hash": ""
   },
   "sketch/src/DiagLog.cpp": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.5260534,
     "ast_hash": "376cdb8d149dc971f448ed50d51bbdc0",
     "semantic_hash": ""
   },
   "sketch/src/DiagLog.h": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.5660565,
     "ast_hash": "7d5fd2239626c60b5a1b5192be09e49f",
     "semantic_hash": ""
   },
   "sketch/src/LogRing.h": {
-    "mtime": 1787572985.0,
+    "mtime": 1787572985.6100595,
     "ast_hash": "bc9a16e89bd0c7cd05ebaf2e62cd1c28",
     "semantic_hash": ""
   },
   "docs/adr/0009-connection-ceiling.md": {
-    "mtime": 1787572981.0,
+    "mtime": 1787572981.7697835,
     "ast_hash": "947f47fb7bf07e173e9ad97e3b89d361",
     "semantic_hash": ""
   },
   "python/app/routers/stream.py": {
-    "mtime": 1787573492.0,
+    "mtime": 1787573492.2556632,
     "ast_hash": "7849c53276f0ca174b8fabfb7cf7982b",
     "semantic_hash": ""
   },
   "python/tests/integration/test_stream.py": {
-    "mtime": 1787573504.0,
+    "mtime": 1787573504.5999281,
     "ast_hash": "0698f7ea1c3fa9927e801aee8409dfec",
     "semantic_hash": ""
   }

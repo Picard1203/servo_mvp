@@ -1207,5 +1207,113 @@ explained.
 
 ---
 
+### D32 — Speed field snaps to the angle's step grid, not its own
+**Status:** CLOSED · 24 August 2026 · **Severity:** low · **Raised by:** the
+operator, 24 August 2026
+
+**The angle half was not a defect — confirmed, closed without a code change.**
+`89.94` is `90 - ANGLE_STEP` exactly (`app.js:24`, `ANGLE_STEP = 0.06`): the
+arrow key steps by one servo count in output degrees, working as designed,
+same number as the documented rounding decision (`PROJECT_STATE.md`'s
+gear-ratio audit).
+
+**The speed half was a real, root-caused bug, fixed.** The SPEED field's step
+buttons carry `data-d="5"` (`index.html:100,102`), but `nudge()`
+(`app.js:1960-1968`) rounded *every* field it was bound to against the same
+hardcoded `ANGLE_STEP`: `30 + 5` → `Math.round(35 / 0.06) * 0.06` = `34.98`.
+Fixed by making `nudge()` snap only when `inputId === "inAngle"`; every other
+field (speed) now just takes its own delta.
+
+**A third piece, found investigating the nudge buttons and fixed the same
+session — the angle field's typed path silently rewrote what the operator
+typed.** `doMove()` sent `Math.round(target / ANGLE_STEP) * ANGLE_STEP`
+regardless of what was typed — type `0.08`, it silently became `0.06` with no
+indication anything changed. The backend already had the real guard for this
+(`_validate_step`, `motion_service.py`, raises `StepError`), already tested
+at the API level (`test_servo_routes.py::TestStepRefusalStatesTheEnforcedStep`)
+and already displayed correctly by the client (`check_client_behaviour.js`'s
+D21 check) — but the client's silent pre-snap meant neither had ever actually
+been connected to the other from a browser. Fixed by deleting the client-side
+snap in `doMove()`; the existing guard and display path now do their job,
+confirmed live on the board during this session (an accidental test POST of
+`72.07` was rejected with the real backend message before the fix landed).
+
+**Verified:** `check_client_behaviour.js` (new: speed nudge does not snap to
+0.06; a typed non-multiple angle reaches the backend unmodified and the
+refusal displays). Board-confirmed live.
+
+**Related:** D21 (built the display path this reconnected), D35 (the
+speed-step *enforcement* this investigation originally intended to add,
+pulled out and postponed after a board measurement raised doubt about the
+unit conversion it would have relied on).
+
+---
+
+### D33 — Recent Activity timestamps display in UTC, not local time
+**Status:** CLOSED · 24 August 2026 · **Severity:** low · **Raised by:** the
+operator, 24 August 2026
+
+`EventService.record()` (`python/app/core/events.py`) stamped
+`datetime.now().isoformat(timespec="seconds")` with no UTC offset, on a
+container whose system clock is UTC (same fact D30's fix documented).
+`app.js`'s `eventTime()` parses an offset-less string as already-local, so no
+conversion happened and the raw UTC clock showed as if it were local time.
+Same species as D30, different code path.
+
+**Fixed:** `datetime.now(timezone.utc)`, so the stamped string carries an
+explicit offset and the browser's own `toLocaleTimeString` converts it
+correctly.
+
+**Also found, left alone deliberately:** `zero_service.py`'s `created_at` on
+captured zeros has the identical bug — currently not rendered anywhere in the
+UI, so out of scope; worth its own entry if that field is ever surfaced.
+
+**Verified:** `test_events.py::test_timestamp_carries_an_explicit_utc_offset`
+(new). Board-confirmed live (app restarted, Recent Activity checked).
+
+**Related:** D30 (same UTC/local class, different code path).
+
+---
+
+### D34 — Angle displays truncate to 1 decimal, losing the 0.06° step
+**Status:** CLOSED · 24 August 2026 · **Severity:** low · **Raised by:** the
+operator, 24 August 2026 (move log); widened to every angle readout the same
+session, at the operator's direction
+
+Not D21 resurfacing — D21 was stale UI copy; this was display precision.
+`ANGLE_STEP = 0.06` is the real minimum step, but every angle-facing display
+formatted at 1 decimal place, which cannot distinguish two adjacent steps
+(0.06 and 0.12 both read "0.1"). The backend already computed and sent
+2-decimal precision (`servo_state.py`, `round(..., 2)`); the loss was
+entirely client/message-formatting, throwing away precision the backend
+already provided. 2 decimals was also already the established precision
+elsewhere in this exact codebase (the angle input's own typed-value
+stepping; the out-of-travel error message), so this fix brought the rest
+into line with existing precedent.
+
+**Every location fixed, all to 2 decimals:**
+
+| File:line | What |
+|---|---|
+| `app.js:415` | current position (`posN`) |
+| `app.js:454` | target readout |
+| `app.js:464` | delta (Δ) readout |
+| `app.js:608` | saved-zero list angle |
+| `motion_service.py:87` | `from_deg` in the move-accepted event's structured data |
+| `motion_service.py:89` | move-accepted event message |
+| `motion_service.py:112` | `at_deg` in the stop event |
+| `motion_service.py:218-219` | fine-approach event message + `overshoot_deg` |
+| `motion_service.py:242` | out-of-travel error's `low`/`high` (was inconsistent with the `.2f` already on `target_deg` in the same sentence) |
+
+**Verified:** `test_motion_service.py` (2 new tests: message precision,
+`from_deg` precision) and `check_client_behaviour.js` (5 pre-existing
+1-decimal assertions updated to 2 decimals — the same sweep-every-copy
+discipline this project's own history exists to enforce). Board-confirmed
+live.
+
+**Related:** D21 (closed, different bug — stale copy, not this).
+
+---
+
 ## Requirements captured but not yet designed
 

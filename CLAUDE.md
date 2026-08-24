@@ -96,7 +96,7 @@ is a defect — fix it rather than updating one copy.
 Run all three. Note the numbers.
 
 ```bash
-cd python && ../.venv/bin/python -m pytest    # 222 tests
+cd python && ../.venv/bin/python -m pytest    # 226 tests
 cd sketch/tests/native && make           # 194 checks
 python3 tools/check_bridge_contract.py   # "both sides agree"
 ```

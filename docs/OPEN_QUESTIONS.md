@@ -188,3 +188,21 @@ run mentioned in T9 implies one exists.
 
 *Needed:* the date, or confirmation that there is not one. A cut line without a
 date is a preference; with one it is a plan.
+
+### Q10 — Should code-level docs/comments carry rationale, or move to `docs/`? `open`
+**Blocks:** T15.
+
+The operator's read (24 August 2026, `BACKLOG.md` T15): current docstrings and
+inline comments are too long, contain disapproved-of inline comments, and carry
+"insider information" — project history, rationale, incident narrative — that
+belongs in `docs/` markdown, not source. This directly contradicts current,
+deliberate policy: `CONVENTIONS.md` (Docstrings, ~L30) says the opposite, and
+the repo's own defect history (`AUDIT.md`, D2, D9) has cases where exactly this
+kind of in-line "why" comment is what stopped the same mistake recurring
+nearby.
+
+*Needed:* which failure mode the project would rather risk — verbose in-code
+narrative taxing every session's token budget, or a repeated mistake because
+the rationale that would have stopped it lived only in a doc nobody was
+reading at the moment of the edit. Whichever way it goes, `CONVENTIONS.md`'s
+Docstrings section gets rewritten to match before T15's full-repo pass starts.

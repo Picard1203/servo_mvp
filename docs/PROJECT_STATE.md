@@ -30,9 +30,9 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-223 Python tests (confirmed after Session 6's D10 fix; line coverage
-not remeasured this session — see backlog D24 on why a stale coverage
-figure is worse than none)
+226 Python tests (confirmed after Session 7's D32/D33/D34 fixes; line
+coverage not remeasured this session — see backlog D24 on why a stale
+coverage figure is worse than none)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 ```
@@ -45,7 +45,9 @@ Bridge contract checker: both sides agree
 
 **23 August 2026 — Session 5 closed that whole gap table, plus two new fields the operator asked for live, mid-session: target angle and servo (pre-ratio) angle, both captured, persisted, and shown in the UI's own target marker/Δ readout and in the export.** Also shipped: angle-correlated charts (mechanical team's request — a genuine `c:scatterChart`, verified against a reference, because a category axis cannot carry a real numeric angle axis), a typed chart-range selector confirmed live to actually narrow the charts, decoded flags, full column widths, LCARS styling, and a per-day summary table. One real regression happened and was caught the same session: an automatic date-axis tick spacing that looked fine against synthetic test data produced an illegible label smear against real board data — reverted to an explicitly computed tick interval, re-verified live. R5's remaining gap (no persisted move/event narrative) is now the only open row in its table. Full detail in `BACKLOG.md`'s R5 entry — this is the distilled version.
 
-**24 August 2026 — Session 6, first half: D10 closed for the real reason.** The prior writeup's theory (a race on the active zero being edited) didn't survive a check of the actual logs — no zero write happened near either crash, and the schema rules out a stored `NULL`. The real cause: `Database` shares one SQLite connection across every thread and only serialized writes, not reads; reproduced with a stress test that broke the *unlocked reads* using nothing but ordinary telemetry writes, then confirmed the fix (every statement, not just writes, through the same lock) holds under 185k+ concurrent reads. Full record, including the twin-path sweep that found the same gap in four more places, is in `CLOSED.md`. **Session 6's second half is R2 (motor isolation)** — see `BACKLOG.md`'s START HERE row 6; a `/grilling` pass on its open design questions is queued first, and can run as a fresh session.
+**24 August 2026 — Session 6, first half: D10 closed for the real reason.** The prior writeup's theory (a race on the active zero being edited) didn't survive a check of the actual logs — no zero write happened near either crash, and the schema rules out a stored `NULL`. The real cause: `Database` shares one SQLite connection across every thread and only serialized writes, not reads; reproduced with a stress test that broke the *unlocked reads* using nothing but ordinary telemetry writes, then confirmed the fix (every statement, not just writes, through the same lock) holds under 185k+ concurrent reads. Full record, including the twin-path sweep that found the same gap in four more places, is in `CLOSED.md`.
+
+**24 August 2026 — Session 7: T14 (the maintenance triage) closed, and three operator-found UI defects closed with it, ahead of R2 rather than after — the operator's call, inverting the order the docs had planned.** Every previously-unslotted backlog item now has a real session or a stated reason it doesn't (see `BACKLOG.md`'s START HERE table); the Closed index gained three items it had silently dropped (D3, D27, D13). **D32, D33, D34 closed same-session, board-tested and board-verified** (app restarted, changes checked live): the speed nudge no longer snaps to the angle's step grid, a typed angle that isn't a clean 0.06° multiple is refused with the backend's own message instead of being silently rewritten, Recent Activity timestamps read correctly in local time, and every angle-facing display now shows 2 decimals instead of 1 (the backend already computed that precision — the loss was purely in formatting). **D35 opened, not closed**: bench-testing D32's originally-planned speed-step enforcement, a live timed move measured the servo running at roughly 1.5-2x the commanded speed. Ruled out cheaply: the Python-side position/speed conversions share the same stored constants and cannot disagree with each other; the firmware has a second speed-conversion function but it is dead code, never called from the live move path. Not yet ruled out — the operator's own suspicion — is that the servo's `GoalSpeed` register does not actually share position's encoder-count unit the way the structural evidence (shared register block, matching official Feetech library layout) suggested; the belt ratio (1.4667) and its square (2.15) both sit inside the measured range. The planned speed-step enforcement was pulled rather than shipped on that unverified assumption. **R2 (motor isolation) is next** — see `BACKLOG.md`'s START HERE row 9; the `/grilling` pass on its open design questions is queued first, and can run as a fresh session.
 
 **Batch 2 landed the same day** — D3, D13 closed, desk work only (see "Known
 gaps" below: the sketch side of D3 has never been compiled or flashed). It
@@ -187,6 +189,13 @@ is answered, this table is a priority ordering rather than a schedule.
   below 0 silently and still reports success
 - direction **+1**; deadband **0**; speed saturates ~**1100 counts/s**;
   acceleration has no effect above ~**50**
+- **Not yet in this list, and it should be:** what one `GoalSpeed` register
+  unit is actually worth in real deg/s. Assumed equal to one position count
+  (0.06°) by symmetry with position — structurally plausible (same register
+  block, same packet, same official library layout) but a live timed move
+  measured the servo running ~1.5-2x faster than that assumption predicts
+  (backlog D35). Don't build anything on the 0.06 speed-step assumption
+  until D35 closes it with an actual measurement.
 - Serial1 @ 1 Mbps is reliable (200/200 reads, 220 µs)
 - Ethernet shield needs **SpiRemap** — SPI2 sits on D11–D13 but the shield takes
   SPI from ICSP (PD1/PC2/PC3). Apply it after `SPI.begin()` **and again** after

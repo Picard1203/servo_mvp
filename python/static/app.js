@@ -412,7 +412,7 @@ function renderState(s) {
   const known = measured || ((state.readFailures < FAILURES_BEFORE_ALARM)
                              && (state.lastKnownDeg !== null));
   const deg = measured ? s.output_deg : state.lastKnownDeg;
-  $("posN").textContent = known ? deg.toFixed(1) : "—";
+  $("posN").textContent = known ? deg.toFixed(2) : "—";
 
   /* Scaled against the REACHABLE range the server just sent
      (output_min_deg/output_max_deg), not a fixed /360. Travel here is
@@ -451,7 +451,7 @@ function renderState(s) {
   }
   const targetItem = $("targetItem");
   $("targetVal").textContent = hasTarget
-    ? s.target_deg.toFixed(1) + "°" + (s.target_stale ? " · STOPPED" : "")
+    ? s.target_deg.toFixed(2) + "°" + (s.target_stale ? " · STOPPED" : "")
     : "—";
   targetItem.classList.toggle("stale", !!s.target_stale);
 
@@ -461,7 +461,7 @@ function renderState(s) {
   const hasDelta = known && hasTarget;
   const deltaVal = hasDelta ? (s.target_deg - deg) : null;
   $("deltaVal").textContent = hasDelta
-    ? (deltaVal > 0 ? "+" : "") + deltaVal.toFixed(1) + "°"
+    ? (deltaVal > 0 ? "+" : "") + deltaVal.toFixed(2) + "°"
     : "—";
   $("deltaItem").classList.toggle("stale", !!s.target_stale);
 
@@ -605,7 +605,7 @@ function renderZeros() {
         (z.is_active ? '<span class="zt">Active</span>'
                      : '<span class="spacer"></span>') +
         "<span>" + escapeHtml(z.name) + "</span>" +
-        '<span class="deg">' + deg.toFixed(1) + "\u00b0</span>";
+        '<span class="deg">' + deg.toFixed(2) + "\u00b0</span>";
       row.onclick = () => { state.selectedZeroId = z.id; renderZeros(); };
       list.appendChild(row);
     });
@@ -677,8 +677,11 @@ async function doMove() {
     return;
   }
   try {
+    /* Sent exactly as typed - the backend enforces the step (D32) and
+       says so in its own words; silently rewriting it here would hide
+       the correction from the operator instead of explaining it. */
     await apiPost("/servo/move", {
-      target_deg: Math.round(target / ANGLE_STEP) * ANGLE_STEP,
+      target_deg: target,
       speed_dps: speed,
       acceleration: state.acceleration,
     });
@@ -1955,10 +1958,14 @@ async function doExport() {
 }
 
 function nudge(inputId, delta) {
+  /* Angle snaps to the servo's own step grid (D32) - speed has no such
+     grid, so it just takes the delta as asked. */
   const input = $(inputId);
   const value = parseFloat(input.value) || 0;
-  const stepped = Math.round((value + delta) / ANGLE_STEP) * ANGLE_STEP;
-  input.value = stepped.toFixed(2);
+  const next = inputId === "inAngle"
+    ? Math.round((value + delta) / ANGLE_STEP) * ANGLE_STEP
+    : value + delta;
+  input.value = next.toFixed(2);
 }
 
 function bind(id, handler) {

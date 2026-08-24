@@ -84,9 +84,9 @@ class MotionService:
             self._servo.command_move(target_counts, speed_counts,
                                      acceleration)
 
-        from_deg = round(start_deg, 1) if start_deg is not None else None
+        from_deg = round(start_deg, 2) if start_deg is not None else None
         self._events.record("servo.move.accepted",
-                            f"move to {target_deg:.1f} deg",
+                            f"move to {target_deg:.2f} deg",
                             {"from_deg": from_deg,
                              "to_deg": target_deg})
         logger.info("move accepted",
@@ -109,7 +109,7 @@ class MotionService:
         self._servo.command_stop()
         self._state.mark_target_stale()
         deg = self._state.current_output_deg()
-        at_deg = round(deg, 1) if deg is not None else None
+        at_deg = round(deg, 2) if deg is not None else None
         self._events.record("servo.stop", "stop commanded",
                             {"at_deg": at_deg})
         logger.info("stop commanded",
@@ -215,8 +215,8 @@ class MotionService:
                      metadata={"event": "servo.move.fine_approach"},
                      extra={"target_deg": target_deg})
         self._events.record("servo.move.fine_approach",
-                            f"fine approach to {target_deg:.1f} deg",
-                            {"overshoot_deg": round(overshoot_deg, 1)})
+                            f"fine approach to {target_deg:.2f} deg",
+                            {"overshoot_deg": round(overshoot_deg, 2)})
 
     def _validate_reachable(self, target_deg: float) -> None:
         """Refuses targets the servo would silently clamp.
@@ -239,7 +239,7 @@ class MotionService:
         low, high = self._state.reachable_output_range_deg()
         raise OutOfTravelError(
             f"{target_deg:.2f} deg is outside the servo's travel from the "
-            f"current reference; reachable range is {low:.1f} to {high:.1f} "
+            f"current reference; reachable range is {low:.2f} to {high:.2f} "
             f"deg. Re-calibrate near the middle of travel to recentre it.")
 
     def _await_settle(self) -> None:

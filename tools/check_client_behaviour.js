@@ -195,9 +195,9 @@ console.log("\nD14 - a refused connection reads as something to act on");
   check("servo angle follows the measured reading",
         $("servoVal").textContent === "18.3°", $("servoVal").textContent);
   check("target renders with sign-free formatting",
-        $("targetVal").textContent === "20.0°", $("targetVal").textContent);
+        $("targetVal").textContent === "20.00°", $("targetVal").textContent);
   check("delta is signed and reads target minus measured",
-        $("deltaVal").textContent === "+7.5°", $("deltaVal").textContent);
+        $("deltaVal").textContent === "+7.50°", $("deltaVal").textContent);
   check("the target marker is shown once a target exists",
         $("targetMarker").classList.contains("show"));
   check("the marker sits at the target's position on the REAL range"
@@ -228,7 +228,7 @@ console.log("\nD14 - a refused connection reads as something to act on");
         $("servoVal").textContent === "—", $("servoVal").textContent);
   check("but the target is INDEPENDENT of reading validity - still known"
         + " when the servo goes silent",
-        $("targetVal").textContent === "20.0°", $("targetVal").textContent);
+        $("targetVal").textContent === "20.00°", $("targetVal").textContent);
   check("...while delta blanks anyway, since the measured side is gone",
         $("deltaVal").textContent === "—", $("deltaVal").textContent);
   check("the chip stops claiming HOLDING",
@@ -264,10 +264,10 @@ console.log("\nD14 - a refused connection reads as something to act on");
 
   ctx.renderState(Object.assign({}, good, { target_stale: true }));
   check("a stale target is kept, not cleared, and says so",
-        $("targetVal").textContent === "20.0° · STOPPED",
+        $("targetVal").textContent === "20.00° · STOPPED",
         $("targetVal").textContent);
   check("delta keeps reading while stale - that is the point of keeping it",
-        $("deltaVal").textContent === "+7.5°", $("deltaVal").textContent);
+        $("deltaVal").textContent === "+7.50°", $("deltaVal").textContent);
   check("the marker is dimmed while stale",
         $("targetMarker").classList.contains("stale"));
 
@@ -364,6 +364,37 @@ console.log("\nD14 - a refused connection reads as something to act on");
         ctx.eventTime({ timestamp: "notadate T09:10:11" }));
   check("a missing timestamp does not throw",
         ctx.eventTime({}) === "");
+
+  /* ---------- D32: nudge() steps each field by its own unit ---------- */
+  console.log("\nD32 - the speed field does not snap to the angle's grid");
+  $("inAngle").value = "90";
+  ctx.nudge("inAngle", -0.06);
+  check("angle still snaps to the servo's step grid",
+        $("inAngle").value === "89.94", $("inAngle").value);
+  $("inSpeed").value = "30";
+  ctx.nudge("inSpeed", 5);
+  check("speed moves by its own delta, not the angle's 0.06 grid",
+        $("inSpeed").value === "35.00", $("inSpeed").value);
+
+  /* ---------- D32: doMove sends exactly what was typed ---------- */
+  console.log("\nD32 - a typed angle reaches the backend unmodified");
+  let sentBody = null;
+  ctx.fetch = async (url, init) => {
+    sentBody = JSON.parse(init.body);
+    return {
+      ok: false, status: 422, statusText: "Unprocessable Entity",
+      json: async () => ({ detail: "angle must be in steps of 0.06 deg",
+                           reason: "step" }),
+    };
+  };
+  toasts.length = 0;
+  $("inAngle").value = "0.08";
+  $("inSpeed").value = "30";
+  await ctx.doMove();
+  check("the client no longer pre-snaps the typed value",
+        sentBody && sentBody.target_deg === 0.08, sentBody);
+  check("the backend's own refusal reaches the operator",
+        lastToast() && /0\.06/.test(lastToast().message), lastToast());
 
   console.log("\n" + (failures ? failures + " FAILURE(S)" : "all checks passed"));
   process.exit(failures ? 1 : 0);

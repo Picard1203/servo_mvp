@@ -21,10 +21,13 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
 | **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
 | **6 — D10 half DONE, 24 Aug 2026; R2 next, can start fresh** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** This can start in a new chat; nothing from Session 6's D10 work is a prerequisite for it. | R2: yes, for the operator-visible part |
-| **7 — after Session 6** | **T14** — the maintenance pass: triage the unslotted items ("Not yet slotted" table, end of the Ordering section — now fourteen: the original ten plus **D32**, **T15**, **D33** and **D34**, all raised 24 August 2026 during Session 6), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
+| **7 — DONE, 24 Aug 2026** | **T14 closed** — all fourteen unslotted items given a real session (rows above and below) or an explicit reason they don't get one (T13, T15 — see their entries); Closed index gained D3/D27/D13 (moved to `CLOSED.md` but never indexed). **D32, D33, D34 closed the same session** — board-tested, verified (suite 223→226), app restarted and checked live. **D35 opened** (speed-step enforcement postponed, see Session 10) — a board measurement during D32's work found commanded and actual servo speed disagree by ~1.5-2x, so the planned fix was not shipped on an unverified unit-conversion assumption. | yes — used to verify D32/D33/D34 live and to bench-test D35's measurement |
+| **8 — next** | One batch, many small fixes, no reason to split across sessions: **D24** (2 uncovered `InvalidReadingError` guards + `--cov-fail-under`), **D26** (loop the suite to reproduce its 1-in-10 flake, time-boxed — fix or document the timing sensitivity), **D30** (the one missing regression test for the already-fixed UTC/local cutoff bug), **T12** (decide `check_client_behaviour.js`'s status, 15 min), **D8** (deploy without `.env` must fail loud, not default to the simulator — the one must-ship item in this triage), **D29** (`LOG_LEVEL` is inert on the Logger461 stand-in — add the level filter), **D23** (decide + implement the `moving`/fault-boolean shape on a failed read — amends ADR-0008), **D25** (keep a reported alarm visible through the D16 blanking rule). **D23+D25 deliberately go last in this session, immediately before R2** — both touch the exact `ServoStateResponse` surface R2 is about to extend with an isolated-state field, so R2 designs against a settled shape instead of one about to move under it. | no (board confirmation of D8/D23/D25 is a nice-to-have, not required) |
+| **9 — after Session 8** | **R2** — motor isolation, per Session 6's entry. The `/grilling` pass on its open design questions runs at the start of this session. | yes, for the operator-visible part |
+| **10 — opportunistic, any time after 7** | **D28** (MCU boot-time `mcu_log` notify race — needs a flash to fix or confirm) + **D35** (commanded vs. actual speed disagree by ~1.5-2x, found bench-testing D32 this session — needs `PRESENT_SPEED` register-level readback, not just wall-clock timing). D32 itself closed this session (24 Aug) — its speed-step-enforcement piece split into D35 rather than shipped on an unverified assumption. Low severity, no dependency on anything above; ride along with any session that already has the board up (R2's Session 9 is the natural host). | yes |
 
-**Read `docs/BACKLOG.md` T14's entry in full before starting Session 7** — the
-actual punch list, this row is just a pointer to it.
+**Read `docs/BACKLOG.md` T14's entry in full for the reasoning behind this
+slotting** — this row is just a pointer to it.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -377,27 +380,13 @@ not collide with real fixes. High volume, low reasoning — the Antigravity spli
 - **D19** — needs a reachability answer first; see its entry.
 - **R3, R4, R8** — post-MVP by decision, not by omission.
 
-**Audited 23 August 2026 — ten open items had no batch at all, found by
-cross-checking every open item against every batch, not assumed complete.**
-None of these are new; they were simply never placed. Not re-triaged here,
-just surfaced so the next planning pass starts from the truth:
-
-| Item | Severity | One line |
-|---|---|---|
-| D8 | medium | `.env` must exist before first run — the manual step is done on the board, nothing stops the next deploy repeating the omission |
-| D23 | medium | Fault flags reported as measured on a failed read — API-shape decision needed |
-| D24 | medium | Two `InvalidReadingError` guards uncovered; coverage is 99%, docs claimed 100% |
-| D25 | medium | An overload that stops being readable disappears from the screen instead of staying flagged |
-| D26 | medium | Python suite failed once in ten runs, never reproduced |
-| D28 | low | MCU boot-time `mcu_log` notify lost to a startup race |
-| D29 | medium | `LOG_LEVEL` is inert — the Logger461 stand-in always logs at DEBUG regardless of setting |
-| D30 | — | Code fixed (the timezone bug that made a bad soak read "clean"); regression test still needed |
-| T12 | medium | Decide the status of `tools/check_client_behaviour.js` |
-| T13 | medium | Distil the remaining documents |
-| D32 | unknown | Arrow keys on Angle/Speed inputs step by an odd amount — raised 24 Aug, not yet reproduced |
-| T15 | medium | Code-level docs/comments called unprofessional and token-costly — contradicts current `CONVENTIONS.md`, needs a decision first |
-| D33 | low | Recent Activity timestamps show UTC, not local time — same class as D30, unconfirmed |
-| D34 | low | Move log rounds a 0.06 deg commanded angle to 0.1 deg — possibly D21 resurfacing elsewhere |
+**T14 closed, 24 August 2026 — every item that had no batch now has one, or an
+explicit reason it doesn't.** The fourteen from the 23 August audit (D8, D23,
+D24, D25, D26, D28, D29, D30, T12, T13, D32, T15, D33, D34): twelve are slotted
+in Session 8, 9 or 10 above; **D33 and D34 were fixed the same session as this
+triage** (pre-diagnosed going in); **T13 stays deliberately unscheduled** — its
+own entry says do it opportunistically, not as a sweep; **T15 is blocked on an
+operator decision**, moved to `OPEN_QUESTIONS.md` Q10.
 
 **What is not in any batch is as important as what is:** if a batch slips, the
 cut line in `PROJECT_STATE.md` says what ships anyway.
@@ -421,11 +410,17 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D21** | The UI tells the operator the step is 0.1°; it is 0.06° | 8 August 2026 · Batch 1 |
 | **T8** | Instrumented run on the board over adb | 7 August 2026 · **Flow:** `WORKFLOWS.md` W1 |
 | **T4** | Moves while unverified: DECIDED, permitted | (decision) · **Recorded in:** ADR-0007 |
+| **D3** | The C++ side has no logging | 8 August 2026 · Batch 2 |
+| **D27** | `synthetic_operator.py` does not reproduce `app.js`'s concurrent poll timers | 8 August 2026 · Batch 2 |
+| **D13** | Requests arriving faster than slots free up are refused | 8 August 2026 · ADR-0009 |
 | **D4** | Connection drops after a few commands; requires a page refresh | 11 August 2026 · Session 3 (SSE) — full two-session soak saga kept whole in `CLOSED.md` |
 | **D18** | A failed CSV export navigates the operator out of the application | 11 August 2026 |
 | **D22** | The only export control is fixed at 24 hours | 11 August 2026 · R5's delivery path |
 | **D31** | Telemetry export drops instantly with "controller busy" | 23 August 2026 · real cause was a client-side `ReferenceError`, not the Pydantic hypothesis — see `CLOSED.md` |
 | **D10** | `logger.exception` swallows the exception; recurred as an unexplained sampler crash | 24 August 2026 · Session 6 · real cause was every read on the shared SQLite connection running unlocked, not a zero-table race — see `CLOSED.md` |
+| **D32** | Speed field snaps to the angle's step grid, not its own; typed angle silently rewritten before send | 24 August 2026 · Session 7 (T14) · speed-step enforcement split into D35 rather than shipped unverified |
+| **D33** | Recent Activity timestamps display in UTC, not local time | 24 August 2026 · Session 7 (T14) |
+| **D34** | Angle displays truncate to 1 decimal, losing the 0.06° step | 24 August 2026 · Session 7 (T14) · widened from the move log to every angle readout |
 
 ---
 
@@ -529,57 +524,59 @@ local-timezone cutoff but inside the UTC one, asserting it's still counted.
 
 ---
 
-### D32 — Arrow keys on the Angle/Speed inputs step by an odd amount
-**Status:** open, not yet investigated · **Severity:** unknown · **Raised by:**
-the operator, 24 August 2026, pending the post-R2 triage session
+### D35 — Commanded speed and actual speed disagree by roughly 1.5-2x
+**Status:** open, not yet investigated · **Severity:** medium · **Found:**
+24 August 2026, bench-testing D32's proposed speed-step enforcement
 
-Pressing Left/Right (or Up/Down) inside the MOVE panel's ANGLE or SPEED number
-field steps the value by an amount that reads as arbitrary rather than a clean
-increment — screenshot from the session showed the fields sitting at `89.94`
-deg and `34.98` deg/s after arrow-key use, not round numbers. Not yet
-reproduced or root-caused: could be the input's own `step` attribute, a
-JS handler doing arithmetic in output-degrees against a non-round
-servo-to-output ratio, or floating-point drift accumulating over repeated
-presses. Needs a live repro with an exact press-by-press value log before
-diagnosing.
+**The measurement.** Board-tested (not simulated): commanded a move of
+17.92° (90.07° → 72.06°) at `speed_dps: 1.8`. Settled somewhere between
+t=4.4s (still moving) and t=6.58s (settled) — actual average speed
+**2.7-4.1 deg/s against a commanded 1.8**, roughly **1.5x to 2.3x faster**
+than asked. This is why D32's speed-step enforcement (reusing `output_step_deg`
+for speed, on the theory that 1 `GoalSpeed` unit = 1 encoder count/s, same as
+position) was pulled from that item and postponed here instead of shipped on
+an unverified assumption.
 
-**Related:** none identified yet — first pass needed.
+**Ruled out, both cheaply and concretely:**
+- **Python-side inconsistency between the position and speed conversions.**
+  `ServoStateStore.counts_from_output_deg()` and
+  `.counts_speed_from_output_speed()` (`servo_state.py:186-210`) read the
+  identical `self._servo_deg_per_output_deg` / `self._counts_per_servo_deg`
+  set once in `__init__` — they cannot disagree with each other within this
+  codebase.
+- **Firmware-side double conversion.** `AngleMath.h:56-64`
+  (`CountsPerSecondFromOutputSpeed()`) exists and independently reapplies the
+  belt ratio, which would explain a faster-than-commanded result — but
+  `BridgeApi.cpp`'s `HandleServoMove` never calls it; it passes the
+  Python-computed `speed_counts_per_second` straight through to
+  `ServoController::Move()` and on to `WritePosEx`. **Worth its own small
+  finding: this firmware function is written, header-only tested, and
+  unreachable from the live command path** — either dead code or a sign
+  something was meant to call it and doesn't.
+- **Fine-approach overshoot or acceleration ramp.** Both can only add time,
+  never remove it, so neither explains a *faster* result.
 
----
+**Not yet ruled out — the operator's suspicion, and the leading hypothesis:**
+the belt ratio (44/30 = **1.4667**) sits almost exactly at the low end of the
+measured ratio range, and its square (**2.1511**) sits near the high end. Both
+are consistent with the crude timing bounds above. This points at the
+servo's own `GoalSpeed` register (0x2E) not actually sharing position's
+encoder-count LSB the way `ServoRegisters.h:57`'s `// step/s` comment and the
+shared register-block/packet-format evidence suggested — i.e., the codebase's
+pipeline is internally consistent (see above), but the *assumption* that 1
+`GoalSpeed` unit is worth exactly one position-encoder-count/s may itself be
+wrong by a belt-ratio-shaped factor, applied once or twice somewhere between
+the register's real meaning and this project's model of it.
 
-### D33 — Recent Activity timestamps display in UTC, not local time
-**Status:** open, not yet investigated · **Severity:** low · **Raised by:**
-the operator, 24 August 2026, pending the post-R2 triage session
+**Next step:** a tighter bench test — command a few different `GoalSpeed`
+values, read `PRESENT_SPEED` (register 0x3A, not currently exposed by the
+API) during the move rather than inferring from elapsed wall-clock time, and
+correlate against known real angular distance over a precisely-timed window.
+The official Feetech memory-table PDF (`feetechrc.com`, password-gated) would
+settle this outright if it can be obtained. **Blocks:** the speed-step half
+of D32's enforcement.
 
-The operator's screenshot of the Recent Activity panel showed entries several
-hours behind the actual local time. `app.js:639` (`eventTime()`) does
-`new Date(e.timestamp)` then formats with `toLocaleTimeString` — that call
-does convert UTC to the browser's local zone, but only if the source string
-carries an explicit UTC marker (`Z`/offset). If the backend serializes event
-timestamps without one, JS parses the string as already-local, so no
-conversion happens and the raw UTC value is shown as-is. This is the same
-species of defect as D30 (a UTC value read as local, there in
-`soak_report.py`), just a different location. Not confirmed — needs a check
-of what `EventService` actually serializes before concluding this is the
-cause.
-
-**Related:** D30 (same UTC/local class, different code path).
-
----
-
-### D34 — Move Recent Activity log rounds the commanded angle to 0.1 deg
-**Status:** open, not yet investigated · **Severity:** low · **Raised by:**
-the operator, 24 August 2026, pending the post-R2 triage session
-
-The operator commanded a move to 0.06 deg (the documented minimum step, per
-`skills/uno-q-st3215/SKILL.md`) and the Recent Activity entry read "move to
-0.1 deg" — the logged/displayed value lost the actual commanded precision.
-Possibly a resurfacing of D21 (closed: the UI claimed a 0.1 deg step when
-the real step is 0.06 deg) in a different display location, or a distinct
-rounding point in how the move event gets formatted for the log. Not yet
-traced to a specific line.
-
-**Related:** D21 (closed, same 0.1-vs-0.06 discrepancy, different location).
+**Related:** D32 (the postponed enforcement this measurement blocks).
 
 ---
 
@@ -984,8 +981,8 @@ it indexes.
 ---
 
 ### T15 — Code-level documentation reads as unprofessional and costs tokens
-**Status:** open, needs a decision before work · **Raised by:** the operator,
-24 August 2026, pending the post-R2 triage session
+**Status:** blocked on an operator decision — see `OPEN_QUESTIONS.md` Q10 ·
+**Raised by:** the operator, 24 August 2026
 
 The operator's read on the current docstrings/comments: too long, contains
 inline comments (disapproved of), and carries "insider information" — project

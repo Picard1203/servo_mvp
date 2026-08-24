@@ -19,10 +19,11 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **2 — DONE, 8 + 10 Aug 2026** | D4 closed via SSE in Session 3 | yes |
 | **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
-| **5 — next** | **R5's UX gap table** (BACKLOG.md, under R5): unreadable timestamp column (`####`, needs a column width), no actual day/range selector on the charts (the formula plumbing exists, the picker doesn't), the packed flags column reads too narrow — reconsider the tradeoff, and an LCARS visual pass on the workbook (operator recalls asking Antigravity for this previously). Also still open: D10's real root cause (a real stack trace now exists, not chased down yet), Batch 4's motor isolation. | yes, for a real cross-app open-and-look each time a chart/layout change is made — this session's whole lesson was that "it opens in one lenient tool" is not validation |
+| **5 — next** | **R5's UX gap table** (under R5): unreadable timestamp column, no actual day/range chart selector, over-compressed flags column, LCARS styling wanted. **Plus D10's real root cause** (a real stack trace exists now) **and Batch 4's motor isolation (R2)**, still not started. **Plus the "Not yet slotted" table** (end of the Ordering section) — ten items (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13) an audit found with no batch at all; not triaged, just surfaced so this session doesn't silently skip them the way earlier sessions did. | yes, for a real cross-app open-and-look each time a chart/layout change is made — this session's whole lesson was that "it opens in one lenient tool" is not validation |
 
-**Read `docs/BACKLOG.md` R5's entry in full before starting Session 5** — the gap
-table there is the actual punch list, this row is just the pointer to it.
+**Read `docs/BACKLOG.md` R5's entry and the "Not yet slotted" table (end of
+the Ordering section) in full before starting Session 5** — both are the
+actual punch list, this row is just the pointer to them.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -370,9 +371,28 @@ not collide with real fixes. High volume, low reasoning — the Antigravity spli
 
 ### Not scheduled
 
-- **T2** air-gapped bundle — **blocked on adapter delivery (R7)**, not on us.
+- **T2** air-gapped bundle, **R7** the logistics behind it — **blocked on
+  adapter delivery**, not on us.
 - **D19** — needs a reachability answer first; see its entry.
 - **R3, R4, R8** — post-MVP by decision, not by omission.
+
+**Audited 23 August 2026 — ten open items had no batch at all, found by
+cross-checking every open item against every batch, not assumed complete.**
+None of these are new; they were simply never placed. Not re-triaged here,
+just surfaced so the next planning pass starts from the truth:
+
+| Item | Severity | One line |
+|---|---|---|
+| D8 | medium | `.env` must exist before first run — the manual step is done on the board, nothing stops the next deploy repeating the omission |
+| D23 | medium | Fault flags reported as measured on a failed read — API-shape decision needed |
+| D24 | medium | Two `InvalidReadingError` guards uncovered; coverage is 99%, docs claimed 100% |
+| D25 | medium | An overload that stops being readable disappears from the screen instead of staying flagged |
+| D26 | medium | Python suite failed once in ten runs, never reproduced |
+| D28 | low | MCU boot-time `mcu_log` notify lost to a startup race |
+| D29 | medium | `LOG_LEVEL` is inert — the Logger461 stand-in always logs at DEBUG regardless of setting |
+| D30 | — | Code fixed (the timezone bug that made a bad soak read "clean"); regression test still needed |
+| T12 | medium | Decide the status of `tools/check_client_behaviour.js` |
+| T13 | medium | Distil the remaining documents |
 
 **What is not in any batch is as important as what is:** if a batch slips, the
 cut line in `PROJECT_STATE.md` says what ships anyway.
@@ -396,6 +416,10 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D21** | The UI tells the operator the step is 0.1°; it is 0.06° | 8 August 2026 · Batch 1 |
 | **T8** | Instrumented run on the board over adb | 7 August 2026 · **Flow:** `WORKFLOWS.md` W1 |
 | **T4** | Moves while unverified: DECIDED, permitted | (decision) · **Recorded in:** ADR-0007 |
+| **D4** | Connection drops after a few commands; requires a page refresh | 11 August 2026 · Session 3 (SSE) — full two-session soak saga kept whole in `CLOSED.md` |
+| **D18** | A failed CSV export navigates the operator out of the application | 11 August 2026 |
+| **D22** | The only export control is fixed at 24 hours | 11 August 2026 · R5's delivery path |
+| **D31** | Telemetry export drops instantly with "controller busy" | 23 August 2026 · real cause was a client-side `ReferenceError`, not the Pydantic hypothesis — see `CLOSED.md` |
 
 ---
 

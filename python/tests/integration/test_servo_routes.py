@@ -13,7 +13,9 @@ class TestState:
                      "position_verified", "active_zero", "temperature_c",
                      "voltage_v", "current_a", "torque_kgcm", "overload",
                      "overcurrent", "overheat", "voltage_fault",
-                     "sensor_fault", "angle_fault"}
+                     "sensor_fault", "angle_fault", "servo_deg",
+                     "target_deg", "target_stale", "output_min_deg",
+                     "output_max_deg"}
 
     def test_full_shape_and_boot_defaults(self, client):
         body = client.get("/api/v1/servo/state").json()
@@ -21,6 +23,8 @@ class TestState:
         assert body["position_verified"] is False
         assert body["active_zero"] == "factory"
         assert body["locked"] is False
+        assert body["target_deg"] is None
+        assert body["target_stale"] is False
 
 
 class TestMove:

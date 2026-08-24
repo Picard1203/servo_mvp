@@ -13,20 +13,37 @@ from app.models.entities import TelemetrySample
 from app.repositories.abstract.telemetry_repository import TelemetryRepository
 from app.services.servo_state import ServoStateStore
 
-# Binary telemetry payload struct format:
-# Base Header: <dI (8-byte base timestamp, 4-byte sample count)
-# Per Sample (18 bytes):
+# Binary telemetry payload struct format. This is a twin path with
+# parseBinaryTelemetry() in static/app.js - the two must be changed
+# together, and this comment is the third statement of the same format,
+# so all three must agree (a stale comment here once disagreed with both
+# the struct string and the client - see BACKLOG.md).
+#
+# Base Header (16 bytes): <dIf
+# d: base timestamp (unix seconds, float64)
+# I: sample count (uint32)
+# f: servo_deg per output_deg, signed by direction (float32) - the ONE
+#    authoritative gear-ratio constant, sent as data so the client
+#    derives servo angle rather than declaring a second copy of it
+#    (ANGLE_STEP in app.js is the same class of duplication D9 cost).
+#
+# Per Sample (20 bytes): <HhhHHhBIBh
 # H: raw_counts (uint16)
 # h: output_deg * 100 (int16)
 # h: temperature_c * 100 (int16)
-# H: voltage_v * 100 (uint16)
-# H: current_a * 100 (uint16)
+# H: voltage_v * 100 (uint16) - never negative; was mis-typed 'h'
+#    (signed) here while the comment and the client already agreed on
+#    'H'. Fixed to match all three; no behaviour change at real values.
+# H: current_a * 100 (uint16) - same fix, same reason.
 # h: torque_kgcm * 100 (int16)
 # B: flags bitmask
 # I: dt_ms (uint32)
-# B: pad
-SAMPLE_STRUCT = struct.Struct("<HhhhhhBIB")
-HEADER_STRUCT = struct.Struct("<dI")
+# B: target_valid (0 or 1) - was an unused pad byte
+# h: target_deg * 100 (int16) - meaningless when target_valid is 0;
+#    the client must render that as unknown, never as 0.0 deg (the
+#    same rule output_deg's own null-on-failed-read already follows)
+SAMPLE_STRUCT = struct.Struct("<HhhHHhBIBh")
+HEADER_STRUCT = struct.Struct("<dIf")
 
 
 class TelemetryService:
@@ -62,7 +79,9 @@ class TelemetryService:
             An iterator over the packed binary bytes.
         """
         count, base_ts = self._telemetry.count_range(ts_from, ts_to, self._settings.export_max_rows)
-        yield HEADER_STRUCT.pack(base_ts, count)
+        ratio = (self._settings.servo_deg_per_output_deg
+                 * self._settings.servo_direction)
+        yield HEADER_STRUCT.pack(base_ts, count, ratio)
 
         # Batch samples into one relay write instead of one per sample - board-
         # validated 2026-08-23 (see BACKLOG.md D6): real gain, but the Bridge's
@@ -82,6 +101,10 @@ class TelemetryService:
                 ((1 if sample.sensor_fault else 0) << 6) |
                 ((1 if sample.angle_fault else 0) << 7)
             )
+            target_valid = 1 if sample.target_deg is not None else 0
+            target_packed = (max(-32768, min(32767,
+                             int(round(sample.target_deg * 100))))
+                             if target_valid else 0)
             buf += SAMPLE_STRUCT.pack(
                 max(0, min(65535, int(sample.raw_counts))),
                 max(-32768, min(32767, int(round(sample.output_deg * 100)))),
@@ -91,7 +114,8 @@ class TelemetryService:
                 max(-32768, min(32767, int(round(sample.torque_kgcm * 100)))),
                 flags,
                 dt_ms,
-                0
+                target_valid,
+                target_packed
             )
             if len(buf) >= _BATCH * SAMPLE_STRUCT.size:
                 yield bytes(buf)
@@ -152,7 +176,8 @@ class TelemetryService:
             overheat=view.overheat,
             voltage_fault=view.voltage_fault,
             sensor_fault=view.sensor_fault,
-            angle_fault=view.angle_fault))
+            angle_fault=view.angle_fault,
+            target_deg=view.target_deg))
 
     def _maybe_purge(self) -> None:
         """Applies retention at the configured interval.

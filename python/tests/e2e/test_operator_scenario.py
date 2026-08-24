@@ -77,7 +77,7 @@ class TestOperatorSession:
                               params={"from": 0, "to": time.time() + 1})
             assert export.status_code == 200
             assert export.headers["content-type"] == "application/octet-stream"
-            _, count = HEADER_STRUCT.unpack(export.content[:HEADER_STRUCT.size])
+            _, count, _ = HEADER_STRUCT.unpack(export.content[:HEADER_STRUCT.size])
             assert count >= 1
 
             # 8. the session's story is in the events feed

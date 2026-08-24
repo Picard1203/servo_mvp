@@ -96,9 +96,10 @@ class TestExport:
 
     XLSX assembly is client-side (app.js) by design - see BACKLOG.md R5 -
     so the server's contract is the compact binary stream only: a header
-    (base timestamp, sample count) followed by one 18-byte packed record
-    per sample. These tests replace an earlier version written against a
-    server-side export_xlsx() that was never implemented (see D31/R5).
+    (base timestamp, sample count, servo-degrees-per-output-degree ratio)
+    followed by one 20-byte packed record per sample. These tests replace
+    an earlier version written against a server-side export_xlsx() that
+    was never implemented (see D31/R5).
     """
 
     def test_header_and_stream_length(self, backend, service, sim):
@@ -107,10 +108,29 @@ class TestExport:
         service._sample_once()
         chunks = list(service.export_binary_stream(0, time.time() + 1))
         stream = b"".join(chunks)
-        base_ts, count = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
+        base_ts, count, ratio = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
         assert count == 2
         assert base_ts > 0
+        assert ratio == pytest.approx(backend.settings.servo_deg_per_output_deg
+                                       * backend.settings.servo_direction)
         assert len(stream) == HEADER_STRUCT.size + count * SAMPLE_STRUCT.size
+
+    def test_target_angle_round_trips(self, backend, service, sim):
+        """A sample taken before any move has target_valid=0; one taken
+        after an accepted move carries the target angle."""
+        from app.deps import get_motion_service
+        from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
+        service._sample_once()  # no move commanded yet
+        get_motion_service().move_to(30.0, 100.0)
+        service._sample_once()
+        stream = b"".join(service.export_binary_stream(0, time.time() + 1))
+        offset = HEADER_STRUCT.size
+        first = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
+        assert first[8] == 0  # target_valid
+        offset += SAMPLE_STRUCT.size
+        second = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
+        assert second[8] == 1
+        assert second[9] == pytest.approx(3000, abs=1)  # 30.0 deg * 100
 
     def test_rows_and_flag_encoding(self, backend, service, sim):
         from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
@@ -119,7 +139,7 @@ class TestExport:
         sim.command_move(sim.read_raw_counts(), 1000, 50)  # clears fault
         service._sample_once()
         stream = b"".join(service.export_binary_stream(0, time.time() + 1))
-        _, count = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
+        _, count, _ = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
         assert count == 2
         offset = HEADER_STRUCT.size
         first = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
@@ -137,7 +157,7 @@ class TestExport:
         time.sleep(0.05)
         service._sample_once()
         stream = b"".join(service.export_binary_stream(0, boundary))
-        _, count = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
+        _, count, _ = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
         assert count == 1  # only the sample before the boundary
 
 

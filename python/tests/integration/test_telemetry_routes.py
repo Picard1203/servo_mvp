@@ -20,7 +20,7 @@ class TestExport:
             params={"from": 0, "to": time.time() + 1})
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/octet-stream"
-        _, count = HEADER_STRUCT.unpack(response.content[:HEADER_STRUCT.size])
+        _, count, _ = HEADER_STRUCT.unpack(response.content[:HEADER_STRUCT.size])
         assert count == 1
 
     def test_missing_params_422(self, client):
@@ -31,5 +31,5 @@ class TestExport:
         response = client.get("/api/v1/telemetry/binary",
                               params={"from": 1, "to": 2})
         assert response.status_code == 200
-        _, count = HEADER_STRUCT.unpack(response.content[:HEADER_STRUCT.size])
+        _, count, _ = HEADER_STRUCT.unpack(response.content[:HEADER_STRUCT.size])
         assert count == 0

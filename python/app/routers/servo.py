@@ -31,16 +31,7 @@ def get_state(state: StateDep) -> ServoStateResponse:
         Current position, flags and telemetry.
     """
     view = state.snapshot()
-    return ServoStateResponse(
-        output_deg=view.output_deg, reading_valid=view.reading_valid,
-        moving=view.moving, locked=view.locked,
-        settling=view.settling, position_verified=view.position_verified,
-        active_zero=view.active_zero_name,
-        temperature_c=view.temperature_c, voltage_v=view.voltage_v,
-        current_a=view.current_a, torque_kgcm=view.torque_kgcm,
-        overload=view.overload, overcurrent=view.overcurrent,
-        overheat=view.overheat, voltage_fault=view.voltage_fault,
-        sensor_fault=view.sensor_fault, angle_fault=view.angle_fault)
+    return ServoStateResponse.from_view(view)
 
 
 @router.post("/move", status_code=202, response_model=MoveAcceptedResponse)

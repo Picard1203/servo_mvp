@@ -413,13 +413,57 @@ function renderState(s) {
                              && (state.lastKnownDeg !== null));
   const deg = measured ? s.output_deg : state.lastKnownDeg;
   $("posN").textContent = known ? deg.toFixed(1) : "—";
-  const pct = known ? Math.min(100, Math.max(0, (deg / 360) * 100)) : 0;
+
+  /* Scaled against the REACHABLE range the server just sent
+     (output_min_deg/output_max_deg), not a fixed /360. Travel here is
+     -90..+90 from a mid-travel datum, not a full turn: the old /360
+     math rendered every negative angle as 0% (indistinguishable from
+     resting at the datum) and never filled the positive half past a
+     quarter of the bar - found while building the target marker, which
+     needed a scale that actually matched reachable travel. Falls back
+     to the client's own mirrored limits only if a state payload is
+     somehow missing the range (older cached response). */
+  const rangeMin = (typeof s.output_min_deg === "number") ? s.output_min_deg : ANGLE_MIN;
+  const rangeMax = (typeof s.output_max_deg === "number") ? s.output_max_deg : ANGLE_MAX;
+  const rangeSpan = (rangeMax - rangeMin) || 1;
+  const toRangePct = (angle) =>
+    Math.min(100, Math.max(0, ((angle - rangeMin) / rangeSpan) * 100));
+
+  const pct = known ? toRangePct(deg) : 0;
   $("posBar").style.width = pct + "%";
   /* An empty track is what a genuine reading at the datum looks like,
      so collapsing the bar to 0 on an unknown read says "at zero" in
      exactly the way the numeric readout is careful not to. The track
      itself has to show that it is not reporting. */
   $("posTrack").classList.toggle("unknown", !known);
+
+  // Target: independent of reading_valid - a target is still known when
+  // the servo goes silent (unlike SERVO below, which mirrors the
+  // measured position exactly). Never fabricated as 0.0 (D16 shape).
+  const hasTarget = s.target_deg !== null && s.target_deg !== undefined;
+  const marker = $("targetMarker");
+  if (hasTarget) {
+    marker.style.left = toRangePct(s.target_deg) + "%";
+    marker.classList.add("show");
+    marker.classList.toggle("stale", !!s.target_stale);
+  } else {
+    marker.classList.remove("show");
+  }
+  const targetItem = $("targetItem");
+  $("targetVal").textContent = hasTarget
+    ? s.target_deg.toFixed(1) + "°" + (s.target_stale ? " · STOPPED" : "")
+    : "—";
+  targetItem.classList.toggle("stale", !!s.target_stale);
+
+  // Delta: the whole point of showing a target is seeing this number
+  // without doing the subtraction by eye - blank whenever either side
+  // is unknown, never computed against a fabricated value.
+  const hasDelta = known && hasTarget;
+  const deltaVal = hasDelta ? (s.target_deg - deg) : null;
+  $("deltaVal").textContent = hasDelta
+    ? (deltaVal > 0 ? "+" : "") + deltaVal.toFixed(1) + "°"
+    : "—";
+  $("deltaItem").classList.toggle("stale", !!s.target_stale);
 
   // Everything below this line describes the SERVO, and on a failed read
   // the servo described nothing. temperature, voltage, current and
@@ -443,6 +487,12 @@ function renderState(s) {
   $("vVolt").textContent = num(shown && shown.voltage_v, 2);
   $("vCur").textContent = num(shown && shown.current_a, 2);
   $("vTorq").textContent = num(shown && shown.torque_kgcm, 1);
+
+  // Servo (pre-ratio) angle follows the measured position exactly - same
+  // "shown" snapshot, same blanking pacing as temp/voltage/current/torque
+  // above. It is a debug value, not an operator control.
+  const servoText = num(shown && shown.servo_deg, 1);
+  $("servoVal").textContent = servoText === "—" ? "—" : servoText + "°";
 
   const anyFault = !!shown && (shown.overload || shown.overcurrent ||
                    shown.overheat || shown.voltage_fault ||
@@ -512,14 +562,29 @@ function setFault(id, on) {
   else s.innerHTML = '<span class="okdot"></span>OK';
 }
 
+/* The one list of fault flag -> label. faultName() (live event line, one
+   name) and the export's decoded Faults column (all active names) both
+   read this instead of each stating the mapping independently. */
+const FAULT_FIELDS = [
+  { key: "overload", label: "Overload" },
+  { key: "overcurrent", label: "Overcurrent" },
+  { key: "overheat", label: "Overheat" },
+  { key: "voltage_fault", label: "Voltage fault" },
+  { key: "sensor_fault", label: "Sensor fault" },
+  { key: "angle_fault", label: "Angle fault" },
+];
+
 function faultName(s) {
-  if (s.overload) return "Overload";
-  if (s.overcurrent) return "Overcurrent";
-  if (s.overheat) return "Overheat";
-  if (s.voltage_fault) return "Voltage fault";
-  if (s.sensor_fault) return "Sensor fault";
-  if (s.angle_fault) return "Angle fault";
-  return "Fault";
+  const hit = FAULT_FIELDS.find((f) => s[f.key]);
+  return hit ? hit.label : "Fault";
+}
+
+/* Export use: every active fault, not just the first - a forensic
+   reviewer of an unattended run needs to know all of them, not the
+   single-line summary the live event log shows. "" (blank) when none,
+   read the same way the Faults column reads: absence is normal. */
+function decodedFaultNames(s) {
+  return FAULT_FIELDS.filter((f) => s[f.key]).map((f) => f.label).join(", ");
 }
 
 /* ---------------- zeros (saved positions) ---------------- */
@@ -710,15 +775,30 @@ function setExportPreset(rangeKey) {
   });
 }
 
+/* Mirrors SAMPLE_STRUCT/HEADER_STRUCT in telemetry_service.py exactly -
+   a twin path; both sides move together, and this comment is the third
+   statement of the format alongside the Python struct string and its
+   own comment (a stale copy of this exact comment once disagreed with
+   the real struct, see BACKLOG.md). Header is 16 bytes: base timestamp
+   (f64), sample count (u32), servo-degrees-per-output-degree ratio
+   (f32, signed by direction) - the one authoritative gear-ratio
+   constant, received as data rather than restated as a second,
+   hardcoded copy (ANGLE_STEP below is the OTHER angle constant this
+   project already keeps in one place only). Sample is 20 bytes. */
+const SERVO_RATIO_OFFSET = 12;
+const HEADER_BYTES = 16;
+const SAMPLE_BYTES = 20;
+
 function parseBinaryTelemetry(buffer) {
   const view = new DataView(buffer);
-  if (buffer.byteLength < 12) return [];
+  if (buffer.byteLength < HEADER_BYTES) return { samples: [], servoRatio: null };
   const baseTs = view.getFloat64(0, true);
   const count = view.getUint32(8, true);
+  const servoRatio = view.getFloat32(SERVO_RATIO_OFFSET, true);
 
   const samples = [];
-  let offset = 12;
-  for (let i = 0; i < count && offset + 18 <= buffer.byteLength; i++) {
+  let offset = HEADER_BYTES;
+  for (let i = 0; i < count && offset + SAMPLE_BYTES <= buffer.byteLength; i++) {
     const rawCounts = view.getUint16(offset, true);
     const outputDeg = view.getInt16(offset + 2, true) / 100.0;
     const tempC = view.getInt16(offset + 4, true) / 100.0;
@@ -727,7 +807,11 @@ function parseBinaryTelemetry(buffer) {
     const torque = view.getInt16(offset + 10, true) / 100.0;
     const flags = view.getUint8(offset + 12);
     const dtMs = view.getUint32(offset + 13, true);
-    offset += 18;
+    const targetValid = view.getUint8(offset + 17) !== 0;
+    /* null, not 0.0, when no target was in effect - same rule as every
+       other "did not answer" field in this contract (D16's shape). */
+    const targetDeg = targetValid ? view.getInt16(offset + 18, true) / 100.0 : null;
+    offset += SAMPLE_BYTES;
 
     samples.push({
       timestamp: baseTs + (dtMs / 1000.0),
@@ -745,9 +829,14 @@ function parseBinaryTelemetry(buffer) {
       voltage_fault: (flags & 32) !== 0,
       sensor_fault: (flags & 64) !== 0,
       angle_fault: (flags & 128) !== 0,
+      target_deg: targetDeg,
+      /* Servo (pre-ratio) angle is a pure function of output_deg and the
+         one ratio carried in the header - computed here, not stored a
+         second time on the wire or in the export (see BACKLOG.md R5). */
+      servo_deg: servoRatio ? outputDeg * servoRatio : null,
     });
   }
-  return samples;
+  return { samples, servoRatio };
 }
 
 function crc32(strOrUint8) {
@@ -918,8 +1007,9 @@ async function createZipArchive(entries, onProgress) {
    binning, see minMaxDownsampleRefs), so the chart is genuinely fetching
    from the day sheets, live, without holding one giant series. */
 const CHART_DOWNSAMPLE_MAX_POINTS = 2000;
-const DAY_SHEET_COLS = { output_deg: "C", temperature_c: "D", voltage_v: "E",
-                         current_a: "F", torque_kgcm: "G", interval: "I" };
+const DAY_SHEET_COLS = { output_deg: "C", servo_deg: "D", target_deg: "E",
+                         temperature_c: "F", voltage_v: "G", current_a: "H",
+                         torque_kgcm: "I", interval: "M" };
 
 function groupSamplesByDay(samples) {
   const days = [];
@@ -974,15 +1064,59 @@ function computeStatsAndIntervals(samples) {
            minVoltage, maxVoltage, minAngle, maxAngle, faultCounts };
 }
 
-/* Min-max binning over the flattened (day, row) sequence: for each bin,
-   keeps the highest and lowest sample of `field` - preserves spikes and
-   faults, which matter more here than a smooth-looking average would.
-   Returns refs {dayIdx, row}, in ascending row order, ready to become
-   formula cells. */
-function minMaxDownsampleRefs(days, field) {
+/* Per-day rows for the Overview table - "which day ran hot, which day
+   stalled" (operator's ask: richer content than one whole-range number
+   per stat). Derivable from data already grouped by day; no schema
+   change, no new sampling. `days` already groups samples per calendar
+   day (groupSamplesByDay), so this is one more pass over what is
+   already in memory, not a second query. */
+function computeDailyStats(days) {
+  return days.map((day) => {
+    const samples = day.samples;
+    let peakTorque = 0, peakCurrent = 0, minTemp = 999, maxTemp = -999,
+        minVoltage = 999, maxVoltage = 0, stallCount = 0, movingCount = 0,
+        angleTravelled = 0, prevAngle = null, prevTs = null;
+    samples.forEach((s) => {
+      peakTorque = Math.max(peakTorque, s.torque_kgcm);
+      peakCurrent = Math.max(peakCurrent, s.current_a);
+      minTemp = Math.min(minTemp, s.temperature_c);
+      maxTemp = Math.max(maxTemp, s.temperature_c);
+      minVoltage = Math.min(minVoltage, s.voltage_v);
+      maxVoltage = Math.max(maxVoltage, s.voltage_v);
+      if (s.moving) movingCount += 1;
+      if (prevTs !== null && (s.timestamp - prevTs) >= 9.0) stallCount += 1;
+      if (prevAngle !== null) angleTravelled += Math.abs(s.output_deg - prevAngle);
+      prevAngle = s.output_deg;
+      prevTs = s.timestamp;
+    });
+    if (samples.length === 0) { minTemp = maxTemp = minVoltage = maxVoltage = 0; }
+    return {
+      dateStr: day.dateStr, count: samples.length,
+      movingPct: samples.length ? (movingCount / samples.length) * 100 : 0,
+      angleTravelled, peakTorque, peakCurrent, minTemp, maxTemp,
+      minVoltage, maxVoltage, stallCount,
+    };
+  });
+}
+
+/* Min-max binning over the flattened (day, row) sequence, IN TIME ORDER:
+   for each bin, keeps the highest and lowest sample of `field` -
+   preserves spikes and faults, which matter more here than a smooth-
+   looking average would. Returns refs {dayIdx, row, value, ts}, ascending
+   row order, ready to become formula cells.
+   opts.skipNull drops samples where the field is null/undefined before
+   binning - needed for target_deg, which is null until a move is ever
+   commanded; without it, null would compare as 0 in the min/max picks
+   and silently fabricate a target that was never set (D16 shape). */
+function minMaxDownsampleRefs(days, field, opts) {
+  const skipNull = !!(opts && opts.skipNull);
   const flat = [];
   days.forEach((day, dayIdx) => {
-    day.samples.forEach((s, i) => flat.push({ value: s[field], ts: s.timestamp, dayIdx, row: i + 2 }));
+    day.samples.forEach((s, i) => {
+      const value = s[field];
+      if (skipNull && (value === null || value === undefined)) return;
+      flat.push({ value, ts: s.timestamp, dayIdx, row: i + 2 });
+    });
   });
   const n = flat.length;
   if (n === 0) return [];
@@ -1004,6 +1138,43 @@ function minMaxDownsampleRefs(days, field) {
   return picked;
 }
 
+/* Same min-max binning, but over the sequence sorted by OUTPUT ANGLE
+   rather than time - for the angle-correlated charts (mechanical team's
+   request: see how a field relates to position, not to when it was
+   sampled). Returns refs {dayIdx, row, value, angle}, ascending angle. */
+function angleSortedDownsampleRefs(days, field) {
+  const flat = [];
+  days.forEach((day, dayIdx) => {
+    day.samples.forEach((s, i) => {
+      if (s.output_deg === null || s.output_deg === undefined) return;
+      flat.push({ value: s[field], angle: s.output_deg, dayIdx, row: i + 2 });
+    });
+  });
+  flat.sort((a, b) => a.angle - b.angle);
+  const n = flat.length;
+  if (n === 0) return [];
+  if (n <= CHART_DOWNSAMPLE_MAX_POINTS) return flat;
+  const bins = Math.max(1, Math.floor(CHART_DOWNSAMPLE_MAX_POINTS / 2));
+  const binSize = Math.ceil(n / bins);
+  const picked = [];
+  for (let start = 0; start < n; start += binSize) {
+    const end = Math.min(n, start + binSize);
+    let lo = flat[start], hi = flat[start];
+    for (let i = start; i < end; i++) {
+      if (flat[i].value < lo.value) lo = flat[i];
+      if (flat[i].value > hi.value) hi = flat[i];
+    }
+    // Ordered by ANGLE (the x-axis here), not original row index - the
+    // time-sorted version above can order by row because row order IS
+    // time order; that shortcut doesn't hold once the sequence has been
+    // re-sorted by angle.
+    if (lo === hi) picked.push(lo);
+    else if (lo.angle <= hi.angle) picked.push(lo, hi);
+    else picked.push(hi, lo);
+  }
+  return picked;
+}
+
 function dayCellRef(days, ref, colLetter) {
   return `'${days[ref.dayIdx].dateStr}'!${colLetter}${ref.row}`;
 }
@@ -1018,21 +1189,35 @@ function excelSerialDate(unixSeconds) {
   return unixSeconds / 86400 + 25569;
 }
 
-/* Same bit layout export_binary_stream already uses server-side
-   (telemetry_service.py) - one encoding, not a second one invented here. */
-function packFlags(s) {
-  return (s.moving ? 1 : 0) | (s.locked ? 2 : 0) | (s.overload ? 4 : 0) |
-    (s.overcurrent ? 8 : 0) | (s.overheat ? 16 : 0) | (s.voltage_fault ? 32 : 0) |
-    (s.sensor_fault ? 64 : 0) | (s.angle_fault ? 128 : 0);
-}
-
 const RAW_HEADERS = [
-  "Timestamp", "Raw Counts", "Output Angle (deg)", "Temperature (C)",
-  "Voltage (V)", "Current (A)", "Torque (kg.cm)", "Flags (bit0=moving,1=locked,2=overload,3=overcurrent,4=overheat,5=voltage,6=sensor,7=angle)",
-  "Interval (s)"
+  "Timestamp", "Raw Counts", "Output Angle (deg)", "Servo Angle (deg)",
+  "Target Angle (deg)", "Temperature (C)", "Voltage (V)", "Current (A)",
+  "Torque (kg.cm)", "Moving", "Locked", "Faults", "Interval (s)"
 ];
-const RAW_COLS = ["A","B","C","D","E","F","G","H","I"];
+const RAW_COLS = ["A","B","C","D","E","F","G","H","I","J","K","L","M"];
 const TIMESTAMP_COL = "A";
+
+/* Explicit widths for every column - the previous version had none at
+   all, so every column (not just the date) sat at Excel's default and
+   the timestamp rendered as `########` (BACKLOG.md R5). Units are
+   Excel's own "characters of the default font" measure. */
+const DAY_SHEET_COL_WIDTHS_XML =
+  `<cols>` +
+  `<col min="1" max="1" width="20" customWidth="1"/>` +   // Timestamp
+  `<col min="2" max="2" width="12" customWidth="1"/>` +   // Raw Counts
+  // The 3 angle columns and Temperature/Torque are sized for their OWN
+  // header text ("Output/Servo/Target Angle (deg)", "Temperature (C)"),
+  // not just the data - a value fits in half this width, but a header
+  // clipped mid-word is the same unreadable-column defect this section
+  // exists to fix (found rendering a real preview, not assumed fixed).
+  `<col min="3" max="5" width="20" customWidth="1"/>` +   // the 3 angles
+  `<col min="6" max="6" width="17" customWidth="1"/>` +   // Temperature (C)
+  `<col min="7" max="8" width="12" customWidth="1"/>` +   // Voltage/Current
+  `<col min="9" max="9" width="15" customWidth="1"/>` +   // Torque (kg.cm)
+  `<col min="10" max="11" width="9" customWidth="1"/>` +  // Moving/Locked
+  `<col min="12" max="12" width="26" customWidth="1"/>` + // Faults (can list several)
+  `<col min="13" max="13" width="13" customWidth="1"/>` + // Interval (s)
+  `</cols>`;
 
 /* One worksheet per day, full resolution - this is the raw form; nothing
    downsamples it, and there is no row cap, so a day is always well under
@@ -1047,53 +1232,115 @@ function makeDaySheetXml(day) {
   let body = "";
   day.samples.forEach((s, idx) => {
     const r = idx + 2;
-    body += `<row r="${r}">` +
+    const hasServo = s.servo_deg !== null && s.servo_deg !== undefined;
+    const hasTarget = s.target_deg !== null && s.target_deg !== undefined;
+    const faults = decodedFaultNames(s);
+    /* Row-level style only - no per-cell stamps, confirmed to still
+       render (see stylesXml's comment) - what matters at millions of
+       rows is one attribute per row, not nine. A fault row takes
+       priority over plain banding, mirroring the live UI's fault lamps
+       (style.css .fault.on) taking priority over the ordinary look. */
+    const rowStyle = faults ? 4 : (idx % 2 === 1 ? 3 : null);
+    const rowAttrs = rowStyle !== null ? ` s="${rowStyle}" customFormat="1"` : "";
+    body += `<row r="${r}"${rowAttrs}>` +
       `<c r="A${r}" s="2"><v>${excelSerialDate(s.timestamp)}</v></c>` +
       `<c r="B${r}"><v>${s.raw_counts}</v></c>` +
       `<c r="C${r}"><v>${Math.round(s.output_deg * 100) / 100}</v></c>` +
-      `<c r="D${r}"><v>${Math.round(s.temperature_c * 100) / 100}</v></c>` +
-      `<c r="E${r}"><v>${Math.round(s.voltage_v * 100) / 100}</v></c>` +
-      `<c r="F${r}"><v>${Math.round(s.current_a * 100) / 100}</v></c>` +
-      `<c r="G${r}"><v>${Math.round(s.torque_kgcm * 100) / 100}</v></c>` +
-      `<c r="H${r}"><v>${packFlags(s)}</v></c>` +
-      `<c r="I${r}"><v>${Math.round(s.interval * 1000) / 1000}</v></c>` +
+      (hasServo ? `<c r="D${r}"><v>${Math.round(s.servo_deg * 100) / 100}</v></c>` : "") +
+      (hasTarget ? `<c r="E${r}"><v>${Math.round(s.target_deg * 100) / 100}</v></c>` : "") +
+      `<c r="F${r}"><v>${Math.round(s.temperature_c * 100) / 100}</v></c>` +
+      `<c r="G${r}"><v>${Math.round(s.voltage_v * 100) / 100}</v></c>` +
+      `<c r="H${r}"><v>${Math.round(s.current_a * 100) / 100}</v></c>` +
+      `<c r="I${r}"><v>${Math.round(s.torque_kgcm * 100) / 100}</v></c>` +
+      (s.moving ? `<c r="J${r}" t="inlineStr"><is><t>Yes</t></is></c>` : "") +
+      (s.locked ? `<c r="K${r}" t="inlineStr"><is><t>Yes</t></is></c>` : "") +
+      (faults ? `<c r="L${r}" t="inlineStr"><is><t>${faults}</t></is></c>` : "") +
+      `<c r="M${r}"><v>${Math.round(s.interval * 1000) / 1000}</v></c>` +
       `</row>`;
   });
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n` +
-    `<sheetData>${hRowXml}${body}</sheetData>\n</worksheet>`;
+    `${DAY_SHEET_COL_WIDTHS_XML}\n<sheetData>${hRowXml}${body}</sheetData>\n</worksheet>`;
 }
 
-const CHART_FIELDS = [
+/* Every TIME-based chart series this workbook can show, one place, so
+   there is a single list of "what gets charted against time" rather than
+   a second one drifting out of sync with ChartData's column allocation.
+   target_deg is skipNull: it doesn't exist until a move is commanded,
+   and letting the downsample treat a missing target as 0 would chart a
+   target that was never set (D16 shape). */
+const TIME_SERIES = [
   { key: "output_deg", title: "Measured Output Angle", axis: "Degrees (deg)", color: "FF9900" },
   { key: "torque_kgcm", title: "Shaft Torque Load", axis: "kg.cm", color: "FF9900" },
   { key: "current_a", title: "Electrical Current Draw", axis: "Amperes", color: "7077A1" },
   { key: "temperature_c", title: "Motor Temperature", axis: "Celsius", color: "C0392B" },
   { key: "voltage_v", title: "Supply Voltage", axis: "Volts", color: "4A7C59" },
   { key: "interval", title: "Sampler Interval Jitter", axis: "Seconds", color: "7077A1" },
+  { key: "servo_deg", title: "Servo Shaft Angle (pre-ratio)", axis: "Degrees (deg)", color: "BB88BB" },
+  { key: "target_deg", title: "Target Angle", axis: "Degrees (deg)", color: "8888BB", skipNull: true },
 ];
 
-/* Builds the hidden ChartData sheet: one (timestamp, value) formula-cell
-   pair of columns per chart field, each cell a live reference into a day
-   sheet - not a value, so editing a day sheet updates the chart. Bounded
-   to CHART_DOWNSAMPLE_MAX_POINTS rows per field regardless of range. */
+/* Angle-correlated charts, mechanical team's request: how a field
+   relates to POSITION, not to when it was sampled. x is output_deg
+   (the mechanism's own travel), sorted ascending - see
+   angleSortedDownsampleRefs. Colors match each field's own TIME_SERIES
+   entry above, so the time chart and its angle-correlated counterpart
+   read as the same fact, not two unrelated colors. */
+const ANGLE_SERIES = [
+  { key: "torque_kgcm", title: "Torque vs Angle", axis: "kg.cm", color: "FF9900" },
+  { key: "current_a", title: "Current vs Angle", axis: "Amperes", color: "7077A1" },
+  { key: "temperature_c", title: "Temperature vs Angle", axis: "Celsius", color: "C0392B" },
+  { key: "voltage_v", title: "Voltage vs Angle", axis: "Volts", color: "4A7C59" },
+];
+
+/* Fixed Overview cells the operator types a range into - typed once,
+   in one recognisable place, so ChartData's formulas below can hardcode
+   the reference (see makeOverviewSheetXml for the labelled cells). */
+const RANGE_FROM_CELL = "Overview!$C$2";
+const RANGE_TO_CELL = "Overview!$C$3";
+
+/* Wraps a value formula so it disappears (NA(), which Excel line/scatter
+   charts render as a gap, not a zero) whenever its own sample falls
+   outside the operator-typed range - the mechanism the typed range
+   selector runs on. tsRef is always the day-sheet TIMESTAMP cell for
+   THIS row, even when the column being computed is the angle x-value:
+   gating by real time, not by the angle re-sort, is what "the operator's
+   range" has to mean. */
+function gatedFormula(tsRef, valueRef) {
+  return `IF(AND(${tsRef}&gt;=${RANGE_FROM_CELL},${tsRef}&lt;=${RANGE_TO_CELL}),${valueRef},NA())`;
+}
+
+/* Builds the hidden ChartData sheet: one (x, y) formula-cell pair of
+   columns per series above (TIME_SERIES then ANGLE_SERIES), each cell a
+   live reference into a day sheet, gated by the typed range - not a
+   plain value, so editing a day sheet OR the range updates the charts.
+   Bounded to CHART_DOWNSAMPLE_MAX_POINTS rows per field regardless of
+   range length. 12 series today = 24 columns, comfortably inside A..Z -
+   this stops being true past 13 series and would need double-letter
+   columns; noted here since nothing else enforces it. */
 function makeChartDataSheetXml(days) {
-  const colPairs = CHART_FIELDS.map((_, i) => [
-    RAW_COLS[i * 2] || String.fromCharCode(65 + i * 2),
-    RAW_COLS[i * 2 + 1] || String.fromCharCode(65 + i * 2 + 1),
+  const allSeries = [
+    ...TIME_SERIES.map((f) => Object.assign({ mode: "time" }, f)),
+    ...ANGLE_SERIES.map((f) => Object.assign({ mode: "angle" }, f)),
+  ];
+  const colPairs = allSeries.map((_, i) => [
+    String.fromCharCode(65 + i * 2), String.fromCharCode(65 + i * 2 + 1),
   ]);
   let maxRows = 0;
-  const perField = CHART_FIELDS.map((f) => {
-    const refs = minMaxDownsampleRefs(days, f.key === "interval" ? "interval" : f.key);
+  const perField = allSeries.map((f) => {
+    const refs = f.mode === "angle"
+      ? angleSortedDownsampleRefs(days, f.key)
+      : minMaxDownsampleRefs(days, f.key, { skipNull: !!f.skipNull });
     maxRows = Math.max(maxRows, refs.length);
     return refs;
   });
 
   let hRow = `<row r="1">`;
-  CHART_FIELDS.forEach((f, i) => {
-    const [tsCol, valCol] = colPairs[i];
-    hRow += `<c r="${tsCol}1" t="inlineStr"><is><t>${f.title} - time</t></is></c>` +
-            `<c r="${valCol}1" t="inlineStr"><is><t>${f.title}</t></is></c>`;
+  allSeries.forEach((f, i) => {
+    const [xCol, yCol] = colPairs[i];
+    const xLabel = f.mode === "angle" ? `${f.title} - angle` : `${f.title} - time`;
+    hRow += `<c r="${xCol}1" t="inlineStr"><is><t>${xLabel}</t></is></c>` +
+            `<c r="${yCol}1" t="inlineStr"><is><t>${f.title}</t></is></c>`;
   });
   hRow += `</row>`;
 
@@ -1101,22 +1348,30 @@ function makeChartDataSheetXml(days) {
   for (let r = 0; r < maxRows; r++) {
     const rowN = r + 2;
     let rowXml = `<row r="${rowN}">`;
-    CHART_FIELDS.forEach((f, i) => {
+    allSeries.forEach((f, i) => {
       const refs = perField[i];
       if (r >= refs.length) return;
       const ref = refs[r];
-      const valCol = f.key === "interval" ? DAY_SHEET_COLS.interval : DAY_SHEET_COLS[f.key];
-      const [tsColOut, valColOut] = colPairs[i];
+      const tsRef = dayCellRef(days, ref, TIMESTAMP_COL);
+      const [xColOut, yColOut] = colPairs[i];
+      const yValRef = dayCellRef(days, ref, DAY_SHEET_COLS[f.key]);
       /* Formula AND cached value on every cell - real Excel output never
          ships a formula alone (confirmed against a reference file), and
          a renderer that doesn't recalculate on open (some OnlyOffice/
-         LibreOffice paths) would otherwise show these blank. */
-      /* Cached value must match what the day-sheet cell actually holds
-         (an Excel serial date now, not raw Unix seconds) - otherwise the
-         cache and the live formula would disagree the moment anything
-         recalculates. */
-      rowXml += `<c r="${tsColOut}${rowN}" s="2"><f>${dayCellRef(days, ref, TIMESTAMP_COL)}</f><v>${excelSerialDate(ref.ts)}</v></c>` +
-                `<c r="${valColOut}${rowN}"><f>${dayCellRef(days, ref, valCol)}</f><v>${ref.value}</v></c>`;
+         LibreOffice paths) would otherwise show these blank. Cached
+         value is the UNGATED value: at generation time every sample is
+         inside the default (full-export) range, so cache and live
+         formula agree until the operator actually edits the range -
+         which needs a recalc to show regardless (see the OnlyOffice
+         gate on the range selector itself). */
+      if (f.mode === "angle") {
+        const xValRef = dayCellRef(days, ref, DAY_SHEET_COLS.output_deg);
+        rowXml += `<c r="${xColOut}${rowN}"><f>${gatedFormula(tsRef, xValRef)}</f><v>${ref.angle}</v></c>` +
+                  `<c r="${yColOut}${rowN}"><f>${gatedFormula(tsRef, yValRef)}</f><v>${ref.value}</v></c>`;
+      } else {
+        rowXml += `<c r="${xColOut}${rowN}" s="2"><f>${gatedFormula(tsRef, tsRef)}</f><v>${excelSerialDate(ref.ts)}</v></c>` +
+                  `<c r="${yColOut}${rowN}"><f>${gatedFormula(tsRef, yValRef)}</f><v>${ref.value}</v></c>`;
+      }
     });
     rowXml += `</row>`;
     body += rowXml;
@@ -1129,52 +1384,131 @@ function makeChartDataSheetXml(days) {
     colPairs,
     maxRows,
     perField,
+    allSeries,
   };
 }
 
-/* Real, verified OOXML chart structure - generated with XlsxWriter and
-   unzipped to confirm the exact schema, not guessed from documentation
-   (the previous session's version of this function was never written at
-   all: every call to makeChartXml/makeDrawingXml threw ReferenceError). */
+/* Real, verified OOXML chart structures - both generated with XlsxWriter
+   and unzipped to confirm the exact schema, not guessed from
+   documentation (the line-chart shape was verified 23 Aug; the scatter
+   shape, needed this session for a genuinely numeric x-axis, the same
+   way - see BACKLOG.md R5, the lesson that cost a corrupted-file defect
+   was "verify against a reference, don't guess a second time"). */
 function numCacheXml(values) {
   const pts = values.map((v, i) => `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join("");
   return `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${values.length}"/>${pts}</c:numCache>`;
 }
 
-function makeChartXml(title, axisTitle, seriesName, colorHex, catFormula, valFormula,
-                      catCache, valCache) {
-  /* Cache embedded alongside the reference, matching real Excel output -
-     a renderer that shows the chart before/without resolving cross-sheet
-     formulas (some OnlyOffice/LibreOffice paths) still has something
-     correct to draw. */
-  const catCacheXml = catCache ? numCacheXml(catCache) : "";
-  const valCacheXml = valCache ? numCacheXml(valCache) : "";
+function titleXml(text, vertical) {
+  const bodyPr = vertical ? `<a:bodyPr rot="-5400000" vert="horz"/>` : `<a:bodyPr/>`;
+  return `<c:title><c:tx><c:rich>${bodyPr}<a:lstStyle/><a:p><a:pPr><a:defRPr/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>${text}</a:t></a:r></a:p></c:rich></c:tx><c:layout/></c:title>`;
+}
+
+/* A category axis with an EXPLICIT tick-label skip, computed by us from
+   the actual point count - not c:dateAx's "auto" spacing. c:dateAx was
+   tried first (verified against a reference, rendered cleanly there) and
+   still made this WORSE on a real board export: LibreOffice's automatic
+   interval picked a per-second tick across a full hour of real (denser,
+   less uniform) data, producing the same illegible label smear it was
+   meant to fix. Trusting the renderer's heuristic on data we hadn't
+   actually tested it against was the mistake - we already know exactly
+   how many points are in this series, so we pick the interval ourselves
+   and verified THIS shape against a reference at real scale (2000
+   points) before shipping it, the same rigor as everything else in this
+   file that touches OOXML. */
+function catAxXml(axId, crossAxId, tickLblSkip) {
+  /* -45deg labels (rot="-2700000", OOXML angle units are 1/60000 deg) -
+     even with a dozen labels instead of hundreds, horizontal labels on
+     a chart this narrow still touch/overlap edge to edge. Diagonal was
+     the original layout before this session's changes; restored on
+     request, verified against a real reference (this exact txPr shape)
+     rather than reassembled from memory. */
+  const txPr = `<c:txPr><a:bodyPr rot="-2700000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr baseline="0"/></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
+  return `<c:catAx><c:axId val="${axId}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="mm-dd hh:mm" sourceLinked="0"/><c:tickLblPos val="nextTo"/>${txPr}<c:crossAx val="${crossAxId}"/><c:crosses val="autoZero"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:tickLblSkip val="${tickLblSkip}"/></c:catAx>`;
+}
+
+/* Aim for roughly a dozen visible labels regardless of how many points
+   actually feed the chart - readable at the smallest range (1 hour) and
+   the largest (30 days) alike, without depending on a renderer's own
+   auto-spacing guess. */
+function tickSkipFor(pointCount) {
+  return Math.max(1, Math.ceil(pointCount / 12));
+}
+
+/* One <c:ser> block, shared by the line-chart (c:cat/c:val) and the
+   scatter-chart (c:xVal/c:yVal) builders below - same series shape,
+   different tag names, per the real OOXML schema for each chart type. */
+function seriesXml(idx, tagX, tagY, name, colorHex, xFormula, yFormula, xCache, yCache) {
+  const xCacheXml = xCache ? numCacheXml(xCache) : "";
+  const yCacheXml = yCache ? numCacheXml(yCache) : "";
+  return `<c:ser><c:idx val="${idx}"/><c:order val="${idx}"/><c:tx><c:v>${name}</c:v></c:tx>` +
+    `<c:spPr><a:ln><a:solidFill><a:srgbClr val="${colorHex}"/></a:solidFill></a:ln></c:spPr>` +
+    `<c:marker><c:symbol val="none"/></c:marker>` +
+    `<c:${tagX}><c:numRef><c:f>${xFormula}</c:f>${xCacheXml}</c:numRef></c:${tagX}>` +
+    `<c:${tagY}><c:numRef><c:f>${yFormula}</c:f>${yCacheXml}</c:numRef></c:${tagY}>` +
+    `</c:ser>`;
+}
+
+/* Time-series line chart. seriesSpecs is a list so the same builder
+   covers both a single-field chart (every entry below except one) and
+   the Measured-vs-Target overlay (two series, one chart) without a
+   second, near-duplicate chart function. */
+function makeChartXml(title, axisTitle, seriesSpecs, pointCount) {
+  const seriesXmls = seriesSpecs.map((s, i) =>
+    seriesXml(i, "cat", "val", s.seriesName, s.colorHex, s.catFormula, s.valFormula,
+             s.catCache, s.valCache)).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <c:chart>
-<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:layout/></c:title>
+${titleXml(title, false)}
 <c:plotArea><c:layout/>
 <c:lineChart><c:grouping val="standard"/>
-<c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>${seriesName}</c:v></c:tx>
-<c:spPr><a:ln><a:solidFill><a:srgbClr val="${colorHex}"/></a:solidFill></a:ln></c:spPr>
-<c:marker><c:symbol val="none"/></c:marker>
-<c:cat><c:numRef><c:f>${catFormula}</c:f>${catCacheXml}</c:numRef></c:cat>
-<c:val><c:numRef><c:f>${valFormula}</c:f>${valCacheXml}</c:numRef></c:val>
-</c:ser>
+${seriesXmls}
 <c:axId val="111111111"/><c:axId val="222222222"/>
 </c:lineChart>
-<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="222222222"/></c:catAx>
-<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="111111111"/><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${axisTitle}</a:t></a:r></a:p></c:rich></c:tx></c:title></c:valAx>
+${catAxXml("111111111", "222222222", tickSkipFor(pointCount))}
+<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="111111111"/>${titleXml(axisTitle, true)}</c:valAx>
 </c:plotArea>
 <c:legend><c:legendPos val="b"/></c:legend>
 <c:plotVisOnly val="1"/>
+<c:dispBlanksAs val="gap"/>
+</c:chart>
+</c:chartSpace>`;
+}
+
+/* Angle-correlated chart: a genuinely numeric x-axis (output angle),
+   which c:lineChart's category axis cannot give - a category axis
+   assumes evenly-spaced ordinal categories, wrong for angle values that
+   aren't evenly sampled. c:scatterChart with scatterStyle="lineMarker"
+   and markers suppressed is Excel's own shape for an XY line (verified
+   against a real XlsxWriter-generated file, same rigor as the line
+   chart above), with TWO value axes (c:valAx/c:valAx, not catAx/valAx). */
+function makeScatterChartXml(title, xAxisTitle, yAxisTitle, seriesName, colorHex,
+                             xFormula, yFormula, xCache, yCache) {
+  const ser = seriesXml(0, "xVal", "yVal", seriesName, colorHex,
+                        xFormula, yFormula, xCache, yCache);
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<c:chart>
+${titleXml(title, false)}
+<c:plotArea><c:layout/>
+<c:scatterChart><c:scatterStyle val="lineMarker"/>
+${ser}
+<c:axId val="333333333"/><c:axId val="444444444"/>
+</c:scatterChart>
+<c:valAx><c:axId val="333333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="444444444"/><c:crossBetween val="midCat"/>${titleXml(xAxisTitle, false)}</c:valAx>
+<c:valAx><c:axId val="444444444"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="333333333"/><c:crossBetween val="midCat"/>${titleXml(yAxisTitle, true)}</c:valAx>
+</c:plotArea>
+<c:legend><c:legendPos val="b"/></c:legend>
+<c:plotVisOnly val="1"/>
+<c:dispBlanksAs val="gap"/>
 </c:chart>
 </c:chartSpace>`;
 }
 
 /* Anchors: [{rId, fromCol, fromRow, toCol, toRow}]. One drawing part can
-   anchor several charts on the same sheet - used to lay all 6 charts on
-   the Overview sheet in a 2-column grid. */
+   anchor several charts on the same sheet - used to lay every chart on
+   the Overview sheet in a 2-column grid, however many there are. */
 function makeDrawingXml(anchors) {
   const frames = anchors.map((a, i) =>
     `<xdr:twoCellAnchor><xdr:from><xdr:col>${a.fromCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.fromRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${a.toCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.toRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${i + 2}" name="Chart ${i + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${a.rId}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`
@@ -1184,7 +1518,21 @@ function makeDrawingXml(anchors) {
     `${frames}\n</xdr:wsDr>`;
 }
 
-function makeOverviewSheetXml(days, samples, stats) {
+/* Charts are anchored starting at row index 1 (row 2), column index 3
+   (column D) - see generateExcelXlsxZip's drawing1Xml. Text content in
+   columns A:C never collides with them regardless of row; the per-day
+   table below is deliberately placed past the LAST chart's bottom edge
+   so it can use the full row width without the drawing layer sitting
+   over it. Kept as named constants so a future chart-count change (this
+   session went from 6 charts to 13) has one place to update, not a
+   number re-derived by eye. */
+const CHART_GRID_COLS = 2;
+const CHART_ROW_HEIGHT = 15;
+function chartGridBottomRow(chartCount) {
+  return 1 + Math.ceil(chartCount / CHART_GRID_COLS) * CHART_ROW_HEIGHT + 14;
+}
+
+function makeOverviewSheetXml(days, samples, stats, fromTs, toTs, chartCount) {
   const dtStart = new Date(samples[0]?.timestamp * 1000 || 0).toISOString().replace("T", " ").slice(0, 16) + " UTC";
   const dtEnd = new Date(samples[samples.length - 1]?.timestamp * 1000 || 0).toISOString().replace("T", " ").slice(0, 16) + " UTC";
   const totalFaults = Object.values(stats.faultCounts).reduce((a, b) => a + b, 0);
@@ -1202,56 +1550,201 @@ function makeOverviewSheetXml(days, samples, stats) {
     ["Max sampler interval", `${stats.maxInterval.toFixed(3)} s`],
     ["Fault trips (any type)", String(totalFaults)],
   ];
-  let body = `<row r="1"><c r="A1" t="inlineStr"><is><t>Servo Telemetry Export - Summary</t></is></c></row>`;
+  /* Title band spans A1:F1 (not just A1) so the tangerine fill backs
+     the whole title rather than clipping where column A's own width
+     ends - a styled band that stops under the text it's meant to
+     frame reads as a bug, found rendering a real preview. */
+  let body = `<row r="1" ht="24" customHeight="1">` +
+    `<c r="A1" t="inlineStr" s="5"><is><t>Servo Telemetry Export - Summary</t></is></c>` +
+    `<c r="B1" s="5"/><c r="C1" s="5"/><c r="D1" s="5"/><c r="E1" s="5"/><c r="F1" s="5"/>` +
+    `</row>`;
+  /* The typed range selector - two cells the operator edits directly,
+     same date-time style (s="2") the day sheets already use. Fixed at
+     C2/C3 (RANGE_FROM_CELL/RANGE_TO_CELL) so every ChartData formula can
+     hardcode the reference. Defaults to the full exported range, so a
+     fresh export already shows everything without editing anything. */
+  body += `<row r="2"><c r="A2" t="inlineStr" s="6"><is><t>Chart range - From</t></is></c>` +
+          `<c r="C2" s="2"><v>${excelSerialDate(fromTs)}</v></c></row>`;
+  body += `<row r="3"><c r="A3" t="inlineStr" s="6"><is><t>Chart range - To</t></is></c>` +
+          `<c r="C3" s="2"><v>${excelSerialDate(toTs)}</v></c></row>`;
+  body += `<row r="4"><c r="A4" t="inlineStr"><is><t>Edit the two dates above to narrow every chart to that window - defaults to the full export.</t></is></c></row>`;
   rows.forEach(([k, v], idx) => {
-    const r = idx + 3;
-    body += `<row r="${r}"><c r="A${r}" t="inlineStr"><is><t>${k}</t></is></c>` +
+    const r = idx + 6;
+    body += `<row r="${r}"><c r="A${r}" t="inlineStr" s="6"><is><t>${k}</t></is></c>` +
             `<c r="B${r}" t="inlineStr"><is><t>${v}</t></is></c></row>`;
   });
+
+  /* Per-day table: which day ran hot, which day stalled - one row per
+     day, placed below the chart drawing's bottom edge so the full
+     column width is free to use. */
+  const dailyStats = computeDailyStats(days);
+  const dailyHeaders = ["Day", "Samples", "Moving %", "Angle Travelled (deg)",
+                        "Peak Torque (kg.cm)", "Peak Current (A)",
+                        "Temp Range (C)", "Voltage Range (V)", "Stalls (>=9s)"];
+  const dailyCols = ["A","B","C","D","E","F","G","H","I"];
+  const tableTop = chartGridBottomRow(chartCount) + 4;
+  body += `<row r="${tableTop - 1}"><c r="A${tableTop - 1}" t="inlineStr" s="6"><is><t>Per-day summary</t></is></c></row>`;
+  body += `<row r="${tableTop}" ht="20" customHeight="1">` +
+    dailyHeaders.map((h, i) => `<c r="${dailyCols[i]}${tableTop}" t="inlineStr" s="1"><is><t>${h}</t></is></c>`).join("") +
+    `</row>`;
+  dailyStats.forEach((d, idx) => {
+    const r = tableTop + 1 + idx;
+    const rowAttrs = (idx % 2 === 1) ? ` s="3" customFormat="1"` : "";
+    body += `<row r="${r}"${rowAttrs}>` +
+      `<c r="A${r}" t="inlineStr"><is><t>${d.dateStr}</t></is></c>` +
+      `<c r="B${r}"><v>${d.count}</v></c>` +
+      `<c r="C${r}"><v>${Math.round(d.movingPct * 10) / 10}</v></c>` +
+      `<c r="D${r}"><v>${Math.round(d.angleTravelled * 100) / 100}</v></c>` +
+      `<c r="E${r}"><v>${Math.round(d.peakTorque * 100) / 100}</v></c>` +
+      `<c r="F${r}"><v>${Math.round(d.peakCurrent * 100) / 100}</v></c>` +
+      `<c r="G${r}" t="inlineStr"><is><t>${d.minTemp.toFixed(1)} - ${d.maxTemp.toFixed(1)}</t></is></c>` +
+      `<c r="H${r}" t="inlineStr"><is><t>${d.minVoltage.toFixed(2)} - ${d.maxVoltage.toFixed(2)}</t></is></c>` +
+      `<c r="I${r}"><v>${d.stallCount}</v></c>` +
+      `</row>`;
+  });
+
+  /* Same defect this session already found and fixed on the day sheets
+     (BACKLOG.md R5): a date/number cell too narrow shows ### rather than
+     overflowing like text does, so the range-selector's own values need
+     an explicit width, not just the day sheets'. */
+  const colsXml = `<cols>` +
+    `<col min="1" max="1" width="30" customWidth="1"/>` +
+    // Widened from 12: the whole-range stat VALUES this column also
+    // holds ("2026-08-23 18:20 UTC", "-90.31 to 90.13 deg") are longer
+    // than that, and were visibly overflowing (found live, not assumed
+    // fixed - the per-day table's "Samples" column shares this width
+    // too, which just leaves it wider than it strictly needs).
+    `<col min="2" max="2" width="26" customWidth="1"/>` +
+    `<col min="3" max="3" width="20" customWidth="1"/>` +
+    `<col min="4" max="4" width="20" customWidth="1"/>` +
+    `<col min="5" max="8" width="16" customWidth="1"/>` +
+    `<col min="9" max="9" width="14" customWidth="1"/>` +
+    `</cols>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n` +
-    `<sheetData>${body}</sheetData>\n<drawing r:id="rId1"/>\n</worksheet>`;
+    `${colsXml}\n<sheetData>${body}</sheetData>\n<drawing r:id="rId1"/>\n</worksheet>`;
 }
 
 async function generateExcelXlsxZip(samples, fromTs, toTs, onProgress) {
   const stats = computeStatsAndIntervals(samples);
   const days = groupSamplesByDay(samples);
   const chartData = makeChartDataSheetXml(days);
-  const overviewXml = makeOverviewSheetXml(days, samples, stats);
+  const chartCount = TIME_SERIES.length + 1 /* Measured vs Target overlay */ + ANGLE_SERIES.length;
+  const overviewXml = makeOverviewSheetXml(days, samples, stats, fromTs, toTs, chartCount);
   /* Day-sheet XML is NOT built here - each is built lazily, one at a
      time, inside the filesMap entries below, so createZipArchive can
      compress and discard one day's text before building the next
      rather than holding every day's raw XML in memory simultaneously. */
 
-  const chartXmls = CHART_FIELDS.map((f, i) => {
-    const [tsCol, valCol] = chartData.colPairs[i];
-    const lastRow = chartData.maxRows + 1;
-    const refs = chartData.perField[i];
-    return makeChartXml(f.title, f.axis, f.title, f.color,
-                        `ChartData!$${tsCol}$2:$${tsCol}$${lastRow}`,
-                        `ChartData!$${valCol}$2:$${valCol}$${lastRow}`,
-                        refs.map((r) => excelSerialDate(r.ts)), refs.map((r) => r.value));
-  });
-  const drawing1Xml = makeDrawingXml(
-    chartXmls.map((_, i) => ({ rId: `rId${i + 1}`, fromCol: (i % 2) * 8, fromRow: 1 + Math.floor(i / 2) * 15,
-                               toCol: (i % 2) * 8 + 7, toRow: 1 + Math.floor(i / 2) * 15 + 14 })));
+  const lastRow = chartData.maxRows + 1;
+  const rangeXml = (colPairIdx) => {
+    const [xCol, yCol] = chartData.colPairs[colPairIdx];
+    return { xFormula: `ChartData!$${xCol}$2:$${xCol}$${lastRow}`,
+             yFormula: `ChartData!$${yCol}$2:$${yCol}$${lastRow}` };
+  };
 
+  /* One chart per TIME_SERIES entry - every field gets the same
+     treatment (R5's own 10 August principle: no field singled out). */
+  const timeChartXmls = TIME_SERIES.map((f, i) => {
+    const { xFormula, yFormula } = rangeXml(i);
+    const refs = chartData.perField[i];
+    return makeChartXml(f.title, f.axis, [{
+      seriesName: f.title, colorHex: f.color, catFormula: xFormula, valFormula: yFormula,
+      catCache: refs.map((r) => excelSerialDate(r.ts)), valCache: refs.map((r) => r.value),
+    }], chartData.maxRows);
+  });
+
+  /* Measured vs Target overlay - the one chart that exists specifically
+     to show the gap between where the mechanism is and where it was
+     told to go, the same purpose the live UI's target marker serves
+     (renderState(), style.css .subline). Two series, one time axis, tangerine/bluebell
+     matching the app's own colour semantics throughout this file. */
+  const outputIdx = TIME_SERIES.findIndex((f) => f.key === "output_deg");
+  const targetIdx = TIME_SERIES.findIndex((f) => f.key === "target_deg");
+  const outputRange = rangeXml(outputIdx);
+  const targetRange = rangeXml(targetIdx);
+  const overlayXml = makeChartXml("Measured vs Target Angle", "Degrees (deg)", [
+    { seriesName: "Measured", colorHex: "FF9900",
+      catFormula: outputRange.xFormula, valFormula: outputRange.yFormula,
+      catCache: chartData.perField[outputIdx].map((r) => excelSerialDate(r.ts)),
+      valCache: chartData.perField[outputIdx].map((r) => r.value) },
+    { seriesName: "Target", colorHex: "8888BB",
+      catFormula: targetRange.xFormula, valFormula: targetRange.yFormula,
+      catCache: chartData.perField[targetIdx].map((r) => excelSerialDate(r.ts)),
+      valCache: chartData.perField[targetIdx].map((r) => r.value) },
+  ], chartData.maxRows);
+
+  /* Angle-correlated charts - mechanical team's request: each field
+     against the mechanism's own travel, not against time. */
+  const angleChartXmls = ANGLE_SERIES.map((f, i) => {
+    const seriesIdx = TIME_SERIES.length + i;
+    const { xFormula, yFormula } = rangeXml(seriesIdx);
+    const refs = chartData.perField[seriesIdx];
+    return makeScatterChartXml(f.title, "Output Angle (deg)", f.axis, f.title, f.color,
+                               xFormula, yFormula,
+                               refs.map((r) => r.angle), refs.map((r) => r.value));
+  });
+
+  const chartXmls = [...timeChartXmls, overlayXml, ...angleChartXmls];
+  /* Anchored starting at column D (index 3), clear of the text columns
+     (A: labels, C: the range-selector values) so the drawing layer
+     never sits on top of readable cell content. CHART_GRID_COLS/
+     CHART_ROW_HEIGHT are the same constants chartGridBottomRow() uses to
+     tell the per-day table where the drawing ends - one grid geometry,
+     not two copies of it drifting apart. */
+  const drawing1Xml = makeDrawingXml(
+    chartXmls.map((_, i) => ({
+      rId: `rId${i + 1}`,
+      fromCol: 3 + (i % CHART_GRID_COLS) * 8,
+      fromRow: 1 + Math.floor(i / CHART_GRID_COLS) * CHART_ROW_HEIGHT,
+      toCol: 3 + (i % CHART_GRID_COLS) * 8 + 7,
+      toRow: 1 + Math.floor(i / CHART_GRID_COLS) * CHART_ROW_HEIGHT + (CHART_ROW_HEIGHT - 1),
+    })));
+
+  /* LCARS palette, ported from style.css's actual hex values (not
+     re-guessed) - --tangerine #FF9900 (headers/title band),
+     --panel2 #F6EEDA (row banding), --alarm-bg #F9E2DE (fault rows),
+     --action-ink #2A1A00 (text on a colour fill), --ink #2A2310 (body
+     text). Fonts: "Bahnschrift SemiCondensed" is the app's own
+     documented zero-download LCARS face (style.css:3-5, stock on Win
+     10/11); Consolas mirrors --mono for numeric columns. Real fill/font
+     XML shape (8-hex ARGB, not the chart namespace's 6-hex) confirmed
+     against an XlsxWriter-generated reference before writing this by
+     hand - the fill namespace is not the chart namespace, and guessing
+     that class of detail is exactly what cost the corrupted-zip defect
+     last session (BACKLOG.md R5). Row banding is a ROW-level style
+     (s= + customFormat="1", no per-cell stamps) - confirmed to render in
+     LibreOffice via a hand-built minimal file before relying on it here,
+     since the alternative (restyling every cell) is the kind of per-row
+     cost that matters at the 5.18M-row scale this export is built for. */
   const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="1">
   <numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm:ss"/>
 </numFmts>
-<fonts count="2">
-  <font><sz val="10"/><name val="Calibri"/></font>
-  <font><b/><sz val="10"/><name val="Calibri"/></font>
+<fonts count="4">
+  <font><sz val="10"/><color rgb="FF2A2310"/><name val="Consolas"/></font>
+  <font><b/><sz val="10"/><color rgb="FF2A1A00"/><name val="Bahnschrift SemiCondensed"/></font>
+  <font><b/><sz val="16"/><color rgb="FF2A1A00"/><name val="Bahnschrift SemiCondensed"/></font>
+  <font><b/><sz val="10"/><color rgb="FF2A2310"/><name val="Bahnschrift SemiCondensed"/></font>
 </fonts>
-<fills count="1"><fill><patternFill patternType="none"/></fill></fills>
+<fills count="5">
+  <fill><patternFill patternType="none"/></fill>
+  <fill><patternFill patternType="gray125"/></fill>
+  <fill><patternFill patternType="solid"><fgColor rgb="FFFF9900"/><bgColor indexed="64"/></patternFill></fill>
+  <fill><patternFill patternType="solid"><fgColor rgb="FFF6EEDA"/><bgColor indexed="64"/></patternFill></fill>
+  <fill><patternFill patternType="solid"><fgColor rgb="FFF9E2DE"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
 <borders count="1"><border/></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="3">
-  <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-  <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
-  <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<cellXfs count="7">
+  <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>                                          <!-- 0: default data -->
+  <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>               <!-- 1: header row (day sheets + Overview) -->
+  <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>                   <!-- 2: date - unchanged index, referenced pervasively as s="2" -->
+  <xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>                             <!-- 3: banded row -->
+  <xf numFmtId="0" fontId="0" fillId="4" borderId="0" xfId="0" applyFill="1"/>                             <!-- 4: fault row -->
+  <xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>               <!-- 5: title band -->
+  <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>                             <!-- 6: bold label on white -->
 </cellXfs>
 </styleSheet>`;
 
@@ -1383,11 +1876,16 @@ async function doExport() {
       chunks.push(value);
       receivedBytes += value.length;
 
-      if (chunks.length === 1 && value.length >= 12) {
+      /* Header/sample sizes here must track SAMPLE_BYTES/HEADER_BYTES
+         above - this is an estimate for a progress bar, not the parse
+         itself, but it is still a third place stating the wire format
+         and it drifted out of sync with the real one once already
+         (BACKLOG.md). */
+      if (chunks.length === 1 && value.length >= HEADER_BYTES) {
         const view = new DataView(value.buffer, value.byteOffset, value.byteLength);
         const sampleCount = view.getUint32(8, true);
         if (sampleCount > 0) {
-          totalUncompressedBytes = (sampleCount * 18) + 12;
+          totalUncompressedBytes = (sampleCount * SAMPLE_BYTES) + HEADER_BYTES;
         }
       }
 
@@ -1412,7 +1910,11 @@ async function doExport() {
       offset += chunk.length;
     }
 
-    const samples = parseBinaryTelemetry(fullBuffer.buffer);
+    /* servo_deg is already computed per-sample inside parseBinaryTelemetry
+       from the header's ratio - servoRatio itself isn't needed past this
+       point, so it isn't threaded any further (one derived value, not a
+       second copy of the constant it came from). */
+    const { samples } = parseBinaryTelemetry(fullBuffer.buffer);
 
     /* Stage 3 of 3: building the workbook - real progress per file (each
        day sheet, plus charts/overview/etc), not a frozen percentage. A

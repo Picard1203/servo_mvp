@@ -100,7 +100,8 @@ class TestStream:
                 "settling", "position_verified", "active_zero",
                 "temperature_c", "voltage_v", "current_a", "torque_kgcm",
                 "overload", "overcurrent", "overheat", "voltage_fault",
-                "sensor_fault", "angle_fault"
+                "sensor_fault", "angle_fault", "servo_deg", "target_deg",
+                "target_stale", "output_min_deg", "output_max_deg"
             }
             assert set(state_data) == expected_keys
 

@@ -19,12 +19,12 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **2 — DONE, 8 + 10 Aug 2026** | D4 closed via SSE in Session 3 | yes |
 | **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
-| **5 — next** | **R5's UX gap table** (under R5): unreadable timestamp column, no actual day/range chart selector, over-compressed flags column, LCARS styling wanted. **Plus D10's real root cause** (a real stack trace exists now) **and Batch 4's motor isolation (R2)**, still not started. | yes, for a real cross-app open-and-look each time a chart/layout change is made — this session's whole lesson was that "it opens in one lenient tool" is not validation |
-| **6 — after Session 5** | **T14** — the maintenance pass: triage the ten items an audit found with no batch at all (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13 — the "Not yet slotted" table, end of the Ordering section), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
+| **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
+| **6 — next** | **D10's real root cause** (a real stack trace exists now) and **Batch 4's motor isolation (R2)** — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. | yes |
+| **7 — after Session 6** | **T14** — the maintenance pass: triage the ten items an audit found with no batch at all (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13 — the "Not yet slotted" table, end of the Ordering section), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
 
-**Read `docs/BACKLOG.md` R5's entry in full before starting Session 5, and
-T14's entry in full before starting Session 6** — both are the actual punch
-lists, these rows are just pointers to them.
+**Read `docs/BACKLOG.md` T14's entry in full before starting Session 7** — the
+actual punch list, this row is just a pointer to it.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -1361,7 +1361,7 @@ R2. Fusing them now would leave no distinct meaning for emergency stop later.
 ---
 
 ### R5 — Metrics export and benchmarking output
-**Scope:** in MVP · **Status:** core mechanism done and validated (not corrupted, works cross-app) · 23 August 2026 · **known UX gaps open, see table below — not fully done**
+**Scope:** in MVP · **Status:** mechanism, UX gaps and operator-requested richness all shipped, 23 August 2026 (Session 5) · one gap genuinely still open, see table below
 
 Pull telemetry for an arbitrary time range and chart it for delivery. The
 point is that the MVP must be **benchmarkable**: the receiving teams need to
@@ -1489,15 +1489,89 @@ just the fix: a file "opening" in one lenient tool is not proof it's
 correct — validate with the strictest available reader, and test cross-app
 compatibility for real, not by inspection.**
 
-**Known gaps, found live the same session — deferred to next session, not
-forgotten:**
+**Shipped, 23 August 2026 (Session 5) — the operator redirected this session
+live, mid-plan, to two new fields plus the whole UX gap table at once.**
+Decisions below are scoped to this one item, so recorded here rather than
+as a standalone ADR.
+
+- **Target angle and servo (pre-ratio) angle, end to end** — captured
+  (`ServoStateStore.set_target`/`_to_servo_deg`, `servo_state.py`), persisted
+  (`telemetry.target_deg`, nullable, idempotent migration), carried over the
+  binary contract (header gains the gear ratio as a float so the client
+  derives servo angle rather than re-declaring the constant — the exact
+  duplication that caused D9), shown live (`.subline` under the big
+  readout: target, signed Δ, servo angle, plus a target marker on the
+  travel bar — the deviation is spatial, not arithmetic) and in the export
+  (own columns, own line chart, an overlay chart plotting measured against
+  target on one axis). Stop marks the target **stale, not cleared** — kept
+  on screen dimmed, because "asked for 45, stopped at 27" is the reading
+  the feature exists for.
+- **Angle-correlated charts** — torque/voltage/current/temperature each
+  plotted against **output angle** (mechanical team's request), line style,
+  angle-sorted downsample. Real OOXML type is `c:scatterChart` with
+  `scatterStyle="lineMarker"` (a category axis cannot carry a genuinely
+  numeric, unevenly-spaced axis) — verified against an XlsxWriter reference
+  before writing it by hand, same rule as everything else here.
+- **Typed chart-range selector** — two date cells on Overview
+  (`RANGE_FROM_CELL`/`RANGE_TO_CELL`); every `ChartData` formula gates on
+  them (`IF(AND(...),value,NA())`, `dispBlanksAs="gap"`) rather than a
+  per-day picker. Confirmed live against real board data: editing the
+  dates narrows every chart.
+- **Richer Overview**: a per-day table (samples, moving %, angle travelled,
+  peak torque/current, temp/voltage range, stalls) below the chart grid,
+  derived from data already grouped by day — no schema change.
+- **Decoded flags** — the bitmask column is gone; `Moving`/`Locked` are
+  their own columns, `Faults` is a decoded name list. Closes the old
+  "flags too compact" complaint by construction rather than tuning the
+  packing.
+- **All day-sheet columns sized explicitly** (were unset entirely —
+  `makeDaySheetXml` had no `<cols>` at all, not just a narrow date column).
+- **LCARS styling** — real palette hex values from `style.css`, not
+  re-guessed: tangerine header/title band, panel2 row banding (row-level
+  `s=`+`customFormat="1"`, confirmed to render with no per-cell stamps —
+  matters at 5.18M rows), alarm-bg fault rows, Bahnschrift SemiCondensed/
+  Consolas fonts matching the app's own choices.
+
+**Desired angle's earlier "defer to a later session" reasoning (retroactive
+NULLs on existing rows) turned out not to be the operator's actual ask** —
+they wanted it captured going forward and shown live too, not just charted
+retroactively. Overridden on request; the retroactive-NULL fact is still
+true and just doesn't matter for what was actually wanted.
+
+**Five more defects found live on the real board, same session, fixed
+before calling it done — the export's own standing lesson (found by
+opening a real file, not assumed) held again:**
+
+1. Travel bar scaled position as `deg/360` on a mechanism that travels
+   −90..+90 — every negative angle rendered as 0%, indistinguishable from
+   the datum. Found designing the target marker; fixed by sending the
+   reachable range in the state response instead of a second hardcoded
+   copy of it in `app.js`.
+2. Binary format's documented types disagreed with the actual struct
+   (`voltage_v`/`current_a` declared `H` in the comment and read as
+   `getUint16` client-side, packed as signed `h` server-side). Harmless at
+   real values; fixed since those exact lines were already being touched.
+3. **A genuine regression, caught and reverted the same session**: `c:dateAx`
+   with automatic tick spacing rendered cleanly against an isolated
+   reference (500 evenly-spaced points) but produced an illegible
+   per-second label smear against real, denser board data — worse than
+   the original crowding it was meant to fix. Reverted to `c:catAx` with
+   an explicitly computed `tickLblSkip` (we already know the point count;
+   no reason to trust a renderer's heuristic on data it hadn't been tried
+   against) plus restored diagonal label rotation, both re-verified
+   against real board exports before shipping.
+4. Overview's title band and its own value column (the range-selector
+   dates) were both too narrow for their own content — same class of gap
+   this whole item exists to close, just not caught until a real render.
+5. The target/Δ/servo sub-line had uneven spacing (6px between a label
+   and its own value, 18px between items) — visually lopsided around Δ
+   specifically. Flattened to one uniform gap.
+
+**Known gap, still genuinely open:**
 
 | Gap | What was seen | What's needed |
 |---|---|---|
-| Day-sheet timestamp column unreadable | Shows `########` — column too narrow for the date format | Set an explicit column width for the date column (and probably the others) in `makeDaySheetXml`'s `<cols>` |
-| No actual range/day selector | Charts always plot every downsampled day concatenated; the x-axis is unreadable at any real range (see the operator's screenshot — dozens of truncated repeated date labels) | The `ChartData` formula mechanism (fetch from day sheets) exists, but nothing lets the operator pick which day(s) a chart shows — the interactivity itself was never built, only its plumbing |
-| Flags column too compact | Packed 8 booleans into one bitmask int for file size — operator reports it now reads as "narrow data" versus the richer column set before | Revisit the size-vs-readability tradeoff; likely keep `moving`/`locked` as their own readable columns and pack only the rare fault flags, or add a decoded-text column |
-| LCARS visual styling | Operator recalls asking Antigravity for this previously (matching the app's own theme) — not present in the rebuild | Design pass needed — out of scope for a same-session fix, genuinely a new piece of work |
+| No narrative of *what happened* (moves, refusals, fault transitions over time) | R5's stated use case is reconstructing an unattended run; a table of instantaneous values requires the reader to re-derive events by eye. Root cause: the only place holding that narrative, `EventService` (`core/events.py`), is an **in-memory ring buffer** that does not survive past the SSE session it feeds live — there is nothing left to export by the time an operator requests a range | Needs a persisted move/event history — a real schema item, own session, not a same-session `app.js` patch |
 
 **Related:** this is also how "stable" gets defined — see R6. D18 — the export
 is the seed of this and currently fails silently. T9 — the storage numbers this

@@ -30,8 +30,8 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-198 Python tests, 99% line coverage of app/ (see backlog D24)
-164 native sketch checks, -Wall -Wextra -Wpedantic -Werror
+207 Python tests, 99% line coverage of app/ (see backlog D24)
+194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 ```
 
@@ -39,6 +39,10 @@ Bridge contract checker: both sides agree
 needed. An operator now gets a readable message when the relay refuses, cannot
 double-press a command into a second connection, and is never shown a number the
 servo did not report. It raised D23, D24, D25, D26 and T12.
+
+**Batch 2 landed the same day** — D3, D13 closed, desk work only (see "Known
+gaps" below: the sketch side of D3 has never been compiled or flashed). It
+raised D27.
 
 **It has now been run on real hardware, driving the real servo** (7 August 2026,
 backlog T8). That run changed the picture more than any amount of reading could
@@ -83,7 +87,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 
 | | Why it is non-negotiable |
 |---|---|
-| **D13 decided** (D14, D15 **done** 8 Aug 2026) | "Press it twice" is what a procurement audience remembers. The operator halves are closed; the decision still needs an ADR |
+| **D13 decided** — **done** 8 Aug 2026, **ADR-0009** (D14, D15 also done) | "Press it twice" is what a procurement audience remembers. Both the operator halves and the ceiling decision are closed; the real lever stays unmeasured until Session 2 |
 | **D4 closed by a real soak** | A race that stopped reproducing has not been proved absent |
 | **R1 answered** | The one capacity number anyone will ask for |
 | **R2** motor isolation | Scoped in MVP explicitly *so MVP testing exercises it* |
@@ -98,7 +102,6 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 
 ### Should ship — cut only under real pressure, and say so out loud
 
-**D3** (MCU logging — strong case: two diagnostics exist and cannot be read),
 **D6** (first paint measured), **T3** (on-target run), **T5** (diagrams),
 **D7** (operator screen — *blocked on Q1*), **D12**, **D17**, **D18**, **T9**
 (storage confirmed over hours), **D5**.
@@ -213,7 +216,7 @@ derives from `counts_per_turn` and the belt ratio, so retuning either propagates
 
 ## Decisions on record
 
-Seven ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
+Nine ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
 
 | ADR | Decision |
 |---|---|
@@ -224,6 +227,8 @@ Seven ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
 | 0005 | Develop as if already air-gapped |
 | 0006 | Bridge payloads are CSV strings |
 | 0007 | Moves are permitted while position is unverified |
+| 0008 | A failed read is reported as unknown, never as a number |
+| 0009 | Connection ceiling stays at 6 this batch; timeout_keep_alive is the real lever, unmeasured |
 
 ## Known gaps, stated honestly
 
@@ -233,7 +238,12 @@ Seven ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
   board — **not by a single test**, because no test in this repository can
   reach it.
 - **`sketch/tests/OnTarget/` has never been uploaded** (backlog T3).
-- **The C++ side does not log** anything during operation (backlog D3), so when
-  the MCU misbehaves there is no way to see what it did.
+- **The C++ side now logs (backlog D3, done 8 Aug 2026) and is built,
+  flashed and running on the board.** `get_status`'s `diag_dropped` counter
+  is confirmed live. **But `mcu.jsonl` itself has never been seen** — the
+  one boot-time event that should be unconditional (`mcu.relay.ready`) was
+  lost to a startup race (backlog D28). Whether steady-state events survive
+  it is untested; confirm with a real rejection or timeout before trusting
+  `soak_report.py`'s MCU-side numbers.
 - **"Stable" is not yet defined by numbers.** It gets defined by measurement —
   backlog R5 and R6.

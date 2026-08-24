@@ -55,7 +55,7 @@ Raising `kMaxRelaySockets` buys **exactly one more slot**. It is not a tunable â
 it is a wall one step away.
 
 **Which means the socket count is not the lever.** The real one is uvicorn's
-`timeout_keep_alive=5` (`main.py:142`), which holds each slot for five seconds
+`timeout_keep_alive=5` (`main.py:172`), which holds each slot for five seconds
 after use â€” set deliberately so idle sockets do not park a slot, and the direct
 cause of the measured ceiling of about one new connection per second. Tuning
 that moves capacity far more than the single spare socket does.

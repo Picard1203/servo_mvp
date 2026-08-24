@@ -23,6 +23,15 @@ class Settings(BaseSettings):
         db_path: SQLite database file path on the board.
         log_file: JSON-lines log file path.
         log_level: Minimum log level.
+        mcu_log_file: JSON-lines file for events forwarded from the MCU
+            side (backlog D3). Deliberately separate from log_file: the two
+            sources are sized and rotated independently, so a volume spike
+            on one side cannot evict the other's history, and either file
+            can be included or dropped from a handover bundle on its own.
+        mcu_log_max_bytes: Rotation threshold for mcu_log_file. This file is
+            written directly, not through Logger461 - see
+            app/relay/mcu_log.py - so its rotation is explicit rather than
+            inherited from the main logger's configuration.
         event_buffer_size: Number of recent events kept for the UI.
         counts_per_turn: Encoder counts per full servo turn.
         servo_deg_per_output_deg: Belt ratio 44:30 expressed as servo
@@ -90,6 +99,8 @@ class Settings(BaseSettings):
     db_path: str = "/home/arduino/servo_mvp.db"
     log_file: str = "/home/arduino/logs/app.jsonl"
     log_level: str = "INFO"
+    mcu_log_file: str = "/home/arduino/logs/mcu.jsonl"
+    mcu_log_max_bytes: int = 10_000_000
     event_buffer_size: int = 200
     counts_per_turn: int = 4096
     servo_deg_per_output_deg: float = 44.0 / 30.0

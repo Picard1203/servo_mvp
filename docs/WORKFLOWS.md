@@ -251,8 +251,8 @@ teaches something general, feed it back.
 `CLAUDE.md`:
 
 ```bash
-cd python && pytest                      # 198
-cd sketch/tests/native && make           # 164
+cd python && pytest                      # 207
+cd sketch/tests/native && make           # 194
 python3 tools/check_bridge_contract.py   # both sides agree
 graphify update .
 ```

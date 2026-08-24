@@ -4,8 +4,8 @@ FastAPI backend and an LCARS web UI, served from the board. Any machine on the
 network opens `http://<board-ip>:8000` — several at once, nothing installed on
 the viewing machines.
 
-**Status:** backend, UI, sketch and tests all exist and pass (198 Python tests,
-164 native checks, bridge contract agrees). The system is **not yet stable** —
+**Status:** backend, UI, sketch and tests all exist and pass (207 Python tests,
+194 native checks, bridge contract agrees). The system is **not yet stable** —
 see `docs/BACKLOG.md` for the open defects.
 
 **Working on this repo?** Start at `CLAUDE.md`, not here. This file is
@@ -31,9 +31,9 @@ Console commands: `overload`, `state`, `quit`.
 ## 2. Verify
 
 ```bash
-cd python && pytest                      # 198 tests
+cd python && pytest                      # 207 tests
 cd python && pytest --cov=app            # 99% of app/ (backlog D24)
-cd sketch/tests/native && make           # 164 checks
+cd sketch/tests/native && make           # 194 checks
 python3 tools/check_bridge_contract.py   # "both sides agree"
 ```
 

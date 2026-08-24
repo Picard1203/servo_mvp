@@ -4,28 +4,50 @@ Written for the soak described in `docs/BACKLOG.md` D4: a race that stopped
 reproducing in seven minutes is rare, not absent, and only sustained realistic
 load can tell the difference.
 
-Each virtual operator does what a browser does - polls state once a second -
-and, between polls, what a person does: moves somewhere, waits to see it
-arrive, thinks for a while, occasionally locks, saves a zero or pulls an
-export. Think time is randomised, because several operators acting in lockstep
-is a load pattern no real site produces.
+Each virtual operator reproduces `app.js`'s exact traffic shape: three
+independent polling streams - state once a second, the zero list and the
+event list every 15 seconds, each on its own kept-alive HTTP connection
+(`--enhanced 8 August 2026`, closing backlog D27) - plus, between polls, what
+a person does: moves somewhere, waits to see it arrive, thinks for a while,
+occasionally locks, saves a zero or pulls an export. Think time is
+randomised, because several operators acting in lockstep is a load pattern
+no real site produces.
+
+Earlier versions of this tool used `urllib.request`, which opens and closes
+a fresh TCP connection on every call. That is not what a browser does - a
+browser holds one connection open per active poll via HTTP keep-alive - and
+it materially understated real connection-slot pressure on the relay's
+6-socket ceiling (ADR-0009). Each poll stream here now reuses one
+`http.client.HTTPConnection`, reconnecting only when the server actually
+closes it (uvicorn's `timeout_keep_alive`) or a transport error occurs.
+`connection_opens` in the report is how often that happened - it should stay
+low if keep-alive is doing its job.
 
 Everything it reports is client-side: what the API answered and how long it
 took. The board's own side of the story - sampler gaps, fabricated positions,
-logged failures - comes from the database afterwards, and the two are compared
-by timestamp.
+logged failures, the MCU's own counters (backlog D3) - comes from
+`tools/soak_report.py` afterwards, and the two are compared by timestamp.
 
     python3 tools/synthetic_operator.py --host 192.168.10.60 --minutes 120 \\
         --operators 3 --report soak.json
 
-Safe by construction: it stays inside the travel window, treats a refusal as a
-valid answer rather than an error, and never commands a move while it believes
-the mechanism is still moving.
+Built to survive being left alone for stretches, not just a continuous
+watch: every `--checkpoint-minutes` (default 5) it prints a one-line status
+and rewrites the report file in place, so a check-in mid-run has fresh data
+and a crash or a closed terminal loses at most one checkpoint. Ctrl-C (or a
+SIGTERM) writes the report as it stands and exits cleanly rather than losing
+everything gathered so far.
+
+Safe by construction: it stays inside the travel window, treats a refusal as
+a valid answer rather than an error, and never commands a move while it
+believes the mechanism is still moving.
 """
 
 import argparse
+import http.client
 import json
 import random
+import signal
 import statistics
 import threading
 import time
@@ -33,10 +55,14 @@ import urllib.error
 import urllib.request
 from typing import Any, Optional
 
-# One poll per second, matching static/app.js. The point is to reproduce the
-# real traffic shape, not to hammer the board: a load generator that polls
-# faster than the UI tests something nobody will ever do.
-POLL_INTERVAL_SECONDS: float = 1.0
+# One poll per second, matching static/app.js's POLL_STATE_MS.
+POLL_STATE_SECONDS: float = 1.0
+
+# Matching static/app.js's POLL_LISTS_MS - two SEPARATE timers, same period,
+# not one shared poll. That is what lets them drift into overlapping with
+# each other and with the state poll over a multi-hour run.
+POLL_ZEROS_SECONDS: float = 15.0
+POLL_EVENTS_SECONDS: float = 15.0
 
 # Human pauses between deliberate actions. A person lines up a move, watches
 # it, thinks, then does the next thing.
@@ -51,6 +77,10 @@ TARGET_DEG_MAX: float = 80.0
 # Longest a move is waited on before giving up and moving on.
 MOVE_SETTLE_TIMEOUT_SECONDS: float = 45.0
 
+# How often, by default, to print a live status line and rewrite the report
+# file - the "check in periodically, be away for stretches" usage pattern.
+DEFAULT_CHECKPOINT_MINUTES: float = 5.0
+
 
 class Metrics:
     """Thread-safe tally of everything the operators observed.
@@ -60,6 +90,8 @@ class Metrics:
         _latencies (dict[str, list[float]]): Seconds per request, by action.
         _failures (dict[str, int]): Transport failures, by action.
         _rejections (dict[str, int]): Refusals the API answered deliberately.
+        _connection_opens (dict[str, int]): New TCP connections opened, by
+            action - stays low when keep-alive is working.
         _requests (int): Total requests attempted.
         _invalid_readings (int): Replies carrying reading_valid false.
         _unknown_positions (int): Replies carrying a null output_deg.
@@ -73,6 +105,7 @@ class Metrics:
         self._latencies: dict[str, list[float]] = {}
         self._failures: dict[str, int] = {}
         self._rejections: dict[str, int] = {}
+        self._connection_opens: dict[str, int] = {}
         self._requests: int = 0
         self._invalid_readings: int = 0
         self._unknown_positions: int = 0
@@ -123,6 +156,24 @@ class Metrics:
         with self._lock:
             self._rejections[action] = self._rejections.get(action, 0) + 1
 
+    def record_connection_opened(self, action: str) -> None:
+        """Records that a poll stream opened a fresh TCP connection.
+
+        A stream that opens many connections over a long run means
+        keep-alive is not helping - either the server is closing idle
+        connections faster than expected, or something upstream (the relay)
+        is dropping them. Either is exactly what ADR-0009 needs measured.
+
+        Args:
+            action (str): Name of the poll stream.
+
+        Returns:
+            None
+        """
+        with self._lock:
+            self._connection_opens[action] = \
+                self._connection_opens.get(action, 0) + 1
+
     def record_reading(self, reading_valid: bool,
                        output_deg: Optional[float]) -> None:
         """Records what a state reply said about the position.
@@ -159,6 +210,7 @@ class Metrics:
                     "max_s": round(samples[-1], 3),
                     "failures": self._failures.get(action, 0),
                     "rejections": self._rejections.get(action, 0),
+                    "connection_opens": self._connection_opens.get(action, 0),
                 }
             total_failures = 0
             for count in self._failures.values():
@@ -173,11 +225,97 @@ class Metrics:
             }
 
 
+class PersistentPoller:
+    """One HTTP/1.1 keep-alive connection, reused across a polling loop.
+
+    This is what makes the load shape match a real browser tab: `app.js`
+    holds one TCP connection open per active poll stream, reusing it every
+    interval. `urllib.request.urlopen` does not do this - each call opens
+    and closes its own connection - which understates the relay's real
+    connection-slot pressure. Reconnects transparently on a transport error
+    or once the server actually closes the connection (uvicorn's
+    `timeout_keep_alive`), and counts every reconnect via
+    `Metrics.record_connection_opened`.
+    """
+
+    def __init__(self, host: str, port: int, metrics: Metrics,
+                 action: str) -> None:
+        """Creates a poller bound to one action name.
+
+        Args:
+            host (str): Board address.
+            port (int): API port.
+            metrics (Metrics): Shared tally.
+            action (str): Name recorded in the metrics for every request.
+
+        Returns:
+            None
+        """
+        self._host = host
+        self._port = port
+        self._metrics = metrics
+        self._action = action
+        self._connection: Optional[http.client.HTTPConnection] = None
+
+    def get(self, path: str) -> Optional[Any]:
+        """Performs one GET, reusing the open connection when there is one.
+
+        Args:
+            path (str): Full request path, including the API prefix.
+
+        Returns:
+            Optional[Any]: The decoded JSON reply, or None on failure or a
+            deliberate refusal.
+        """
+        started = time.monotonic()
+        for attempt in range(2):   # one retry, on a freshly opened connection
+            try:
+                if self._connection is None:
+                    self._connection = http.client.HTTPConnection(
+                        self._host, self._port, timeout=10)
+                    self._metrics.record_connection_opened(self._action)
+                self._connection.request("GET", path)
+                response = self._connection.getresponse()
+                body = response.read()
+                if response.status >= 400:
+                    if 400 <= response.status < 500:
+                        self._metrics.record_rejection(self._action)
+                    else:
+                        self._metrics.record_failure(self._action)
+                    return None
+                self._metrics.record_success(self._action,
+                                             time.monotonic() - started)
+                return json.loads(body)
+            except (http.client.HTTPException, OSError):
+                self.close()
+                # First attempt: the connection may simply have been closed
+                # by the server (idle keep-alive timeout) - retry once on a
+                # fresh one before counting a failure.
+        self._metrics.record_failure(self._action)
+        return None
+
+    def close(self) -> None:
+        """Drops the current connection, if any. Safe to call repeatedly.
+
+        Returns:
+            None
+        """
+        if self._connection is not None:
+            try:
+                self._connection.close()
+            except OSError:
+                pass
+            self._connection = None
+
+
 class SyntheticOperator:
-    """One virtual operator: a poller plus a stream of deliberate actions.
+    """One virtual operator: three poll streams plus deliberate actions.
 
     Attributes:
-        _base_url (str): Root of the API, without a trailing slash.
+        _host (str): Board address.
+        _port (int): API port.
+        _base_url (str): Root of the API, without a trailing slash - used
+            only by the one-off actions in _perform_one_action.
         _metrics (Metrics): Shared tally.
         _name (str): Identifier used in console output.
         _random (random.Random): Independently seeded, so operators do not
@@ -185,12 +323,13 @@ class SyntheticOperator:
         _deadline (float): Monotonic time at which this operator stops.
     """
 
-    def __init__(self, base_url: str, metrics: Metrics, name: str,
+    def __init__(self, host: str, port: int, metrics: Metrics, name: str,
                  seed: int, deadline: float) -> None:
         """Creates one operator.
 
         Args:
-            base_url (str): Root of the API, without a trailing slash.
+            host (str): Board address.
+            port (int): API port.
             metrics (Metrics): Shared tally.
             name (str): Identifier used in console output.
             seed (int): Seed for this operator's think times and targets.
@@ -199,7 +338,9 @@ class SyntheticOperator:
         Returns:
             None
         """
-        self._base_url: str = base_url
+        self._host: str = host
+        self._port: int = port
+        self._base_url: str = f"http://{host}:{port}/api/v1"
         self._metrics: Metrics = metrics
         self._name: str = name
         self._random: random.Random = random.Random(seed)
@@ -208,7 +349,12 @@ class SyntheticOperator:
     def _request(self, action: str, path: str,
                  payload: Optional[dict[str, Any]] = None,
                  read_body: bool = True) -> Optional[Any]:
-        """Performs one HTTP call and records its outcome.
+        """Performs one one-off HTTP call and records its outcome.
+
+        Deliberate, occasional actions (a move, a lock, an export) - unlike
+        the three continuous poll streams, these do not model persistent
+        connection reuse; a single click opening its own connection is a
+        reasonable worst case, and is not what ADR-0009's finding was about.
 
         Args:
             action (str): Name recorded in the metrics.
@@ -248,18 +394,54 @@ class SyntheticOperator:
             self._metrics.record_failure(action)
             return None
 
-    def poll_forever(self) -> None:
-        """Polls state once a second until the deadline, as the UI does.
+    def poll_state_forever(self) -> None:
+        """Polls state once a second until the deadline, as app.js does.
 
         Returns:
             None
         """
+        poller = PersistentPoller(self._host, self._port, self._metrics,
+                                  "state")
         while time.monotonic() < self._deadline:
-            state = self._request("state", "/servo/state")
+            state = poller.get("/api/v1/servo/state")
             if state is not None:
                 self._metrics.record_reading(
                     state.get("reading_valid", True), state.get("output_deg"))
-            time.sleep(POLL_INTERVAL_SECONDS)
+            time.sleep(POLL_STATE_SECONDS)
+        poller.close()
+
+    def poll_zeros_forever(self) -> None:
+        """Polls the zero list every 15s, on its own connection.
+
+        A separate `setInterval` in app.js, not the same timer as state or
+        events - so it can be in flight at the same moment either is.
+
+        Returns:
+            None
+        """
+        poller = PersistentPoller(self._host, self._port, self._metrics,
+                                  "zeros_poll")
+        while time.monotonic() < self._deadline:
+            poller.get("/api/v1/zeros")
+            time.sleep(POLL_ZEROS_SECONDS)
+        poller.close()
+
+    def poll_events_forever(self) -> None:
+        """Polls the event list every 15s, on its own connection.
+
+        Same period as poll_zeros_forever but a genuinely independent timer,
+        matching app.js:742-744 - the two drift relative to each other over
+        a multi-hour run rather than firing in lockstep.
+
+        Returns:
+            None
+        """
+        poller = PersistentPoller(self._host, self._port, self._metrics,
+                                  "events_poll")
+        while time.monotonic() < self._deadline:
+            poller.get("/api/v1/system/events?limit=50")
+            time.sleep(POLL_EVENTS_SECONDS)
+        poller.close()
 
     def act_forever(self) -> None:
         """Performs deliberate actions with human pauses until the deadline.
@@ -328,8 +510,12 @@ class SyntheticOperator:
         moving = True
         while (moving is True) and (time.monotonic() < limit) \
                 and (time.monotonic() < self._deadline):
-            time.sleep(POLL_INTERVAL_SECONDS)
-            state = self._request("state", "/servo/state")
+            time.sleep(POLL_STATE_SECONDS)
+            # Deliberately a separate action name from the persistent
+            # "state" poll stream: this one-off, fresh-connection check
+            # during a move is a different traffic shape and must not be
+            # merged into poll_state_forever's kept-alive numbers.
+            state = self._request("state_settle", "/servo/state")
             if state is None:
                 moving = False
             else:
@@ -361,8 +547,95 @@ class SyntheticOperator:
                                 f"&ts_to={finish}", read_body=False)
 
 
+class Checkpointer:
+    """Periodically prints a status line and rewrites the report file.
+
+    Exists for the "in the room most of the time, gone for stretches"
+    running mode: a check-in mid-run sees fresh numbers rather than silence,
+    and a crash or a closed terminal loses at most one checkpoint interval
+    of data rather than the whole run.
+    """
+
+    def __init__(self, metrics: Metrics, report_path: Optional[str],
+                 interval_seconds: float, started_at: float,
+                 deadline: float) -> None:
+        """Creates a checkpointer. Call run() on its own thread.
+
+        Args:
+            metrics (Metrics): Shared tally to snapshot.
+            report_path (Optional[str]): Where to write the report, or None
+                to only print.
+            interval_seconds (float): Seconds between checkpoints.
+            started_at (float): Wall-clock start time (time.time()).
+            deadline (float): Monotonic time the run ends.
+
+        Returns:
+            None
+        """
+        self._metrics = metrics
+        self._report_path = report_path
+        self._interval_seconds = interval_seconds
+        self._started_at = started_at
+        self._deadline = deadline
+        self._stop = threading.Event()
+
+    def run(self) -> None:
+        """Loops until stop() is called or the deadline passes.
+
+        Returns:
+            None
+        """
+        while not self._stop.is_set():
+            remaining = self._deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            if self._stop.wait(min(self._interval_seconds, remaining)):
+                return
+            self.write_once()
+
+    def write_once(self) -> None:
+        """Prints one status line and rewrites the report file, if given.
+
+        Returns:
+            None
+        """
+        summary = self._metrics.summary()
+        elapsed_min = (time.time() - self._started_at) / 60.0
+        opens = sum(row.get("connection_opens", 0)
+                   for row in summary["actions"].values())
+        print(f"[{time.strftime('%H:%M:%S')}] checkpoint  "
+              f"elapsed={elapsed_min:.0f}m  requests={summary['requests']}  "
+              f"failures={summary['failures']}  "
+              f"invalid_readings={summary['invalid_readings']}  "
+              f"connection_opens={opens}")
+        if self._report_path is not None:
+            _write_report(self._report_path, summary)
+
+    def stop(self) -> None:
+        """Signals run() to return promptly.
+
+        Returns:
+            None
+        """
+        self._stop.set()
+
+
+def _write_report(report_path: str, summary: dict[str, Any]) -> None:
+    """Writes the summary as JSON, overwriting any previous checkpoint.
+
+    Args:
+        report_path (str): Destination path.
+        summary (dict[str, Any]): What to write.
+
+    Returns:
+        None
+    """
+    with open(report_path, "w", encoding="utf-8") as handle:
+        json.dump(summary, handle, indent=2)
+
+
 def run_soak(host: str, port: int, minutes: float, operators: int,
-             report_path: Optional[str]) -> int:
+             report_path: Optional[str], checkpoint_minutes: float) -> int:
     """Runs the soak and prints the report.
 
     Args:
@@ -371,34 +644,66 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
         minutes (float): How long to run.
         operators (int): How many virtual operators to simulate.
         report_path (Optional[str]): Where to write the JSON report.
+        checkpoint_minutes (float): Interval between live status updates and
+            report rewrites; 0 disables checkpointing.
 
     Returns:
         int: 0 when no transport failures occurred, 1 otherwise.
     """
-    base_url = f"http://{host}:{port}/api/v1"
     metrics = Metrics()
     deadline = time.monotonic() + (minutes * 60.0)
     started_at = time.time()
     threads: list[threading.Thread] = []
 
-    print(f"soak: {operators} operator(s) against {base_url} "
+    print(f"soak: {operators} operator(s) against {host}:{port} "
           f"for {minutes:g} minute(s)")
     print(f"soak: started at {time.strftime('%H:%M:%S')}, "
           f"ends about {time.strftime('%H:%M:%S', time.localtime(started_at + minutes * 60.0))}")
 
     for index in range(operators):
-        operator = SyntheticOperator(base_url, metrics,
+        operator = SyntheticOperator(host, port, metrics,
                                      f"operator-{index + 1}",
                                      seed=1000 + index, deadline=deadline)
-        poller = threading.Thread(target=operator.poll_forever, daemon=True)
-        actor = threading.Thread(target=operator.act_forever, daemon=True)
-        threads.append(poller)
-        threads.append(actor)
-        poller.start()
-        actor.start()
+        for target in (operator.poll_state_forever, operator.poll_zeros_forever,
+                      operator.poll_events_forever, operator.act_forever):
+            thread = threading.Thread(target=target, daemon=True)
+            threads.append(thread)
+            thread.start()
 
-    for thread in threads:
-        thread.join()
+    checkpointer: Optional[Checkpointer] = None
+    if checkpoint_minutes > 0:
+        checkpointer = Checkpointer(metrics, report_path,
+                                    checkpoint_minutes * 60.0, started_at,
+                                    deadline)
+        checkpoint_thread = threading.Thread(target=checkpointer.run,
+                                             daemon=True)
+        checkpoint_thread.start()
+
+    interrupted = False
+
+    def _on_interrupt(_signum: int, _frame: Any) -> None:
+        nonlocal interrupted
+        interrupted = True
+
+    previous_sigterm = signal.signal(signal.SIGTERM, _on_interrupt)
+    try:
+        for thread in threads:
+            while thread.is_alive():
+                thread.join(timeout=1.0)
+                if interrupted:
+                    break
+            if interrupted:
+                break
+    except KeyboardInterrupt:
+        interrupted = True
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        if checkpointer is not None:
+            checkpointer.stop()
+
+    if interrupted:
+        print()
+        print("soak: interrupted - writing what was gathered so far")
 
     summary = metrics.summary()
     summary["host"] = host
@@ -406,6 +711,7 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
     summary["started_at"] = started_at
     summary["finished_at"] = time.time()
     summary["minutes"] = minutes
+    summary["interrupted"] = interrupted
 
     print()
     print("---- soak report ----")
@@ -419,16 +725,20 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
         print(f"  {action:<12} n={row['count']:<6} "
               f"median={row['median_s']:<7} p95={row['p95_s']:<7} "
               f"max={row['max_s']:<7} fail={row['failures']} "
-              f"refused={row['rejections']}")
+              f"refused={row['rejections']} "
+              f"conn_opens={row['connection_opens']}")
 
     if report_path is not None:
-        with open(report_path, "w", encoding="utf-8") as handle:
-            json.dump(summary, handle, indent=2)
+        _write_report(report_path, summary)
         print()
         print(f"report written to {report_path}")
         print("compare it against the board: sampler gaps over 2 s, rows with "
-              "counts <= 0, and any servo.read.failed in the log.")
+              "counts <= 0, and any servo.read.failed in the log. "
+              "tools/soak_report.py reads the board's own account, including "
+              "the MCU-side counters (backlog D3).")
 
+    if interrupted:
+        return 2
     if summary["failures"] == 0:
         return 0
     return 1
@@ -451,10 +761,16 @@ def main() -> int:
     parser.add_argument("--operators", type=int, default=3,
                         help="virtual operators; 3 remote is the target in R1")
     parser.add_argument("--report", default=None,
-                        help="path for the JSON report")
+                        help="path for the JSON report, rewritten at every "
+                             "checkpoint")
+    parser.add_argument("--checkpoint-minutes", type=float,
+                        default=DEFAULT_CHECKPOINT_MINUTES,
+                        help="live status + report rewrite interval; 0 to "
+                             "disable")
     arguments = parser.parse_args()
     return run_soak(arguments.host, arguments.port, arguments.minutes,
-                    arguments.operators, arguments.report)
+                    arguments.operators, arguments.report,
+                    arguments.checkpoint_minutes)
 
 
 if __name__ == "__main__":

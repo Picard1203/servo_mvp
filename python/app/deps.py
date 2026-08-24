@@ -15,6 +15,7 @@ from app.core.config import Settings, get_settings
 from app.core.events import EventService
 from app.db.database import Database
 from app.relay.bridge_relay import BridgeRelay
+from app.relay.mcu_log import McuLog
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.repositories.abstract.telemetry_repository import TelemetryRepository
 from app.repositories.abstract.zero_repository import ZeroRepository
@@ -152,3 +153,13 @@ def get_relay() -> BridgeRelay:
         The process-wide relay.
     """
     return BridgeRelay(get_settings())
+
+
+@lru_cache
+def get_mcu_log() -> McuLog:
+    """Returns the MCU diagnostic-log receiver (backlog D3).
+
+    Returns:
+        The process-wide receiver.
+    """
+    return McuLog(get_settings())

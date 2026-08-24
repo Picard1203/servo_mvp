@@ -6,10 +6,13 @@
 //
 //   cd sketch/tests/native && make
 #include "../../src/AngleMath.h"
+#include "../../src/LogRing.h"
 #include "../../src/ServoStatus.h"
 #include "../../src/SignMagnitude.h"
 #include "TinyTest.h"
 
+using diag::LogRecord;
+using diag::LogRing;
 using servo::AngleConverter;
 using servo::ServoFaults;
 using servo::SignMagnitude;
@@ -189,6 +192,68 @@ TEST(range_a_datum_at_zero_strands_the_negative_half) {
       baseline_at_centre + converter.CountsFromOutputDegrees(-90.0F)));
   CHECK(converter.IsCountReachable(
       baseline_at_centre + converter.CountsFromOutputDegrees(90.0F)));
+}
+
+// ------------------------------------------------------------- log ring
+
+TEST(log_ring_starts_empty) {
+  LogRing<4> ring;
+  CHECK_EQ(ring.size(), 0U);
+  CHECK(ring.empty());
+  LogRecord out;
+  CHECK(!ring.Pop(&out));
+}
+
+TEST(log_ring_push_pop_preserves_fifo_order) {
+  LogRing<4> ring;
+  CHECK(ring.Push({1, 100, "first", "e.first", 1, 2}));
+  CHECK(ring.Push({2, 200, "second", "e.second", 3, 4}));
+  LogRecord out;
+  CHECK(ring.Pop(&out));
+  CHECK_EQ(std::string(out.message), std::string("first"));
+  CHECK(ring.Pop(&out));
+  CHECK_EQ(std::string(out.message), std::string("second"));
+}
+
+TEST(log_ring_preserves_all_fields) {
+  LogRing<4> ring;
+  CHECK(ring.Push({3, 12345, "boom", "e.boom", -7, 42}));
+  LogRecord out;
+  CHECK(ring.Pop(&out));
+  CHECK_EQ(out.level, 3);
+  CHECK_EQ(out.uptime_ms, 12345U);
+  CHECK_EQ(std::string(out.message), std::string("boom"));
+  CHECK_EQ(std::string(out.event), std::string("e.boom"));
+  CHECK_EQ(out.arg1, -7);
+  CHECK_EQ(out.arg2, 42);
+}
+
+TEST(log_ring_reports_size_as_entries_move_through) {
+  LogRing<4> ring;
+  CHECK_EQ(ring.size(), 0U);
+  ring.Push({0, 0, "a", "e.a", 0, 0});
+  ring.Push({0, 0, "b", "e.b", 0, 0});
+  CHECK_EQ(ring.size(), 2U);
+  LogRecord out;
+  ring.Pop(&out);
+  CHECK_EQ(ring.size(), 1U);
+}
+
+TEST(log_ring_drops_oldest_when_full_and_counts_it) {
+  // Capacity 2: pushing a third entry must evict "a", not refuse "c" - the
+  // most recent state is what a diagnostic ring is for.
+  LogRing<2> ring;
+  CHECK_EQ(ring.dropped_total(), 0U);
+  CHECK(ring.Push({0, 0, "a", "e.a", 0, 0}));
+  CHECK(ring.Push({0, 0, "b", "e.b", 0, 0}));
+  CHECK(!ring.Push({0, 0, "c", "e.c", 0, 0}));  // false: it dropped one
+  CHECK_EQ(ring.dropped_total(), 1U);
+  CHECK_EQ(ring.size(), 2U);
+  LogRecord out;
+  CHECK(ring.Pop(&out));
+  CHECK_EQ(std::string(out.message), std::string("b"));
+  CHECK(ring.Pop(&out));
+  CHECK_EQ(std::string(out.message), std::string("c"));
 }
 
 int main() { return tiny_test::RunAll("sketch pure-logic tests"); }

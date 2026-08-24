@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <SCServo.h>
 
+#include "DiagLog.h"
 #include "ServoRegisters.h"
 #include "SignMagnitude.h"
 
@@ -75,6 +76,13 @@ bool ServoController::Move(const MoveCommand& command) {
   // acknowledges - so a bad target must never reach WritePosEx.
   if (command.target_counts < 0 ||
       command.target_counts > static_cast<int32_t>(units::kCountsPerTurn) - 1) {
+    // The Linux side already checks reachability - reaching here means that
+    // check disagreed with this one or was bypassed, which is worth knowing
+    // about on its own, not just silently refusing.
+    diag::DiagLog::Push(diag::log_level::kWarn,
+                        "Move rejected: target outside one servo turn",
+                        "mcu.servo.move_rejected_out_of_range",
+                        command.target_counts);
     return false;
   }
   const int16_t target = static_cast<int16_t>(command.target_counts);
@@ -139,6 +147,9 @@ bool ServoController::ConfigureRange(bool multi_turn,
 bool ServoController::ClearFault() {
   // Hardware rule: the overload de-rate is released by the next position
   // command, so re-commanding where we already are clears it without moving.
+  diag::DiagLog::Push(diag::log_level::kInfo,
+                      "Fault-clear issued: re-commanding current position",
+                      "mcu.servo.fault_clear_issued");
   return Stop();
 }
 

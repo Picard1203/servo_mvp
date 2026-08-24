@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <zephyr/kernel.h>
 
+#include "Config.h"
+
 namespace net {
 
 class NetworkRelay {

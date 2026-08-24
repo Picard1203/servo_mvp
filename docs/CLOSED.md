@@ -526,5 +526,239 @@ away" later.
 
 ---
 
+### D3 — The C++ side has no logging
+**Status:** done · 8 August 2026 · Batch 2
+
+`ServoBus`, `ServoController` and `NetworkRelay` now log their significant
+transitions and failure paths through a new `DiagLog` singleton
+(`sketch/src/DiagLog.h/.cpp`) — a bounded ring buffer (`LogRing.h`) fed from
+either thread, drained by `BridgeApi::DrainDiagLog()` over a new `mcu_log`
+Bridge notify. Bounded per `Tick()` call so a burst cannot make `loop()`
+spin, per `RELAY_NOTES.md`'s yield requirement.
+
+Received on the Python side (`app/relay/mcu_log.py`) into its own file,
+`logs/mcu.jsonl` — deliberately separate from the main log so a volume spike
+on either source cannot evict the other's history, with its own explicit
+size-based rotation rather than Logger461's (unverified whether Logger461
+supports a second independent sink in this environment). `write_lock_timeouts()`
+and `rejected_total()` are both now visible: the former as its own event
+(carrying the running total), the latter already did; `DiagLog`'s own
+`dropped_total()` (ring evictions) is surfaced in `get_status`'s health line
+next to the existing `relay=`/`rejected=` pair. `tools/soak_report.py` pulls
+and reports the new file, flagging the D4 write-lock-timeout signature.
+
+**Update, 8 August 2026 — built, flashed, and checked on the real board.**
+`arduino-app-cli app start user:servo_mvp` compiled cleanly (143224 bytes
+program, 18%; 54649 bytes RAM, 20%) and flashed via OpenOCD/SWD without
+error. `Arduino_RouterBridge`'s `notify()` was read directly on the board
+(`Arduino_RouterBridge 0.4.3`, `bridge.h:277-287`): it is a variadic
+template all the way down to `Arduino_RPClite`'s `RPCClient::notify`, with
+no fixed argument-count ceiling — **the six-argument arity concern is
+resolved**, not just assumed safe. A live `curl` against the relay IP
+(`192.168.10.60:8000/api/v1/system/health`, the correct path per ADR-0001 —
+the board's own OS network does not expose the port at all) returned
+`"mcu_status":"ready relay=1/rejected=0/diag_dropped=0"` — confirming
+`DiagLog::dropped_total()` works end to end through `get_status`.
+
+**One real gap found, not just a theoretical one: the MCU's boot-time
+`mcu.relay.ready` notify never arrived.** After several minutes of uptime,
+neither `mcu.jsonl` nor any `mcu.*` line exists anywhere in the Python log.
+`NetworkRelay::Begin()` pushes that event during `App::Begin()`, and the
+first `Tick()` drains and sends it almost immediately after `setup()`
+returns — likely *before* Python's `main.py:_start_background()` reaches
+`get_mcu_log().register()`, which runs after telemetry-sampler start and
+relay registration, i.e. late in Python's own startup. `Bridge.notify` is
+fire-and-forget with no acknowledgement (confirmed by reading the library,
+above), so a notify sent before the handler is registered is silently lost
+— exactly the failure mode named below, now observed rather than
+hypothesised. **Practical impact is likely limited to boot-time events
+only** — nothing else fired during this run (only 1 relay connection so
+far, 0 rejections, 0 timeouts), so this doesn't say whether steady-state
+events (fired minutes into a live session, long past the startup race
+window) have the same problem; that needs an actual timeout or rejection to
+occur to test. Filed as a new backlog item rather than fixed blind.
+
+**Two gaps the drop counter does not cover, stated plainly rather than
+implied solved:**
+
+- **`ForwardDiagLog` does not check whether `Bridge.notify` succeeded** —
+  matching the existing `net_open`/`net_rx`/`net_close` precedent, none of
+  which check it either, so this is not a new inconsistency. But `DiagLog`'s
+  ring has already popped the record by the time `notify` runs, so if the
+  Bridge is briefly unavailable — the exact condition this logging exists to
+  diagnose — the record is silently lost and `dropped_total()` does **not**
+  count it. The drop counter only sees ring overflow, not delivery failure.
+- **`String(record.message)`/`String(record.event)` allocate on the loop
+  thread inside the drain**, up to four small heap allocations per `Tick()`.
+  `App.cpp` documents this MCU as having no heap use elsewhere ("no heap on
+  the MCU, and the lifetimes are the program's"). Fragmentation risk under
+  sustained logging is real and unmeasured — worth watching during the first
+  extended board run, not assumed safe because it compiles.
+
+**Original report follows.**
+
+**Severity:** high · **Flow:** `WORKFLOWS.md` W3
+
+Only `App.cpp` produces any output (13 `Serial.print` calls). `ServoBus`,
+`ServoController`, `NetworkRelay` and `BridgeApi` have **zero** logging — and
+every bug in this project has lived in exactly those four files.
+
+There is currently no way to tell from the board what the MCU side is doing.
+
+**Acceptance:** each of the four files logs its significant transitions and every
+failure path, at a level that can be turned down. Log volume must not starve
+`loop()` — see `RELAY_NOTES.md` on the yield requirement.
+
+---
+
+### D27 — `synthetic_operator.py` does not reproduce `app.js`'s concurrent poll timers
+**Status:** done · 8 August 2026 · Session 2 prep
+
+Rewrote the load generator around a `PersistentPoller` — one kept-alive
+`http.client.HTTPConnection` reused across a whole polling loop, closing and
+reconnecting only on a transport error or the server's own
+`timeout_keep_alive`. This mattered more than the timer-shape gap itself:
+the previous version used `urllib.request.urlopen`, which opens and closes a
+**fresh** connection on every single call — so the tool was already
+massively overstating connection churn relative to a real browser before
+D27's finding was even considered.
+
+Each operator now runs three independent poll threads matching `app.js`
+exactly — `poll_state_forever` (1 s), `poll_zeros_forever` and
+`poll_events_forever` (both 15 s, genuinely separate timers, not one shared
+interval) — plus the existing `act_forever` for deliberate actions. A new
+`connection_opens` counter per action confirms the fix empirically rather
+than by inspection: smoke-tested against a local mock server, each
+persistent stream opened **one** connection for the entire run regardless of
+request count (e.g. 40 state polls, 2 connection opens — one per operator).
+
+Also added, since this batch's whole point was a run left semi-attended for
+hours: a `Checkpointer` that prints a live status line and rewrites the
+report file every `--checkpoint-minutes` (default 5), and SIGTERM/Ctrl-C
+handling that writes whatever was gathered before exiting rather than losing
+it. Both verified directly — a live run with a `SIGTERM` sent mid-run
+exited 2, printed "interrupted", and the report file carried
+`"interrupted": true` with the partial data intact.
+
+**Not tested:** against the real board over a multi-hour duration — only a
+short local run against a mock server. The connection-reuse behavior under
+the relay's actual `timeout_keep_alive=5` and W5500 socket ceiling is
+exactly what Session 2 itself now measures for the first time with correct
+fidelity; that is the soak, not something to simulate again here.
+
+**Original report follows.**
+
+**Severity:** medium · **Raised by:** Batch 2, 8 August 2026
+
+Found while writing ADR 0009. Each simulated operator runs two threads:
+`poll_forever` (hits `/servo/state` only) and `act_forever` (sparse, randomised
+discrete actions). **Nothing replicates `app.js`'s three independent timers** —
+`pollState` on a 1 s `setInterval`, `pollZeros`/`pollEvents` on independent
+15 s `setInterval`s (`app.js:9,13,742-744`). A real browser can therefore have
+two fetches in flight at once and open a second TCP connection; the synthetic
+load never does.
+
+Measuring R1 (the operator ceiling) against this tool as written would
+undercount real socket demand and could report R1 "met" without ever
+triggering the pattern that motivated ADR 0009 in the first place — the same
+trap `OPEN_QUESTIONS.md` Q9 already names for the USB-C question: do not
+report a thing measured on the strength of a test that does not exercise it.
+
+**Acceptance:** `synthetic_operator.py`'s poller reproduces the three-timer
+shape (or the gap is stated plainly in the soak's own report), before R1 is
+reported as met on the strength of a run against it.
+
+**Related:** ADR-0009, R1, D13.
+
+---
+
+### D13 — Requests arriving faster than slots free up are refused
+**Status:** done (decided, not fixed) · 8 August 2026 · Batch 2 · **ADR-0009**
+
+`kMaxRelaySockets` stays at **6**. The wall is fixed by hardware (7 sockets,
+W5500 minus the listener) and cannot be tuned; the real lever,
+`timeout_keep_alive` (`main.py:172`), stays at its current value of 5 because
+nobody has measured what a lower value buys yet — tuning it blind repeats the
+exact mistake D9 and D4 already cost this project. Session 2's soak is where
+that measurement happens.
+
+**New finding folded into the ADR**: `app.js` runs `pollState` on an
+independent 1 s timer and `pollZeros`/`pollEvents` on independent 15 s
+timers, not sequential awaits — so a single browser can transiently open two
+connections, not one. The real margin under the 7-socket wall is smaller
+than `OPEN_QUESTIONS.md` Q2's answer assumed.
+
+**Raised, not fixed:** D27 — `tools/synthetic_operator.py`'s load pattern
+does not reproduce that concurrent-fetch behaviour, so R1 measured against it
+as written would undercount real demand.
+
+Full reasoning: `docs/adr/0009-connection-ceiling.md`.
+
+**Original report follows.**
+
+**Severity:** high · **Measured 7 August 2026**
+
+**This is the "first press does nothing, press it again" symptom**, and it now
+reproduces on demand. Identical requests, from one machine, differing only in
+spacing:
+
+| pattern | requests | failures |
+|---|---|---|
+| back to back, new connection each | 10 | **5** |
+| paced at 1 s, as the UI polls | 10 | **0** |
+
+**The ceiling, measured:** `kMaxRelaySockets = 6` slots, each held for about
+five seconds after use by uvicorn's `timeout_keep_alive=5` (`main.py:172`, set
+deliberately so idle sockets do not park a slot). That is a sustained ceiling of
+roughly **one new connection per second**, with a burst tolerance of six.
+
+A browser hides this while it is only polling, because it reuses one socket. It
+surfaces the moment an action needs a *new* connection and every slot is busy —
+the request is refused, the operator sees nothing happen, and pressing again
+works because a slot has freed by then.
+
+**This is what R1 has to be measured against.** The target is roughly three
+remote operators plus one local session. A single browser may open up to six
+connections to one host on its own, so the slot budget can be spent by one
+person before the second connects.
+
+Not a race, and not fixed by the W5500 mutex: the relay is refusing politely and
+correctly (`Poll()` calls `fresh.stop()` and increments `rejected_total_`). The
+question is whether six is enough, and what should happen when it is not — a
+refusal is currently indistinguishable from a failure at the browser.
+
+**`rejected_total()` already counts these and cannot be read from the board**,
+exactly like `write_lock_timeouts()`. Two diagnostics, both unreachable; see D3.
+
+**Acceptance:** the ceiling is stated in numbers here (done above), the target in
+R1 is either met or the limit is raised deliberately, and a refused connection
+produces something an operator can understand rather than silence.
+
+**Promoted and reframed, 8 August 2026 (operator lens).** This is the most
+demo-damaging behaviour in the product: in a room of people deciding whether to
+procure a full project, "press it twice" is what they will remember. Two things
+follow.
+
+**First, it is a decision, not a fix.** The measurement is done. What is missing
+is a choice between raising `kMaxRelaySockets`, dropping uvicorn's
+`timeout_keep_alive=5`, pooling connections on the client, or accepting the
+ceiling and surfacing refusals honestly — each with a different cost, and the
+choice changes what R1 can possibly measure. **It needs an ADR**, or it will be
+re-argued at every future connection bug, exactly as the chunk-size question was.
+
+**Second, the operator half is now two separate defects**, because "the operator
+sees nothing" turned out to be two mechanisms, not one:
+
+- **D14** — when the refusal *does* reach the client, it is shown as the browser
+  string "Failed to fetch".
+- **D15** — nothing marks a command as in flight, so the operator presses again,
+  opening another connection and spending another slot. **The UI's reaction to
+  the symptom feeds the cause.**
+
+Fix both before measuring R1, or the measurement includes the operator's
+double-presses as load.
+
+---
+
 ## Requirements captured but not yet designed
 

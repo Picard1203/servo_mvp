@@ -107,6 +107,15 @@ A mutex, not a semaphore: this protects one resource, it is not a count of
 several. `k_mutex` also gives priority inheritance, which matters when the
 Bridge thread outranks the loop thread.
 
+**`DiagLog` (backlog D3) is a second lock, deliberately separate from
+`chip_lock_`.** Every hardware/network file pushes diagnostic records into it
+from either thread, so it needs its own mutex - but it is never a sink
+callback and never touches the Bridge itself, so holding `chip_lock_` while
+calling `DiagLog::Push()` is safe (the ordering is always `chip_lock_` then
+`DiagLog`'s lock, never the reverse - no inversion risk). Only
+`BridgeApi::DrainDiagLog()`, called from `Tick()`, ever notifies Linux with
+what it collects, and it does so outside both locks.
+
 ## 6. Console: `Serial` works; `Monitor` is an option, not a requirement
 
 The sketch prints through `Serial`, and that is proven - the servo

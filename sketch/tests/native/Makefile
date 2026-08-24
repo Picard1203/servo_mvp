@@ -14,7 +14,8 @@ all: $(BINARY)
 
 $(BINARY): test_pure_logic.cpp TinyTest.h \
            ../../src/AngleMath.h ../../src/ServoStatus.h \
-           ../../src/SignMagnitude.h ../../src/ServoRegisters.h
+           ../../src/SignMagnitude.h ../../src/ServoRegisters.h \
+           ../../src/LogRing.h
 	$(CXX) $(CXXFLAGS) -o $@ test_pure_logic.cpp
 
 clean:

@@ -11,14 +11,19 @@ always shown up:
   has moved off the bottom, is a failed read that became a position.
 - **Failed reads and sampler exceptions.** Both are logged now; neither was
   before.
-- **Growth rate.** Bytes per hour for the database and the log, which is what
-  a month-long test has to be budgeted against.
+- **MCU-side counters (backlog D3).** `write_lock_timeouts` is the D4 race
+  signature from the sketch's own side: non-zero means `loop()` held the
+  W5500 too long. `rejected_total`/`dropped_total` growth is R1's capacity
+  ceiling and the diagnostic ring falling behind, respectively.
+- **Growth rate.** Bytes per hour for the database and both logs, which is
+  what a month-long test has to be budgeted against.
 
-Pulls both files over adb by default, because the database lives on the board
-and a running app is writing to it.
+Pulls all three files over adb by default, because the database lives on the
+board and a running app is writing to it.
 
     python3 tools/soak_report.py --since 2026-08-08T09:00
-    python3 tools/soak_report.py --db ./servo_mvp.db --log ./servo_mvp.jsonl
+    python3 tools/soak_report.py --db ./servo_mvp.db --log ./servo_mvp.jsonl \\
+        --mcu-log ./mcu.jsonl
 """
 
 import argparse
@@ -206,8 +211,82 @@ def _tally_record(record: dict[str, Any], cutoff: str,
         })
 
 
+def _mcu_log_unavailable() -> dict[str, Any]:
+    """Findings shape for when mcu.jsonl could not be pulled (backlog D28).
+
+    Returns:
+        dict[str, Any]: Same keys as report_mcu_log, zeroed and flagged.
+    """
+    return {"available": False, "records": 0, "write_lock_timeouts": 0,
+            "rejected": 0, "dropped": 0, "bus_stalls": 0, "warnings": 0,
+            "errors": []}
+
+
+def report_mcu_log(mcu_log_path: str, since: float) -> dict[str, Any]:
+    """Counts the MCU-side diagnostic events that matter (backlog D3).
+
+    Args:
+        mcu_log_path (str): Path to the MCU-side JSONL log.
+        since (float): Only consider records at or after this timestamp.
+
+    Returns:
+        dict[str, Any]: Findings, ready to print.
+    """
+    cutoff = datetime.datetime.fromtimestamp(since).isoformat()
+    findings: dict[str, Any] = {
+        "available": True,
+        "records": 0,
+        "write_lock_timeouts": 0,
+        "rejected": 0,
+        "dropped": 0,
+        "bus_stalls": 0,
+        "warnings": 0,
+        "errors": [],
+    }
+    with open(mcu_log_path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            record = _decode_record(line)
+            if record is not None:
+                _tally_mcu_record(record, cutoff, findings)
+    return findings
+
+
+def _tally_mcu_record(record: dict[str, Any], cutoff: str,
+                      findings: dict[str, Any]) -> None:
+    """Adds one MCU-side record to the running findings.
+
+    Args:
+        record (dict[str, Any]): A decoded log record.
+        cutoff (str): ISO timestamp before which records are ignored.
+        findings (dict[str, Any]): Tally to update in place.
+
+    Returns:
+        None
+    """
+    if record.get("timestamp", "") < cutoff:
+        return
+    findings["records"] += 1
+    event = record.get("event", "")
+    level = record.get("level", "")
+    if event == "mcu.relay.write_lock_timeout":
+        findings["write_lock_timeouts"] += 1
+    if event == "mcu.relay.rejected":
+        findings["rejected"] += 1
+    if event == "mcu.servo.refresh_failed":
+        # The sampler calls this once a second - the same signature as the
+        # D4/D10 stalls, just observed from the MCU's own side.
+        findings["bus_stalls"] += 1
+    if level == "WARNING":
+        findings["warnings"] += 1
+    if level == "ERROR":
+        findings["errors"].append({"at": record.get("timestamp"),
+                                   "message": record.get("message"),
+                                   "event": event})
+
+
 def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
-                  db_bytes: int, log_bytes: int) -> int:
+                  mcu_log: dict[str, Any], db_bytes: int, log_bytes: int,
+                  mcu_log_bytes: int) -> int:
     """Prints the findings and returns an exit code.
 
     Args:
@@ -233,6 +312,19 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
     print(f"warnings             {log['warnings']}")
     print(f"errors               {len(log['errors'])}")
     print(f"relay churn lines    {log['relay_churn']}")
+    print()
+    if mcu_log["available"]:
+        print(f"MCU write-lock timeouts (D4 signature)  "
+              f"{mcu_log['write_lock_timeouts']}")
+        print(f"MCU bus-refresh stalls                  "
+              f"{mcu_log['bus_stalls']}")
+        print(f"MCU connections rejected                "
+              f"{mcu_log['rejected']}")
+        print(f"MCU warnings / errors                   "
+              f"{mcu_log['warnings']} / {len(mcu_log['errors'])}")
+    else:
+        print("MCU-side log         not present on the board (backlog D28) "
+              "- write-lock/rejection counts not confirmed this run")
 
     if hours > 0.0:
         print()
@@ -243,6 +335,11 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
         print(f"log       {log_bytes / 1_048_576:.1f} MB now, "
               f"{log_bytes / 1_048_576 / hours:.2f} MB/hour "
               f"-> {log_bytes / 1_048_576 / hours * 24 * 30:.0f} MB/month")
+        if mcu_log["available"]:
+            print(f"mcu log   {mcu_log_bytes / 1_048_576:.1f} MB now, "
+                  f"{mcu_log_bytes / 1_048_576 / hours:.2f} MB/hour "
+                  f"-> {mcu_log_bytes / 1_048_576 / hours * 24 * 30:.0f} "
+                  f"MB/month")
 
     for gap in telemetry["gaps"]:
         print(f"  gap at {gap['at']}: {gap['seconds']}s")
@@ -251,13 +348,25 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
     for error in log["errors"]:
         print(f"  ERROR {error['at']} {error['message']} "
               f"[{error['type']}: {error['exception']}]")
+    for error in mcu_log["errors"]:
+        print(f"  MCU ERROR {error['at']} {error['message']} "
+              f"[{error['event']}]")
 
     print()
-    if (telemetry["stall_band_gaps"] == 0) and \
-            (len(telemetry["impossible_positions"]) == 0) and \
-            (len(log["errors"]) == 0):
+    linux_side_clean = (telemetry["stall_band_gaps"] == 0) and \
+        (len(telemetry["impossible_positions"]) == 0) and \
+        (len(log["errors"]) == 0)
+    mcu_side_clean = mcu_log["available"] and \
+        (mcu_log["write_lock_timeouts"] == 0) and \
+        (mcu_log["bus_stalls"] == 0) and \
+        (len(mcu_log["errors"]) == 0)
+    if linux_side_clean and mcu_side_clean:
         print("VERDICT: clean - no stall signature, no fabricated positions, "
               "no errors.")
+        return 0
+    if linux_side_clean and not mcu_log["available"]:
+        print("VERDICT: clean on the Linux side, but the MCU side was never "
+              "checked (D28) - do not report this as a full clean.")
         return 0
     print("VERDICT: something to look at - see the lines above.")
     return 1
@@ -277,6 +386,9 @@ def main() -> int:
                         help="local database path; pulled over adb if omitted")
     parser.add_argument("--log", default=None,
                         help="local log path; pulled over adb if omitted")
+    parser.add_argument("--mcu-log", default=None,
+                        help="local MCU-side log path (backlog D3); "
+                             "pulled over adb if omitted")
     arguments = parser.parse_args()
 
     workspace = tempfile.mkdtemp(prefix="soak-")
@@ -286,14 +398,23 @@ def main() -> int:
     log_path = arguments.log
     if log_path is None:
         log_path = pull_from_board("servo_mvp.jsonl", workspace)
+    mcu_log_path = arguments.mcu_log
+    if mcu_log_path is None:
+        mcu_log_path = pull_from_board("mcu.jsonl", workspace)
     if (db_path is None) or (log_path is None):
         return 2
 
     since = parse_since(arguments.since)
     telemetry = report_telemetry(db_path, since)
     log = report_log(log_path, since)
-    return print_verdict(telemetry, log, os.path.getsize(db_path),
-                         os.path.getsize(log_path))
+    if mcu_log_path is None:
+        mcu_log = _mcu_log_unavailable()
+        mcu_log_bytes = 0
+    else:
+        mcu_log = report_mcu_log(mcu_log_path, since)
+        mcu_log_bytes = os.path.getsize(mcu_log_path)
+    return print_verdict(telemetry, log, mcu_log, os.path.getsize(db_path),
+                         os.path.getsize(log_path), mcu_log_bytes)
 
 
 if __name__ == "__main__":

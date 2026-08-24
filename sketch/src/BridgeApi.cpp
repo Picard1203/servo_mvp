@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include "Config.h"
+#include "DiagLog.h"
 
 namespace api {
 
@@ -101,6 +102,11 @@ String HandleGetStatus() {
     status += "/rejected=";
     status += static_cast<int>(api->relay()->rejected_total());
   }
+  // Same reasoning as relay pressure above: a growing drop count means the
+  // Tick() drain is not keeping up with the producers, and would otherwise
+  // be completely invisible - a dropped record cannot log its own loss.
+  status += "/diag_dropped=";
+  status += static_cast<int>(diag::DiagLog::dropped_total());
   return status;
 }
 
@@ -153,6 +159,18 @@ void ForwardClientClose(uint8_t slot) {
   Bridge.notify("net_close", static_cast<int>(slot));
 }
 
+// ---- diagnostics (backlog D3) -------------------------------------------
+
+/// Shield -> Linux: one diagnostic record drained from DiagLog. uptime is
+/// sent in whole seconds, not milliseconds - T9 plans runs of a month or
+/// more, and a signed 32-bit millisecond count wraps after ~24.8 days.
+void ForwardDiagLog(const diag::LogRecord& record) {
+  Bridge.notify("mcu_log", static_cast<int>(record.level),
+               String(record.message), String(record.event),
+               static_cast<int>(record.arg1), static_cast<int>(record.arg2),
+               static_cast<int>(record.uptime_ms / 1000));
+}
+
 }  // namespace
 
 BridgeApi::BridgeApi(servo::ServoController& controller,
@@ -190,6 +208,15 @@ void BridgeApi::Register() {
     Bridge.provide_safe("net_shutdown", HandleNetShutdown);
     relay_->SetSinks(ForwardClientOpen, ForwardClientBytes,
                      ForwardClientClose);
+  }
+}
+
+void BridgeApi::DrainDiagLog() {
+  diag::LogRecord record;
+  for (uint8_t drained = 0; drained < config::kMcuLogDrainPerTick;
+      ++drained) {
+    if (!diag::DiagLog::Drain(&record)) break;
+    ForwardDiagLog(record);
   }
 }
 

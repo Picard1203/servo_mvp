@@ -20,14 +20,14 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
 | **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
-| **6 — D10 half DONE, 24 Aug 2026; R2 next, can start fresh** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** This can start in a new chat; nothing from Session 6's D10 work is a prerequisite for it. | R2: yes, for the operator-visible part |
+| **6 — D10 half DONE, 24 Aug 2026** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** Nothing from Session 6's D10 work is a prerequisite for it, but **Session 8 now runs first** (inserted 24 Aug 2026 by T14's triage, see row 8) so R2 designs against a settled `ServoStateResponse` shape — R2 itself is Session 9, not a direct continuation of this row. | R2: yes, for the operator-visible part |
 | **7 — DONE, 24 Aug 2026** | **T14 closed** — all fourteen unslotted items given a real session (rows above and below) or an explicit reason they don't get one (T13, T15 — see their entries); Closed index gained D3/D27/D13 (moved to `CLOSED.md` but never indexed). **D32, D33, D34 closed the same session** — board-tested, verified (suite 223→226), app restarted and checked live. **D35 opened** (speed-step enforcement postponed, see Session 10) — a board measurement during D32's work found commanded and actual servo speed disagree by ~1.5-2x, so the planned fix was not shipped on an unverified unit-conversion assumption. | yes — used to verify D32/D33/D34 live and to bench-test D35's measurement |
 | **8 — next** | One batch, many small fixes, no reason to split across sessions: **D24** (2 uncovered `InvalidReadingError` guards + `--cov-fail-under`), **D26** (loop the suite to reproduce its 1-in-10 flake, time-boxed — fix or document the timing sensitivity), **D30** (the one missing regression test for the already-fixed UTC/local cutoff bug), **T12** (decide `check_client_behaviour.js`'s status, 15 min), **D8** (deploy without `.env` must fail loud, not default to the simulator — the one must-ship item in this triage), **D29** (`LOG_LEVEL` is inert on the Logger461 stand-in — add the level filter), **D23** (decide + implement the `moving`/fault-boolean shape on a failed read — amends ADR-0008), **D25** (keep a reported alarm visible through the D16 blanking rule). **D23+D25 deliberately go last in this session, immediately before R2** — both touch the exact `ServoStateResponse` surface R2 is about to extend with an isolated-state field, so R2 designs against a settled shape instead of one about to move under it. | no (board confirmation of D8/D23/D25 is a nice-to-have, not required) |
 | **9 — after Session 8** | **R2** — motor isolation, per Session 6's entry. The `/grilling` pass on its open design questions runs at the start of this session. | yes, for the operator-visible part |
 | **10 — opportunistic, any time after 7** | **D28** (MCU boot-time `mcu_log` notify race — needs a flash to fix or confirm) + **D35** (commanded vs. actual speed disagree by ~1.5-2x, found bench-testing D32 this session — needs `PRESENT_SPEED` register-level readback, not just wall-clock timing). D32 itself closed this session (24 Aug) — its speed-step-enforcement piece split into D35 rather than shipped on an unverified assumption. Low severity, no dependency on anything above; ride along with any session that already has the board up (R2's Session 9 is the natural host). | yes |
 
-**Read `docs/BACKLOG.md` T14's entry in full for the reasoning behind this
-slotting** — this row is just a pointer to it.
+**T14 (`CLOSED.md`) has the full reasoning behind this slotting** if it is
+ever needed again — this row is just a pointer to the outcome.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -380,13 +380,14 @@ not collide with real fixes. High volume, low reasoning — the Antigravity spli
 - **D19** — needs a reachability answer first; see its entry.
 - **R3, R4, R8** — post-MVP by decision, not by omission.
 
-**T14 closed, 24 August 2026 — every item that had no batch now has one, or an
-explicit reason it doesn't.** The fourteen from the 23 August audit (D8, D23,
-D24, D25, D26, D28, D29, D30, T12, T13, D32, T15, D33, D34): twelve are slotted
-in Session 8, 9 or 10 above; **D33 and D34 were fixed the same session as this
-triage** (pre-diagnosed going in); **T13 stays deliberately unscheduled** — its
-own entry says do it opportunistically, not as a sweep; **T15 is blocked on an
-operator decision**, moved to `OPEN_QUESTIONS.md` Q10.
+**T14 closed, 24 August 2026 (full record in `CLOSED.md`) — every item that had
+no batch now has one, or an explicit reason it doesn't.** The fourteen from the
+23 August audit (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13, D32, T15,
+D33, D34): nine are slotted, in Session 8 or Session 10 above; **D32, D33 and
+D34 were closed the same session as this triage** (all three pre-diagnosed or
+diagnosed going in, see the Closed index); **T13 stays deliberately
+unscheduled** — its own entry says do it opportunistically, not as a sweep;
+**T15 is blocked on an operator decision**, moved to `OPEN_QUESTIONS.md` Q10.
 
 **What is not in any batch is as important as what is:** if a batch slips, the
 cut line in `PROJECT_STATE.md` says what ships anyway.
@@ -421,6 +422,7 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D32** | Speed field snaps to the angle's step grid, not its own; typed angle silently rewritten before send | 24 August 2026 · Session 7 (T14) · speed-step enforcement split into D35 rather than shipped unverified |
 | **D33** | Recent Activity timestamps display in UTC, not local time | 24 August 2026 · Session 7 (T14) |
 | **D34** | Angle displays truncate to 1 decimal, losing the 0.06° step | 24 August 2026 · Session 7 (T14) · widened from the move log to every angle readout |
+| **T14** | Triage the unslotted items; audit backlog and doc hygiene deliberately | 24 August 2026 · Session 7 |
 
 ---
 
@@ -942,41 +944,6 @@ dropped.
 **Acceptance:** no open entry states the same thing twice, and every one keeps
 its numbers, paths, decisions and honest statements of what was not tested. The
 rule itself is in `CLAUDE.md` §4.
-
----
-
-### T14 — Triage the unslotted items; audit backlog and doc hygiene deliberately
-**Status:** open · **Severity:** medium · **Raised by:** the operator, 23 August 2026
-
-Two things this session found by accident — noticed only because the work
-happened to touch nearby text — not by any process that catches them
-reliably:
-
-1. **Ten open items had no batch assignment at all** (see the "Not yet
-   slotted" table, end of the Ordering section): D8, D23, D24, D25, D26,
-   D28, D29, D30, T12, T13.
-2. **The Closed index table** (just below Ordering) was missing four items
-   already moved whole to `docs/CLOSED.md`.
-
-Both were only caught because the operator asked directly whether the
-backlog was actually complete. **This item is that check, done once,
-deliberately, instead of by accident** — distinct from T13, which is about
-entries being too long; this is about entries (or index rows) being wrong
-or absent.
-
-**Scope:**
-1. Give each of the ten unslotted items a real batch/session, or an explicit
-   "not scheduled, because —", per the Ordering section's existing convention.
-2. Sweep every summary/index table in the docs (the Closed index, the
-   Ordering batches, `PROJECT_STATE.md`'s status blocks) for the same class
-   of drift — an item closed or moved without every place that lists it
-   being updated to match.
-
-**Acceptance:** every open item in `BACKLOG.md` has a batch or a stated
-reason it doesn't; every index table matches what is actually in the file
-it indexes.
-
-**Related:** T13 (overlaps in spirit, not in scope — see above).
 
 ---
 

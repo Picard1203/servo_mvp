@@ -114,6 +114,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 | **D8** made impossible to get wrong | A silent fallback to the simulator at handover is the worst failure available |
 | **D16** | The operator must not be shown 0.00 V as a measurement |
 | **T10** the recovery runbook | The receiving team runs it unattended for days. They must know what to do when it misbehaves, and the site is three hours away |
+| **T11** the operations manual | Nothing in the repo tells anyone how to *operate* this. Every document is written for whoever is building it |
 | **Docs true** | Cheap, and the project's own standard |
 
 ### Should ship — cut only under real pressure, and say so out loud

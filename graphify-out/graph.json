@@ -17258,8 +17258,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "skills_arduino_agent_package_devdependencies_typescript_eslint_eslint_plugin",
-      "community": 454,
-      "community_name": "@typescript-eslint/eslint-plugin",
+      "community": 76,
+      "community_name": "devDependencies",
       "norm_label": "@typescript-eslint/eslint-plugin"
     },
     {
@@ -17269,8 +17269,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "typescript_eslint_eslint_plugin",
-      "community": 454,
-      "community_name": "@typescript-eslint/eslint-plugin",
+      "community": 76,
+      "community_name": "devDependencies",
       "norm_label": "@typescript-eslint/eslint-plugin"
     },
     {
@@ -17478,8 +17478,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "skills_arduino_agent_package_devdependencies_ignore_styles",
-      "community": 76,
-      "community_name": "devDependencies",
+      "community": 455,
+      "community_name": "ignore-styles",
       "norm_label": "ignore-styles"
     },
     {
@@ -17489,8 +17489,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "ignore_styles",
-      "community": 76,
-      "community_name": "devDependencies",
+      "community": 455,
+      "community_name": "ignore-styles",
       "norm_label": "ignore-styles"
     },
     {
@@ -26477,21 +26477,21 @@
       "norm_label": "q7 \u2014 when do the extra servo bus adapters arrive? `open`"
     },
     {
-      "label": "Q9 \u2014 Does the on-site USB-C session bypass the relay entirely? `open`",
+      "label": "Q9 \u2014 What can the on-site person do? `answered`",
       "file_type": "document",
       "source_file": "docs/OPEN_QUESTIONS.md",
       "source_location": "L154",
       "_origin": "ast",
-      "id": "docs_open_questions_q9_does_the_on_site_usb_c_session_bypass_the_relay_entirely_open",
+      "id": "docs_open_questions_q9_what_can_the_on_site_person_do_answered",
       "community": 14,
       "community_name": "For the operators",
-      "norm_label": "q9 \u2014 does the on-site usb-c session bypass the relay entirely? `open`"
+      "norm_label": "q9 \u2014 what can the on-site person do? `answered`"
     },
     {
       "label": "Q8 \u2014 Is there a date? `open`",
       "file_type": "document",
       "source_file": "docs/OPEN_QUESTIONS.md",
-      "source_location": "L171",
+      "source_location": "L174",
       "_origin": "ast",
       "id": "docs_open_questions_q8_is_there_a_date_open",
       "community": 14,
@@ -53455,8 +53455,8 @@
       "source_location": "L721",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_evaluation_and_iteration",
-      "community": 344,
-      "community_name": "Evaluation and iteration",
+      "community": 222,
+      "community_name": "[Analysis Title]",
       "norm_label": "evaluation and iteration"
     },
     {
@@ -53466,8 +53466,8 @@
       "source_location": "L723",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_build_evaluations_first",
-      "community": 344,
-      "community_name": "Evaluation and iteration",
+      "community": 222,
+      "community_name": "[Analysis Title]",
       "norm_label": "build evaluations first"
     },
     {
@@ -53477,8 +53477,8 @@
       "source_location": "L756",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_develop_skills_iteratively_with_the_agent",
-      "community": 344,
-      "community_name": "Evaluation and iteration",
+      "community": 222,
+      "community_name": "[Analysis Title]",
       "norm_label": "develop skills iteratively with the agent"
     },
     {
@@ -53488,8 +53488,8 @@
       "source_location": "L812",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_observe_how_agents_navigate_skills",
-      "community": 344,
-      "community_name": "Evaluation and iteration",
+      "community": 222,
+      "community_name": "[Analysis Title]",
       "norm_label": "observe how agents navigate skills"
     },
     {
@@ -53499,8 +53499,8 @@
       "source_location": "L823",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_anti_patterns_to_avoid",
-      "community": 222,
-      "community_name": "[Analysis Title]",
+      "community": 454,
+      "community_name": "Anti-patterns to avoid",
       "norm_label": "anti-patterns to avoid"
     },
     {
@@ -53510,8 +53510,8 @@
       "source_location": "L825",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_avoid_windows_style_paths",
-      "community": 222,
-      "community_name": "[Analysis Title]",
+      "community": 454,
+      "community_name": "Anti-patterns to avoid",
       "norm_label": "avoid windows-style paths"
     },
     {
@@ -53521,8 +53521,8 @@
       "source_location": "L834",
       "_origin": "ast",
       "id": "skills_superpowers_skills_writing_skills_anthropic_best_practices_avoid_offering_too_many_options",
-      "community": 222,
-      "community_name": "[Analysis Title]",
+      "community": 454,
+      "community_name": "Anti-patterns to avoid",
       "norm_label": "avoid offering too many options"
     },
     {
@@ -55357,7 +55357,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L200",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "tasks",
       "id": "docs_backlog_tasks"
@@ -55368,7 +55368,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L202",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "t1 \u2014 apply `conventions.md` across the codebase",
       "id": "docs_backlog_t1_apply_conventions_md_across_the_codebase"
@@ -55379,7 +55379,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L214",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "t5 \u2014 add `design_diagrams/` with plantuml",
       "id": "docs_backlog_t5_add_design_diagrams_with_plantuml"
@@ -55390,7 +55390,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L227",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "t6 \u2014 restructure the exception hierarchy",
       "id": "docs_backlog_t6_restructure_the_exception_hierarchy"
@@ -55401,7 +55401,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L248",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "t7 \u2014 add the database abstraction",
       "id": "docs_backlog_t7_add_the_database_abstraction"
@@ -55424,7 +55424,7 @@
       "source_location": "L277",
       "_origin": "ast",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "t2 \u2014 package the air-gapped bundle",
       "id": "docs_backlog_t2_package_the_air_gapped_bundle"
     },
@@ -55434,7 +55434,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L293",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "t3 \u2014 run the on-target test suite",
       "id": "docs_backlog_t3_run_the_on_target_test_suite"
@@ -55445,7 +55445,7 @@
       "source_file": "docs/BACKLOG.md",
       "source_location": "L303",
       "_origin": "ast",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "t4 \u2014 moves while unverified: decided, permitted",
       "id": "docs_backlog_t4_moves_while_unverified_decided_permitted"
@@ -55545,7 +55545,7 @@
       "source_location": "L427",
       "_origin": "ast",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "r7 \u2014 handover logistics depend on adapter delivery",
       "id": "docs_backlog_r7_handover_logistics_depend_on_adapter_delivery"
     },
@@ -56002,7 +56002,7 @@
       "author": null,
       "contributor": null,
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "servo control app manifest",
       "_origin": "semantic",
       "id": "app_project_manifest"
@@ -56018,7 +56018,7 @@
       "author": null,
       "contributor": null,
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "ipaddress cast patch for ethernet 2.0.2",
       "_origin": "semantic",
       "id": "libraries_readme_ipaddress_patch"
@@ -56050,7 +56050,7 @@
       "author": null,
       "contributor": null,
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "vendored arduino libraries",
       "_origin": "semantic",
       "id": "libraries_readme_vendored_libraries"
@@ -56226,7 +56226,7 @@
       "author": null,
       "contributor": null,
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "zephyr uno q board profile",
       "_origin": "semantic",
       "id": "sketch_sketch_board_profile"
@@ -56514,7 +56514,7 @@
       "contributor": null,
       "rationale": "Edits land on the board directly, so there is no push step during development. A development convenience only, not the deployment path; the database at /home/arduino/servo_mvp.db sits outside the mount.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "sshfs board mount as working copy",
       "_origin": "semantic",
       "id": "claude_sshfs_board_mount"
@@ -56977,7 +56977,7 @@
       "author": null,
       "contributor": null,
       "rationale": "Exception for abstract levels, Error for concrete: service base (ServoMvpException) -> category (NotFoundException) -> concrete (ServoNotFoundError). Each class carries its FastAPI status code; error codes accumulate with += into SERVO_MVP.NOT_FOUND.SERVO_NOT_FOUND. The payoff is handler count \u2014 one handler on the service base reads status, code and metadata off whatever was raised. The repo today has a flat set under DomainError.",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "three-tier exception hierarchy",
       "_origin": "semantic",
@@ -56993,7 +56993,7 @@
       "author": null,
       "contributor": null,
       "rationale": "The abstract/concrete split applied to repositories should apply to the database itself; the repo has only the concrete Database in python/app/db/database.py.",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "abstract database with concrete sqlitedatabase",
       "_origin": "semantic",
@@ -57218,7 +57218,7 @@
       "contributor": null,
       "rationale": "Three parts: an ARM64 wheelhouse built with --platform manylinux2014_aarch64, the patched Ethernet/SCServo libraries, and a pinned arduino:zephyr core (0.56.0+, which adds Serial3 and the UNO Q main-thread-priority fix). Never exercised end to end.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "the air-gapped bundle",
       "_origin": "semantic",
       "id": "readme_air_gapped_bundle"
@@ -57234,7 +57234,7 @@
       "contributor": null,
       "rationale": "Board Manager does not exist on an air-gapped machine, so the target must already carry the core version built against. Stated as the most likely cause of 'it worked on my laptop'.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "pin the arduino core version",
       "_origin": "semantic",
       "id": "readme_core_version_pin"
@@ -57298,7 +57298,7 @@
       "contributor": null,
       "rationale": "The working copy is often an sshfs mount of arduino@192.168.1.192:/home/arduino/ArduinoApps/, so edits land on the board with no push step. Convenient for development; explicitly not the deployment path.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "development shortcut \u2014 sshfs mount of the board",
       "_origin": "semantic",
       "id": "readme_sshfs_shortcut"
@@ -57457,7 +57457,7 @@
       "author": null,
       "contributor": null,
       "rationale": "164 checks run on every build, covering sign-magnitude decoding, angle conversion and status bits. They could not have caught any of the chain, because none of it is maths. A new native test reproduces the exact failure: range_a_datum_at_zero_strands_the_negative_half.",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "native tests cover pure maths only",
       "_origin": "semantic",
@@ -57842,7 +57842,7 @@
       "contributor": null,
       "rationale": "Development runs on a WiFi-mounted board; the single servo bus adapter sits on a coloured network that cannot be introduced to the secure one, so the air-gapped path has never been exercised. This version has not yet been run on the board: no .env, no database.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "environment right now",
       "_origin": "semantic",
       "id": "docs_project_state_environment"
@@ -57922,7 +57922,7 @@
       "contributor": null,
       "rationale": "The binding reason is the air gap: a build pipeline means a toolchain and dependency tree that would have to be vendored and reproduced on an isolated network, for a UI of this size. Payload size over the MCU relay was secondary. Consequence: state management and reactivity are hand-rolled in app.js and must be maintained there.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "adr-0002 \u2014 plain html/css/js, no framework",
       "_origin": "semantic",
       "id": "docs_adr_0002_no_frontend_framework_decision"
@@ -58034,7 +58034,7 @@
       "contributor": null,
       "rationale": "Rather than build connected and port later, the project is developed as though the air gap were in place so shipping is 'zip the folder'. The constraint is invisible in the code and explains what otherwise looks like over-engineering: the vendored wheelhouse, the patched libraries, the pinned core, and the absence of build tooling. No CDN, no package fetch, no dependency resolution at deploy time.",
       "community": 12,
-      "community_name": "Tasks",
+      "community_name": "ADR-0005 \u2014 Develop as if already air-gapped",
       "norm_label": "adr-0005 \u2014 develop as if already air-gapped",
       "_origin": "semantic",
       "id": "docs_adr_0005_air_gapped_by_default_development_decision"
@@ -58257,7 +58257,7 @@
       "author": null,
       "contributor": null,
       "rationale": "They catch different things. Host-native runs constantly in milliseconds with no board, covering sign-magnitude decoding, angle round-trips within one count, the +/-90 window fitting one servo turn, direction mirroring, speed conversion and every status bit. On-target covers only what a host cannot: that the servo answers, configuration writes stick, a commanded move lands, and stop holds. OnTarget is not compiled into the main sketch because recursive compilation is limited to src/.",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "two test tiers: host-native and on-target",
       "_origin": "semantic",
@@ -58273,7 +58273,7 @@
       "author": null,
       "contributor": null,
       "rationale": "A ~60-line harness, deliberately not a third-party framework: every dependency is a liability on an air-gapped machine.",
-      "community": 12,
+      "community": 344,
       "community_name": "Tasks",
       "norm_label": "tinytest.h instead of aunit or googletest",
       "_origin": "semantic",
@@ -100472,7 +100472,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "docs/OPEN_QUESTIONS.md",
-      "source_location": "L171",
+      "source_location": "L174",
       "weight": 1.0,
       "_origin": "ast",
       "source": "docs_open_questions_for_the_programme",
@@ -100487,7 +100487,7 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "docs_open_questions_for_the_programme",
-      "target": "docs_open_questions_q9_does_the_on_site_usb_c_session_bypass_the_relay_entirely_open",
+      "target": "docs_open_questions_q9_what_can_the_on_site_person_do_answered",
       "confidence_score": 1.0
     },
     {
@@ -129854,5 +129854,5 @@
       "source_file": "sketch/src/RELAY_NOTES.md"
     }
   ],
-  "built_at_commit": "018eb38733cf145b0e31e75c91fe6a34106c243c"
+  "built_at_commit": "2ebbf406db452eccd03da96df0e770c1db05b1de"
 }

@@ -68,6 +68,13 @@ class MotionService:
         target_counts = self._state.counts_from_output_deg(target_deg)
         speed_counts = self._state.counts_speed_from_output_speed(speed_dps)
 
+        # Set once, here, to the angle the OPERATOR asked for - never in
+        # _fine_approach, which deliberately commands past this value
+        # (anti-backlash overshoot). Recording the overshoot would show
+        # the operator a target they never requested (twin-path hazard,
+        # same shape as D9/D10).
+        self._state.set_target(target_deg)
+
         if self._needs_fine_approach(start_deg, target_deg):
             Thread(target=self._fine_approach,
                    args=(target_deg, target_counts, speed_counts,
@@ -91,10 +98,16 @@ class MotionService:
     def stop(self) -> None:
         """Stops the current move at the present position.
 
+        The last target is marked stale, not cleared: "asked for 45,
+        stopped at 27" is the supposed-vs-actual reading the target
+        display exists for, and it matters most at the moment a move is
+        abandoned.
+
         Returns:
             None.
         """
         self._servo.command_stop()
+        self._state.mark_target_stale()
         deg = self._state.current_output_deg()
         at_deg = round(deg, 1) if deg is not None else None
         self._events.record("servo.stop", "stop commanded",

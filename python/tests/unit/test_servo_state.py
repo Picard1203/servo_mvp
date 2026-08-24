@@ -22,6 +22,48 @@ class TestConversions:
         from app.deps import get_state_store
         assert get_state_store().counts_speed_from_output_speed(0.001) >= 1
 
+    def test_servo_deg_and_output_deg_agree_on_one_conversion(self, backend):
+        """D9 guard: output_deg must be DERIVED from servo_deg, not a
+        second, independent statement of the same conversion - a second
+        definition once disagreed by half a turn."""
+        from app.deps import get_state_store
+        store = get_state_store()
+        view = store.snapshot()
+        assert view.servo_deg is not None
+        expected_output = (view.servo_deg / backend.settings.servo_deg_per_output_deg
+                           * backend.settings.servo_direction)
+        assert abs(view.output_deg - expected_output) < 0.01
+
+
+class TestTargetState:
+    """Target angle: set on accept, staleness, never a fabricated 0.0."""
+
+    def test_no_target_until_a_move_is_commanded(self, backend):
+        from app.deps import get_state_store
+        view = get_state_store().snapshot()
+        assert view.target_deg is None
+        assert view.target_stale is False
+
+    def test_set_target_records_and_clears_staleness(self, backend):
+        from app.deps import get_state_store
+        store = get_state_store()
+        store.mark_target_stale()
+        store.set_target(45.0)
+        target_deg, stale = store.target_state()
+        assert target_deg == 45.0
+        assert stale is False
+
+    def test_mark_target_stale_keeps_the_value(self, backend):
+        """Stale, not cleared: 'asked for 45, stopped at 27' is the
+        reading the target display exists for."""
+        from app.deps import get_state_store
+        store = get_state_store()
+        store.set_target(45.0)
+        store.mark_target_stale()
+        target_deg, stale = store.target_state()
+        assert target_deg == 45.0
+        assert stale is True
+
 
 class TestLockAndSettle:
     """Lock state and settle window."""

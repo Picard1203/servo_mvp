@@ -175,6 +175,8 @@ console.log("\nD14 - a refused connection reads as something to act on");
     temperature_c: 34.2, voltage_v: 12.1, current_a: 0.22,
     torque_kgcm: 1.4, overload: false, overcurrent: false, overheat: false,
     voltage_fault: false, sensor_fault: false, angle_fault: false,
+    servo_deg: 18.3, target_deg: 20.0, target_stale: false,
+    output_min_deg: -90.0, output_max_deg: 90.0,
   };
   const dead = {
     output_deg: null, reading_valid: false, moving: false, locked: false,
@@ -182,12 +184,29 @@ console.log("\nD14 - a refused connection reads as something to act on");
     temperature_c: null, voltage_v: null, current_a: null,
     torque_kgcm: null, overload: false, overcurrent: false, overheat: false,
     voltage_fault: false, sensor_fault: false, angle_fault: false,
+    servo_deg: null, target_deg: 20.0, target_stale: false,
+    output_min_deg: -90.0, output_max_deg: 90.0,
   };
 
   ctx.renderState(good);
   check("a good read shows the readings",
         $("vVolt").textContent === "12.10", $("vVolt").textContent);
   check("a good read shows HOLDING", $("movechip").textContent === "HOLDING");
+  check("servo angle follows the measured reading",
+        $("servoVal").textContent === "18.3°", $("servoVal").textContent);
+  check("target renders with sign-free formatting",
+        $("targetVal").textContent === "20.0°", $("targetVal").textContent);
+  check("delta is signed and reads target minus measured",
+        $("deltaVal").textContent === "+7.5°", $("deltaVal").textContent);
+  check("the target marker is shown once a target exists",
+        $("targetMarker").classList.contains("show"));
+  check("the marker sits at the target's position on the REAL range"
+        + " (-90..+90), not a hardcoded /360",
+        $("targetMarker").style.left === "61.111111111111114%",
+        $("targetMarker").style.left);
+  check("the bar itself is scaled the same way",
+        $("posBar").style.width === "56.94444444444444%",
+        $("posBar").style.width);
 
   ctx.renderState(dead);
   check("one blip holds the last MEASURED voltage, not 0.00",
@@ -205,6 +224,13 @@ console.log("\nD14 - a refused connection reads as something to act on");
   check("...the current", $("vCur").textContent === "—");
   check("...the torque", $("vTorq").textContent === "—");
   check("...and the position", $("posN").textContent === "—");
+  check("...and the servo angle (follows the measured reading)",
+        $("servoVal").textContent === "—", $("servoVal").textContent);
+  check("but the target is INDEPENDENT of reading validity - still known"
+        + " when the servo goes silent",
+        $("targetVal").textContent === "20.0°", $("targetVal").textContent);
+  check("...while delta blanks anyway, since the measured side is gone",
+        $("deltaVal").textContent === "—", $("deltaVal").textContent);
   check("the chip stops claiming HOLDING",
         $("movechip").textContent === "—", $("movechip").textContent);
   check("the fault lamps stop claiming OK",
@@ -225,6 +251,25 @@ console.log("\nD14 - a refused connection reads as something to act on");
         $("vVolt").textContent === "12.10", $("vVolt").textContent);
   check("recovery clears the unknown lamps",
         !$("fOverload").classList.contains("unknown"));
+
+  /* ---------- target: no target yet, and a stale (post-Stop) target -- */
+  console.log("\nTarget angle - never fabricated, stale after Stop");
+  ctx.renderState(Object.assign({}, good, { target_deg: null }));
+  check("no target yet renders as unknown, not 0.0",
+        $("targetVal").textContent === "—", $("targetVal").textContent);
+  check("delta blanks with no target to compare against",
+        $("deltaVal").textContent === "—", $("deltaVal").textContent);
+  check("the marker hides when there is no target",
+        !$("targetMarker").classList.contains("show"));
+
+  ctx.renderState(Object.assign({}, good, { target_stale: true }));
+  check("a stale target is kept, not cleared, and says so",
+        $("targetVal").textContent === "20.0° · STOPPED",
+        $("targetVal").textContent);
+  check("delta keeps reading while stale - that is the point of keeping it",
+        $("deltaVal").textContent === "+7.5°", $("deltaVal").textContent);
+  check("the marker is dimmed while stale",
+        $("targetMarker").classList.contains("stale"));
 
   /* ---------- D15: the second press never leaves ---------- */
   console.log("\nD15 - a command in flight refuses a second press");

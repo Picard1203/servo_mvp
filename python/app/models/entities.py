@@ -97,6 +97,23 @@ class ServoStateView:
         overheat: Overheat fault flag.
         voltage_fault: Supply-voltage fault flag.
         sensor_fault: Angle-sensor fault flag.
+        servo_deg: The servo's own shaft angle, before the gear ratio -
+            same baseline as output_deg (zero at the datum), just
+            un-geared. Follows output_deg's own validity: None exactly
+            when output_deg is None.
+        target_deg: The last target angle, or None if no move has
+            been commanded since boot. Independent of reading_valid - a
+            target is still known when the servo goes silent. Never a
+            measurement; never substituted with 0.0.
+        target_stale: True after stop() until the next accepted move -
+            the target is kept (not cleared) but is no longer being
+            pursued.
+        output_min_deg: Lower reachable output angle from the active
+            baseline (see ServoStateStore.reachable_output_range_deg).
+        output_max_deg: Upper reachable output angle from the active
+            baseline. Sent so the client can scale a travel display
+            against the real range instead of a second, hardcoded copy
+            of it - the config already lives in exactly one place.
     """
 
     output_deg: Optional[float]
@@ -117,6 +134,11 @@ class ServoStateView:
     voltage_fault: bool
     sensor_fault: bool
     angle_fault: bool
+    servo_deg: Optional[float] = None
+    target_deg: Optional[float] = None
+    target_stale: bool = False
+    output_min_deg: float = 0.0
+    output_max_deg: float = 0.0
 
 
 @dataclass(slots=True, frozen=True)
@@ -138,6 +160,11 @@ class TelemetrySample:
         overheat: Overheat fault flag.
         voltage_fault: Supply-voltage fault flag.
         sensor_fault: Angle-sensor fault flag.
+        target_deg: The target angle in effect at sample time, or None
+            when no move had been commanded since boot. Servo-side degree
+            (pre-ratio) is NOT stored - it is a pure function of
+            output_deg and the (fixed) gear ratio, so storing it would
+            duplicate data across a 30-day export for nothing.
     """
 
     timestamp: float
@@ -155,3 +182,4 @@ class TelemetrySample:
     voltage_fault: bool
     sensor_fault: bool
     angle_fault: bool
+    target_deg: Optional[float] = None

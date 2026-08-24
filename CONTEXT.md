@@ -23,6 +23,23 @@ An angle measured at the mechanism, after the 44:30 belt reduction. One count
 is 0.06 output degrees. Unqualified "degrees" always means output degrees.
 _Avoid_: servo degree (that is the pre-belt angle, a different quantity)
 
+**Servo degree**:
+The servo's own shaft angle, before the 44:30 belt reduction — same baseline
+as output degree (zero at the datum), just un-geared: output ±90° is servo
+±132°. A debug quantity for the operator and developer, not a control input;
+computed server-side from one authoritative ratio (`config.py`'s
+`servo_deg_per_output_deg`), never restated as a second copy of that constant
+client-side (Session 5, the exact D9 shape).
+_Avoid_: raw angle, shaft angle, motor angle
+
+**Target angle**:
+The angle last commanded by `POST /servo/move`, held until the next move
+replaces it. Independent of whether the servo is answering reads — a target
+is still known when the position is not. Marked stale (not cleared) after
+`Stop`, so "asked for 45, stopped at 27" stays on screen. Never a
+measurement; never substituted with 0.
+_Avoid_: commanded angle, desired angle, setpoint
+
 **Zero reference**:
 A saved, named position an operator captures and can later re-select. This is
 the genus; the datum is one distinguished member of it.

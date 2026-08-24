@@ -84,13 +84,39 @@ button{font-family:inherit}
 .chip.holding{color:var(--ok)}
 .chip.moving{background:var(--bluebell);color:#fff}
 .chip.alarm{background:var(--alarm);color:#fff}
-.track{height:12px;background:var(--panel2);border-radius:6px;margin:16px 0 0;overflow:hidden}
+/* Target: TANGERINE is a measurement; BLUEBELL is a commanded intent
+   (same colour the MOVING chip already uses) - carried through the
+   marker, the value and every Excel chart series so one colour means
+   one thing everywhere in this app (D16: a non-measured value must
+   never present as one). */
+.subline{display:flex;align-items:baseline;gap:10px;margin-top:7px;flex-wrap:wrap}
+.subitem{font-size:11px;letter-spacing:1.3px;color:var(--faint);
+  text-transform:uppercase;display:flex;align-items:baseline;gap:10px}
+.subitem b{font-family:var(--mono);font-size:16px;font-weight:600;
+  letter-spacing:0;color:var(--bluebell);text-transform:none}
+#servoItem b{color:var(--ink)}
+/* Stale (post-Stop): kept on screen, not cleared, but visibly no
+   longer being pursued. */
+.subitem.stale{color:var(--faint)}
+.subitem.stale b{color:var(--faint);opacity:.75}
+
+.trackwrap{position:relative;margin:16px 0 0}
+.track{height:12px;background:var(--panel2);border-radius:6px;overflow:hidden}
 .track > i{display:block;height:100%;width:0;background:var(--tangerine);border-radius:6px}
 /* Not reporting, as distinct from reporting zero. An empty track is
    what the datum looks like, so the unknown state has to say so on its
    own (D16). */
 .track.unknown{background:repeating-linear-gradient(135deg,
   var(--panel2) 0 6px,var(--line) 6px 12px);opacity:.7}
+/* The signature element: the gap between the filled bar (where it IS)
+   and this marker (where it's SUPPOSED to be) is the deviation, shown
+   spatially - no arithmetic needed to read it. Sits outside .track's
+   own overflow:hidden so it can stand slightly proud of the bar. */
+#targetMarker{position:absolute;top:-3px;bottom:-3px;width:3px;
+  background:var(--bluebell);border-radius:2px;left:0;display:none;
+  pointer-events:none;transition:left .2s ease}
+#targetMarker.show{display:block}
+#targetMarker.stale{opacity:.5}
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
 .m{background:var(--panel2);border-radius:12px;padding:13px 15px;min-width:0}
 .m .k{font-size:12px;letter-spacing:1.3px;color:var(--faint);margin-bottom:5px;

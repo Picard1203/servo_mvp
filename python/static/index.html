@@ -26,7 +26,15 @@
             <div class="pos"><span class="n" id="posN">—</span><span class="u">°</span></div>
             <span class="chip" id="movechip">—</span>
           </div>
-          <div class="track" id="posTrack"><i id="posBar"></i></div>
+          <div class="subline">
+            <span class="subitem" id="targetItem">Target <b id="targetVal">—</b></span>
+            <span class="subitem" id="deltaItem">&Delta; <b id="deltaVal">—</b></span>
+            <span class="subitem" id="servoItem">Servo <b id="servoVal">—</b></span>
+          </div>
+          <div class="trackwrap">
+            <div class="track" id="posTrack"><i id="posBar"></i></div>
+            <i id="targetMarker"></i>
+          </div>
           <div class="metrics">
             <div class="m" id="mTemp"><div class="k">Temp</div><div class="v"><span id="vTemp">—</span><small> °C</small></div></div>
             <div class="m" id="mVolt"><div class="k">Voltage</div><div class="v"><span id="vVolt">—</span><small> V</small></div></div>

@@ -156,6 +156,63 @@ def _events(backend):
     return get_event_service().recent(100)
 
 
+class TestTarget:
+    """Target angle capture: set once on accept, stale (not cleared) on
+    stop, never overwritten by the fine-approach overshoot."""
+
+    def test_accepted_move_sets_target(self, motion):
+        from app.deps import get_state_store
+        motion.move_to(30.0, 60.0)
+        target_deg, stale = get_state_store().target_state()
+        assert target_deg == 30.0
+        assert stale is False
+
+    def test_rejected_move_does_not_set_target(self, motion):
+        from app.deps import get_state_store
+        motion.set_lock(True)
+        with pytest.raises(LockedError):
+            motion.move_to(30.0, 60.0)
+        target_deg, _ = get_state_store().target_state()
+        assert target_deg is None
+
+    def test_stop_marks_target_stale_without_clearing_it(self, motion):
+        from app.deps import get_state_store
+        motion.move_to(30.0, 60.0)
+        motion.stop()
+        target_deg, stale = get_state_store().target_state()
+        assert target_deg == 30.0
+        assert stale is True
+
+    def test_next_move_clears_staleness(self, motion):
+        from app.deps import get_state_store
+        motion.move_to(30.0, 60.0)
+        motion.stop()
+        motion.move_to(12.0, 60.0)
+        target_deg, stale = get_state_store().target_state()
+        assert target_deg == 12.0
+        assert stale is False
+
+    def test_fine_approach_overshoot_does_not_overwrite_target(
+            self, monkeypatch, backend, sim):
+        """The overshoot leg commands PAST the requested angle - the
+        operator must see what they asked for (12.0), never the
+        overshoot value, or the target display would show a number they
+        never requested (same twin-path shape as D9/D10)."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        motion = get_motion_service()
+        store = get_state_store()
+        sim.set_deadband(1)
+        motion.move_to(30.0, 60.0)
+        assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
+        motion.move_to(12.0, 60.0)   # downward: triggers the overshoot leg
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        target_deg, _ = store.target_state()
+        assert target_deg == 12.0
+
+
 class TestRecover:
     """Overload recovery."""
 

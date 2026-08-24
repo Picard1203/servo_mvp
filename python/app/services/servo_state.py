@@ -37,6 +37,11 @@ class ServoStateStore:
         self._locked = False
         self._settle_deadline = 0.0
         self._position_verified = False  # False after every boot
+        self._target_deg: Optional[float] = None  # None until a move is
+        # commanded this power cycle - never fabricated as 0.0 (D16 shape).
+        self._target_stale = False  # True after stop(); cleared by the
+        # next accepted move, never inferred from `moving` (a second
+        # definition of the same fact is exactly what D9/D10 cost).
 
     # ----------------------------------------------------------- locking
 
@@ -91,6 +96,48 @@ class ServoStateStore:
         """
         with self._lock:
             return max(0.0, self._settle_deadline - monotonic())
+
+    # ------------------------------------------------------------- target
+
+    def set_target(self, target_deg: float) -> None:
+        """Records a newly accepted move's target and clears staleness.
+
+        Called once, from an accepted move_to() - never from the fine-
+        approach overshoot, which commands past the requested angle and
+        must not be mistaken for a new target (twin-path hazard: the same
+        shape as D9's two baselines and D10's two loggers).
+
+        Args:
+            target_deg: The angle the operator asked for.
+
+        Returns:
+            None.
+        """
+        with self._lock:
+            self._target_deg = target_deg
+            self._target_stale = False
+
+    def mark_target_stale(self) -> None:
+        """Marks the current target as no longer being pursued.
+
+        Called on stop(). The target is kept, not cleared - "asked for
+        45, stopped at 27" is the supposed-vs-actual reading this feature
+        exists for, and it matters most at the moment a move is abandoned.
+
+        Returns:
+            None.
+        """
+        with self._lock:
+            self._target_stale = True
+
+    def target_state(self) -> tuple[Optional[float], bool]:
+        """Returns the current target and whether it is stale.
+
+        Returns:
+            Tuple of (target_deg or None if never commanded, is_stale).
+        """
+        with self._lock:
+            return (self._target_deg, self._target_stale)
 
     # -------------------------------------------------------- conversions
 
@@ -176,14 +223,20 @@ class ServoStateStore:
             locked = self._locked
             settling = self._settle_deadline > monotonic()
             verified = self._position_verified
+            target_deg = self._target_deg
+            target_stale = self._target_stale
         if not reading.valid:
             logger.warning("servo read failed; position is not known",
                            metadata={"event": "servo.read.failed"},
                            extra={"active_zero": active.name
                                   if active is not None else "factory"})
+        have_reading = reading.valid is True and reading.raw_counts is not None
+        output_min_deg, output_max_deg = self.reachable_output_range_deg()
         return ServoStateView(
             output_deg=(round(self._to_output_deg(reading.raw_counts, active),
-                              2) if (reading.valid is True and reading.raw_counts is not None) else None),
+                              2) if have_reading else None),
+            servo_deg=(round(self._to_servo_deg(reading.raw_counts, active),
+                             2) if have_reading else None),
             raw_counts=reading.raw_counts if reading.valid else None,
             reading_valid=reading.valid,
             moving=reading.moving,
@@ -200,7 +253,11 @@ class ServoStateStore:
             overheat=reading.overheat,
             voltage_fault=reading.voltage_fault,
             sensor_fault=reading.sensor_fault,
-            angle_fault=reading.angle_fault)
+            angle_fault=reading.angle_fault,
+            target_deg=target_deg,
+            target_stale=target_stale,
+            output_min_deg=round(output_min_deg, 2),
+            output_max_deg=round(output_max_deg, 2))
 
     def current_output_deg(self) -> Optional[float]:
         """Returns the current output angle relative to the active zero.
@@ -262,6 +319,26 @@ class ServoStateStore:
         """
         return self._baseline_counts(self._zeros.get_active())
 
+    def _to_servo_deg(self, raw_counts: int,
+                      active: Optional[ZeroReference]) -> float:
+        """Converts counts to the servo's own (pre-ratio) degrees.
+
+        Baseline-relative, same zero point as output degrees, just before
+        the 44:30 belt division - this is the ONLY place that division
+        happens. output_deg is derived from this, not computed a second
+        way (see _to_output_deg): a second definition of one conversion
+        is what sent the mechanism 212.7 deg on a command of 90 (D9).
+
+        Args:
+            raw_counts: Absolute encoder counts.
+            active: The active ZeroReference, or None.
+
+        Returns:
+            Servo shaft angle in degrees, relative to the active baseline.
+        """
+        return ((raw_counts - self._baseline_counts(active))
+                / self._counts_per_servo_deg)
+
     def _to_output_deg(self, raw_counts: int,
                        active: Optional[ZeroReference]) -> float:
         """Converts counts to output degrees using a prefetched baseline.
@@ -273,7 +350,6 @@ class ServoStateStore:
         Returns:
             Output angle in degrees.
         """
-        servo_deg = ((raw_counts - self._baseline_counts(active))
-                     / self._counts_per_servo_deg)
+        servo_deg = self._to_servo_deg(raw_counts, active)
         return (servo_deg / self._servo_deg_per_output_deg
                 * self._servo_direction)

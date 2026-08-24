@@ -5,6 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
+from app.models.entities import ServoStateView
 
 _settings = get_settings()
 
@@ -108,6 +109,17 @@ class ServoStateResponse(BaseModel):
         overheat: Overheat fault flag.
         voltage_fault: Supply-voltage fault flag.
         sensor_fault: Angle-sensor fault flag.
+        servo_deg: The servo's own shaft angle before the gear ratio,
+            same baseline as output_deg. Follows output_deg's own
+            validity.
+        target_deg: The last target angle, or null if none since
+            boot. Not a measurement - never render it as one.
+        target_stale: True after a stop(); the target is kept, not
+            cleared, but is no longer being pursued.
+        output_min_deg: Lower reachable output angle from the active
+            baseline.
+        output_max_deg: Upper reachable output angle from the active
+            baseline.
     """
 
     output_deg: Optional[float]
@@ -127,3 +139,38 @@ class ServoStateResponse(BaseModel):
     voltage_fault: bool
     sensor_fault: bool
     angle_fault: bool
+    servo_deg: Optional[float] = None
+    target_deg: Optional[float] = None
+    target_stale: bool = False
+    output_min_deg: float = 0.0
+    output_max_deg: float = 0.0
+
+    @classmethod
+    def from_view(cls, view: ServoStateView) -> "ServoStateResponse":
+        """Builds the response from one coherent state view.
+
+        The single builder for both call sites (the poller and the SSE
+        stream) - two independent field lists here is exactly the twin-
+        path shape that has cost this project four defects already.
+
+        Args:
+            view: The state store's snapshot.
+
+        Returns:
+            The API response.
+        """
+        return cls(
+            output_deg=view.output_deg, reading_valid=view.reading_valid,
+            moving=view.moving, locked=view.locked,
+            settling=view.settling,
+            position_verified=view.position_verified,
+            active_zero=view.active_zero_name,
+            temperature_c=view.temperature_c, voltage_v=view.voltage_v,
+            current_a=view.current_a, torque_kgcm=view.torque_kgcm,
+            overload=view.overload, overcurrent=view.overcurrent,
+            overheat=view.overheat, voltage_fault=view.voltage_fault,
+            sensor_fault=view.sensor_fault, angle_fault=view.angle_fault,
+            servo_deg=view.servo_deg, target_deg=view.target_deg,
+            target_stale=view.target_stale,
+            output_min_deg=view.output_min_deg,
+            output_max_deg=view.output_max_deg)

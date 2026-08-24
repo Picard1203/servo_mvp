@@ -60,7 +60,8 @@ class Database:
                     overheat INTEGER NOT NULL DEFAULT 0,
                     voltage_fault INTEGER NOT NULL DEFAULT 0,
                     sensor_fault INTEGER NOT NULL DEFAULT 0,
-                    angle_fault INTEGER NOT NULL DEFAULT 0
+                    angle_fault INTEGER NOT NULL DEFAULT 0,
+                    target_deg REAL
                 );
                 CREATE INDEX IF NOT EXISTS idx_telemetry_ts
                     ON telemetry (timestamp);
@@ -94,6 +95,11 @@ class Database:
             " DEFAULT 0",
             "ALTER TABLE telemetry ADD COLUMN angle_fault INTEGER NOT NULL"
             " DEFAULT 0",
+            # Nullable, no default: NULL means "no move commanded yet",
+            # not zero - a fabricated 0.0 would misreport an angle that
+            # was never actually requested (same rule as output_deg's
+            # own null-on-failed-read handling).
+            "ALTER TABLE telemetry ADD COLUMN target_deg REAL",
         )
         for statement in migrations:
             try:

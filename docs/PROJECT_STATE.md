@@ -30,7 +30,9 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-211 Python tests, 99% line coverage of app/ (see backlog D24)
+222 Python tests (confirmed after Session 5's backend work; line coverage
+not remeasured this session — see backlog D24 on why a stale coverage
+figure is worse than none)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 ```
@@ -40,6 +42,8 @@ Bridge contract checker: both sides agree
 **23 August 2026 — R5 (XLSX export) rebuilt, and D31 closed for the real reason.** The 11 August attempt (Batch 4) never worked at all — `app.js` called two chart-building functions that were never written, guaranteed `ReferenceError` on every export, misreported by the UI as "controller busy." The 16-second-Pydantic hypothesis in the old D31 entry was wrong (board-measured: Pydantic was never the bottleneck). Rebuilt: XLSX generation is client-side (by design — the browser is stronger than the board, and the Bridge link is the real constraint, not the browser), one worksheet per day, native charts via a hidden formula-fed sheet, min-max downsampling for charts only. The real transport fix was enabling gzip on the export (5.3x faster, board-measured) plus raising `relay_chunk_bytes` 128→224 (see D6/`RELAY_NOTES.md` §5 — the old "256 vs 128" dispute is closed with a cause: 256 overflows the vendored Bridge library's own 256-byte RPC message buffer). Also this session: sampler cadence 1.0s→0.5s, retention 60d→30d (new requirement), and the display's SSE push cadence — previously a second, hardcoded, undocumented "1.0s" living beside the real setting — now reads the same config value.
 
 **A real corruption bug shipped with the first "done" claim, same session.** The rebuilt export's zip central directory had two fields at swapped byte offsets — every generated `.xlsx` opened fine in lenient tools (`unzip -t`) but was rejected outright by strict ones (Python's `zipfile`, `openpyxl`) and, live, by the operator's own OnlyOffice. Found because the operator actually opened a real export rather than trusting "board-validated," fixed the same session, re-verified with the strict tools this time. **R5's mechanism is now genuinely validated cross-app — but real UX gaps remain (unreadable timestamp column, no actual day/range selector despite the interactivity mechanism existing, an over-compressed flags column, no LCARS styling) and are deferred to next session, see BACKLOG.md R5's gap table.**
+
+**23 August 2026 — Session 5 closed that whole gap table, plus two new fields the operator asked for live, mid-session: target angle and servo (pre-ratio) angle, both captured, persisted, and shown in the UI's own target marker/Δ readout and in the export.** Also shipped: angle-correlated charts (mechanical team's request — a genuine `c:scatterChart`, verified against a reference, because a category axis cannot carry a real numeric angle axis), a typed chart-range selector confirmed live to actually narrow the charts, decoded flags, full column widths, LCARS styling, and a per-day summary table. One real regression happened and was caught the same session: an automatic date-axis tick spacing that looked fine against synthetic test data produced an illegible label smear against real board data — reverted to an explicitly computed tick interval, re-verified live. R5's remaining gap (no persisted move/event narrative) is now the only open row in its table. Full detail in `BACKLOG.md`'s R5 entry — this is the distilled version.
 
 **Batch 2 landed the same day** — D3, D13 closed, desk work only (see "Known
 gaps" below: the sketch side of D3 has never been compiled or flashed). It

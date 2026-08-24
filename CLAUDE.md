@@ -96,7 +96,7 @@ is a defect — fix it rather than updating one copy.
 Run all three. Note the numbers.
 
 ```bash
-cd python && ../.venv/bin/python -m pytest    # 207 tests
+cd python && ../.venv/bin/python -m pytest    # 222 tests
 cd sketch/tests/native && make           # 194 checks
 python3 tools/check_bridge_contract.py   # "both sides agree"
 ```
@@ -158,5 +158,6 @@ Python side runs in a container where `HOME` is `/home/app`, so an absolute
 
 ```bash
 adb shell arduino-app-cli app start user:servo_mvp     # ~16s warm, ~7min cold
+adb shell arduino-app-cli app restart user:servo_mvp   # required after modifying python code via sshfs
 adb shell arduino-app-cli app logs  user:servo_mvp
 ```

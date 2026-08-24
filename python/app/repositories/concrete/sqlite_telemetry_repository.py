@@ -27,14 +27,15 @@ class SqliteTelemetryRepository:
                 "INSERT INTO telemetry (timestamp, raw_counts, output_deg, moving,"
                 " locked, temperature_c, voltage_v, current_a, torque_kgcm,"
                 " overload, overcurrent, overheat, voltage_fault,"
-                " sensor_fault, angle_fault)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " sensor_fault, angle_fault, target_deg)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (sample.timestamp, sample.raw_counts, sample.output_deg,
                  int(sample.moving), int(sample.locked), sample.temperature_c,
                  sample.voltage_v, sample.current_a, sample.torque_kgcm,
                  int(sample.overload), int(sample.overcurrent),
                  int(sample.overheat), int(sample.voltage_fault),
-                 int(sample.sensor_fault), int(sample.angle_fault)))
+                 int(sample.sensor_fault), int(sample.angle_fault),
+                 sample.target_deg))
             self._db.connection.commit()
 
     def count_range(self, ts_from: float, ts_to: float, limit: int) -> tuple[int, float]:
@@ -75,7 +76,8 @@ class SqliteTelemetryRepository:
                 overheat=bool(row["overheat"]),
                 voltage_fault=bool(row["voltage_fault"]),
                 sensor_fault=bool(row["sensor_fault"]),
-                angle_fault=bool(row["angle_fault"]))
+                angle_fault=bool(row["angle_fault"]),
+                target_deg=row["target_deg"])
 
     def purge_older_than(self, days: int) -> int:
         """Deletes samples older than the retention window.

@@ -36,7 +36,8 @@ Bridge contract checker: both sides agree
 ```
 
 **Session 3 landed 11 August 2026** — SSE migration complete. Collapsed 3 polling connections/operator to 1 persistent SSE stream (`GET /api/v1/stream`). Closed D4 (3-operator 10-min soak clean, 0 socket drops, 1,955 requests handled, 0 reconnects). Re-applied D29 async-def fix across 13 FastAPI handlers.
-servo did not report. It raised D23, D24, D25, D26 and T12.
+
+**23 August 2026 — R5 (XLSX export) actually finished, and D31 closed for the real reason.** The 11 August attempt (Batch 4) never worked at all — `app.js` called two chart-building functions that were never written, guaranteed `ReferenceError` on every export, misreported by the UI as "controller busy." The 16-second-Pydantic hypothesis in the old D31 entry was wrong (board-measured: Pydantic was never the bottleneck). Rebuilt: XLSX generation is client-side (by design — the browser is stronger than the board, and the Bridge link is the real constraint, not the browser), one worksheet per day, native charts via a hidden formula-fed sheet, min-max downsampling for charts only. The real transport fix was enabling gzip on the export (5.3x faster, board-measured) plus raising `relay_chunk_bytes` 128→224 (see D6/`RELAY_NOTES.md` §5 — the old "256 vs 128" dispute is closed with a cause: 256 overflows the vendored Bridge library's own 256-byte RPC message buffer). Also this session: sampler cadence 1.0s→0.5s, retention 60d→30d (new requirement), and the display's SSE push cadence — previously a second, hardcoded, undocumented "1.0s" living beside the real setting — now reads the same config value.
 
 **Batch 2 landed the same day** — D3, D13 closed, desk work only (see "Known
 gaps" below: the sketch side of D3 has never been compiled or flashed). It

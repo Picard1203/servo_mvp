@@ -69,13 +69,16 @@ class TestOperatorSession:
             assert not http.get("/api/v1/servo/state").json()["overload"]
 
             # 7. sampler produced history; export honors the contract
+            # (XLSX assembly is client-side, app.js - this checks the
+            # binary stream the server actually serves, see BACKLOG.md R5)
+            from app.services.telemetry_service import HEADER_STRUCT
             time.sleep(0.5)
-            export = http.get("/api/v1/telemetry/export",
+            export = http.get("/api/v1/telemetry/binary",
                               params={"from": 0, "to": time.time() + 1})
-            lines = export.text.strip().splitlines()
-            assert lines[0].startswith("timestamp,raw_counts,output_deg")
-            assert lines[0].endswith("voltage_fault,sensor_fault,angle_fault")
-            assert len(lines) >= 3
+            assert export.status_code == 200
+            assert export.headers["content-type"] == "application/octet-stream"
+            _, count = HEADER_STRUCT.unpack(export.content[:HEADER_STRUCT.size])
+            assert count >= 1
 
             # 8. the session's story is in the events feed
             names = {event["event"] for event in http.get(

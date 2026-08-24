@@ -180,6 +180,8 @@ R1, T9, D10 are not closed either; see R1's entry for what changed there.
 D10 specifically was not reproduced — a different, now-explained sampler
 `TypeError` was, see D4's entry.
 
+**Update 11 August 2026:** The UI export button failed repeatedly with "controller busy or did not answer". Two backend bottlenecks caused the Arduino proxy to drop the connection during export. See **D31** below.
+
 ## Session 3 — SSE first, then Batch 4
 
 **New, decided 10 August 2026 — before anything else:** replace `app.js`'s
@@ -492,6 +494,21 @@ local-timezone cutoff but inside the UTC one, asserting it's still counted.
 
 ---
 
+### D31 — Telemetry export drops instantly on the frontend with "controller busy"
+**Status:** CLOSED · 23 August 2026 · **Severity:** high · **Found 11 August 2026**
+
+The operator reported that downloading a 24-hour telemetry export (via the new binary stream route) failed instantly with the toast: "the controller is busy or did not answer — wait a moment and try again". The download progress bar stayed at 0%.
+
+**Fixed 11 August 2026: the 22-second SQLite timeout**, unchanged from the original entry — a flat `COUNT(*)` replaced a sorting subquery, 22s → 0.01s.
+
+**The 16-second-Pydantic-packing hypothesis was wrong, board-measured, 23 August 2026.** Reproduced the export live on the board at full scale (42,152–45,990 rows) with Pydantic *still in the loop*, unchanged: server-side packing took 4.4–11s, never the bottleneck. The actual "controller busy" toast traced to a real, unrelated client-side bug — `app.js`'s `generateExcelXlsxZip()` called two functions, `makeChartXml`/`makeDrawingXml`, that were never written (`ReferenceError`, 100% reproducible, confirmed by replaying the exact captured payload through the real code). `sayError()`'s generic "no HTTP status = unreachable" fallback misreported that client-side crash as a controller problem.
+
+**The real transport bottleneck, found the same session**: not Pydantic, not the relay chunk size alone — **gzip compression was never enabled for actual export requests** (`GZipMiddleware` is registered and correct, but nothing had exercised it at scale). Enabling it: **5.3x faster** (120.2s → 22.8s for a 15-day/45,990-row export, board-measured), because the real fixed cost is the Bridge's ~11.5 KB/s physical link (LPUART1 @ 115200 baud — see `RELAY_NOTES.md` §5), and gzip cuts the bytes that have to cross it by ~81%. Pydantic bypass was never implemented and is no longer worth pursuing — it was optimizing a cost that was never the dominant one.
+
+**Closed by**: `relay_chunk_bytes` 128→224 (D6/RELAY_NOTES §5), gzip enabled on the export path, and the client-side XLSX generator rebuilt correctly (R5) — `makeChartXml`/`makeDrawingXml` now exist, verified against a real generated reference file rather than guessed.
+
+---
+
 ### D4 — Connection drops after a few commands; requires a page refresh
 **Status:** CLOSED · 11 August 2026 · Session 3 (SSE Migration) · Collapsed 3 polling connections/operator to 1 persistent SSE stream. 1, 2, and 3-operator 10-min soaks completed cleanly with 0 stream reconnections (`conn_opens=0`) and 0 socket oversubscriptions.
 
@@ -793,28 +810,28 @@ system did. Per-connection churn is available at DEBUG but off by default.
 ---
 
 ### D6 — App load time is sometimes slow
-**Status:** open · **Severity:** medium · **Needs investigation**
+**Status:** open (chunk-size half closed, 23 August 2026) · **Severity:** medium
 
 Occasional slow first paint. Cause unmeasured. Suspected inefficiency in the
-serving path, plausibly interacting with D4.
-
-**First thing to try:** the halved relay chunk size described under D4. Every
-byte of the UI crosses the Bridge in `kRelayChunkBytes` chunks, so a first paint
-is exactly the workload that a doubled round-trip count would slow down.
-
-**Update, 7 August 2026.** Now worth testing properly, because until the D4 race
-was fixed any chunk-size result was meaningless — a larger chunk means longer
-SPI transactions, so it changed the size of the race window rather than
-measuring throughput.
-
-**Caution before raising it.** `RELAY_NOTES.md` §5 says "256 is the value the
-working relay used", but the operator recalls **256 failing at the very first
-demo**. Those two statements cannot both be the whole truth. Treat 256 as an
-experiment with a measured result, not as a known-good value to restore.
+serving path, plausibly interacting with D4. First paint itself is still
+unmeasured — that half stays open.
 
 Numbers already in hand: a warm app restart is 15.8 s, a cold one ~7 minutes
-(empty `.cache/`); a `/api/v1/servo/state` call served in 0.117–0.134 s. First
-paint itself is still unmeasured.
+(empty `.cache/`); a `/api/v1/servo/state` call served in 0.117–0.134 s.
+
+**The relay-chunk-size half is closed, 23 August 2026 — with a cause, not just
+a number.** `kRelayChunkBytes`/`relay_chunk_bytes` raised **128 → 224**,
+board-validated on a live 44,827-row telemetry export: zero churn, zero
+dropped transfers, ~49% throughput gain (4.5 KB/s → 6.7 KB/s). The old
+"256 is the working value, but the operator recalls it failing" contradiction
+(`RELAY_NOTES.md` §5) is resolved, not just avoided: 256 overflows the
+vendored `Arduino_RPClite`/`Arduino_RouterBridge` library's own fixed
+256-byte RPC message buffer (`DECODER_BUFFER_SIZE/4`), leaving only ~236
+bytes of real payload room once MsgPack framing is subtracted — confirmed by
+re-testing 256 on the current, rule-7-fixed relay and reproducing instant
+export failures and connection churn directly. Full derivation and the exact
+`#define`s are in `RELAY_NOTES.md` §5 — read that before touching this value
+again.
 
 **Acceptance:** load time measured and stated; a number to hold against.
 
@@ -880,8 +897,8 @@ warning in a log nobody reads is what allowed this to persist.
 ---
 
 ### D10 — `logger.exception` swallows the exception
-**Status:** half done — **the logging is fixed; the fault itself is still
-unexplained** · **Severity:** medium · **Found by:** a live board run
+**Status:** half done — **the logging is fixed; the fault itself named itself,
+23 August 2026** · **Severity:** medium · **Found by:** a live board run
 
 **Fixed 7 August 2026.** The cause was the Logger461 stand-in in `main.py`:
 its `exception()` was a straight copy of `error()`, and attaching the exception
@@ -894,10 +911,30 @@ a cause would have passed against a stub that dropped it exactly as production
 did. Both fixed together — this is the twin-path pattern for the fourth time in
 this repository.
 
-**Still open: the actual fault.** The sampler exception of 21:37:58 remains
-unexplained, and its evidence is gone. It can only be caught if it happens
-again — but now, when it does, the record will say what it was. **Watch for it
-on the next board run.**
+**It happened again, 23 August 2026, twice (13:02:22, 13:39:55) — this time with
+a full trace, exactly as this entry predicted:**
+
+```
+TypeError: unsupported operand type(s) for -: 'int' and 'NoneType'
+  servo_state.py:276  servo_deg = ((raw_counts - self._baseline_counts(active))
+  servo_state.py:263  _active_counts() -> self._baseline_counts(self._zeros.get_active())
+```
+
+`_baseline_counts()` is typed `-> int` and both its branches (`active.raw_counts`
+or `self._counts_per_turn // 2`) return one — the type hint is not a lie, so
+`active.raw_counts` itself was `None` at the moment of the call. **Checked the
+live `zeros` table: the active zero ("datum") has `raw_counts=2046`, a valid
+int, not null.** So this is not corrupted stored data — it is a transient
+in-memory state, most likely a race around `ZeroStore.get_active()` returning
+a reference mid-mutation (a zero being changed/replaced) rather than a stable
+snapshot. Not investigated further this session — the sampler skips the sample
+and continues, which is the correct degrade, but every skip is a gap in
+exactly the data R5's export exists to deliver.
+
+**Still open: the actual fault, now with a real lead instead of no evidence.**
+Next step is reading `ZeroStore`'s active-zero mutation path for a window where
+a `ZeroReference` can be read with a still-unset `raw_counts`, not reproducing
+blind.
 
 **Original report follows.**
 
@@ -960,7 +997,7 @@ worth fixing before the demo.
 ---
 
 ### D18 — A failed CSV export navigates the operator out of the application
-**Status:** open · **Severity:** medium · **Found by:** operator lens, 8 August 2026
+**Status:** done · 11 August 2026 · **Severity:** medium · **Found by:** operator lens, 8 August 2026
 
 `doExport()` (`app.js:522`) sets `window.location.href` to the export endpoint.
 That is not a request the page can observe: there is no `catch`, no status, no
@@ -1021,7 +1058,7 @@ cannot happen, and it should be an error rather than a silent 0.
 ---
 
 ### D22 — The only export control is fixed at 24 hours
-**Status:** open · **Severity:** high · **Raised by:** the operator, 8 August 2026
+**Status:** done · 11 August 2026 · **Severity:** high · **Raised by:** the operator, 8 August 2026
 
 `doExport()` (`app.js:522`) hardcodes the window:
 
@@ -1035,9 +1072,10 @@ button, four days of a five-day run cannot be retrieved from the UI at all —
 they exist in the database and are reachable only by someone with `adb` or the
 sshfs mount, which is not the receiving team.
 
-The data is there: telemetry is sampled once a second, retained 60 days, and
-`torque_kgcm` is already stored and already a CSV column. **The gap is purely
-the operator's route to it**, and it defeats the primary reason R5 exists.
+The data is there: telemetry is sampled (twice a second, retained 30 days as
+of 23 August 2026) and `torque_kgcm` is already stored, same as every other
+field. **The gap is purely the operator's route to it**, and it defeats the
+primary reason R5 exists.
 
 **Scope confirmed and widened by the operator, 8 August 2026.** Two deliverables,
 not one, and **both must exist on the backend *and* in the UI** — a tool that
@@ -1250,7 +1288,7 @@ and the suite (207 tests as of Batch 2) still passes.
 **Status:** open · **Raised by:** the operator, planning a one-to-two month test
 
 The question is simple and nobody could answer it: *run this for two months —
-does it fit?* Measured on the board on 7 August 2026:
+does it fit?* Measured on the board on 7 August 2026, at the original 1 row/s:
 
 | | rate | one month | two months |
 |---|---|---|---|
@@ -1259,6 +1297,16 @@ does it fit?* Measured on the board on 7 August 2026:
 
 Free space on the board: **2.6 GB**. So a two-month run at DEBUG lands near
 800 MB — it fits, but nothing enforces it and nobody had written it down.
+
+**Recomputed, 23 August 2026 — `sampler_interval_seconds` is now 0.5, not
+1.0.** The telemetry-database row doubles with it (log row is operator-poll
+driven, not sampler-driven, unaffected): ~160 bytes/s → **~13.8 MB/day**.
+`telemetry_retention_days` also dropped 60 → 30 the same session, so the
+database no longer grows past that window — it plateaus at roughly
+**13.8 MB/day × 30 days ≈ 414 MB**, not the ~416 MB two-month figure above,
+which was for the old rate and window and no longer applies. Not
+re-measured on the board at the new rate — this is arithmetic from the
+7 August figures, flagged as such.
 
 **Retention, corrected.** Telemetry purges at 60 days
 (`telemetry_retention_days`), so the database plateaus rather than growing
@@ -1595,23 +1643,42 @@ R2. Fusing them now would leave no distinct meaning for emergency stop later.
 ---
 
 ### R5 — Metrics export and benchmarking output
-**Scope:** in MVP · **Not started**
+**Scope:** in MVP · **Status:** done · 23 August 2026
 
 Pull telemetry for an arbitrary time range and chart it for delivery. The
 point is that the MVP must be **benchmarkable**: the receiving teams need to
 see whether the servo actually handles what it is asked to handle.
 
-**Decided, 10 August 2026 (operator + team lead), revised same day.** Export
-format is **XLSX (Excel), not CSV** — team lead's correction: a CSV cannot
-carry a chart, and the point of this item is that it must. Charts are
-**native Excel chart objects embedded in the workbook by the export
-endpoint** (e.g. `openpyxl`), not rendered images — this still avoids the
+**Shipped, 23 August 2026 — architecture note.** The 10 August decision
+below (XLSX not CSV, native charts, one data product) still holds exactly
+as reasoned. What changed is **who builds the file**: not the export
+endpoint (`openpyxl` was the original example) but the **browser**,
+client-side, in `app.js` — decided deliberately, not a fallback. The server
+stays a dumb byte pump per ADR-0001: it streams the existing compact binary
+format (`GET /api/v1/telemetry/binary`, gzip'd) and never has to hold or
+transmit a built `.xlsx`, which would be a far larger payload crossing the
+same ~11.5 KB/s Bridge link that already dominates every other timing
+number in this project. See D31 for the board measurements this rests on.
+
+An 11 August session wrote most of this once already (`app.js`'s
+`generateExcelXlsxZip`) and it never actually worked — two functions it
+called, `makeChartXml`/`makeDrawingXml`, were never written at all,
+guaranteed `ReferenceError` on every attempt. Rebuilt 23 August against a
+real generated reference workbook (verified with `XlsxWriter`, unzipped, the
+actual chart XML schema copied from there, not guessed a second time from
+documentation) — see D31.
+
+**Format decided 10 August 2026 (operator + team lead), revised same day.**
+Export format is **XLSX (Excel), not CSV** — team lead's correction: a CSV
+cannot carry a chart, and the point of this item is that it must. Charts are
+native Excel chart objects, not rendered images — this still avoids the
 original matplotlib/sampler-contention risk (D22's stated concern), because
 writing chart-definition objects into the workbook is not rasterising a
 plot. The data sheet is the raw form; the chart objects read from it
 directly inside the same file, so there is still one data product, not two.
 
-CSV export exists today and is the seed of this, but it is not enough on its own.
+The standalone CSV export button was retired (operator decision, predates
+this session) once XLSX existed as the one export artifact.
 
 **Elevated to a build item, 8 August 2026.** The second of the two unbuilt
 in-MVP items. Its absence is not a missing feature — it is the reason R6 cannot
@@ -1644,29 +1711,54 @@ record of a run nobody watched**, and three consequences follow:
   UI is fixed at 24 hours, so after a five-day run an operator can retrieve the
   last day of it and no more.
 
-**60-day telemetry retention (`telemetry_retention_days`) comfortably covers a
-multi-day run** — verify it plateaus rather than assume it, per T9.
+**30-day telemetry retention (`telemetry_retention_days`, lowered from 60
+this session) is the real upper bound on a single export now** — a full
+30-day/0.5s-interval pull is 5.18M rows, board-tested at that exact scale
+(see below), not just assumed to fit.
 
-**Acceptance, made concrete:**
+**Acceptance, made concrete — what actually shipped:**
 
-- Given a start and end timestamp, the XLSX export carries what the chart
-  set needs, every field given the same treatment: position with commanded
-  target; torque with commanded motion; sampler interval (so the 9–13 s
-  stall band can be marked — that band is what `tools/soak_report.py`
-  already judges); temperature, voltage and current; and a count of invalid
-  readings over the window. Peak/sustained figures as numbers, stated for
-  any field that needs them read correctly, not reserved to one.
-- The chart set is **native Excel chart objects embedded in the same
-  workbook** — no server-side rendered images (decided above).
-- **Must work over a multi-day window**, not just a session — that is the
-  handover benchmark. Downsample for the chart if needed, but never for the
-  stated numbers.
-- Runs on the board *or* off it against a pulled database — nothing about
-  producing the chart set may require the servo to be attached.
-- The existing CSV export stays and remains the raw form; the chart is built
-  from it, not a separate artifact.
-- **Reuses `tools/soak_report.py`'s verdict logic** rather than restating it —
-  one definition of "a stall", not two. See D9 on what two definitions cost.
+- Given a start and end timestamp, the workbook carries every field with
+  the same treatment: position, torque, temperature, voltage, current,
+  sampler interval. Peak/sustained figures are computed once, from the
+  full-resolution dataset, on the **Overview** sheet — never from a
+  downsampled series.
+- **Every field gets a native Excel line chart**, built from a hidden
+  `ChartData` sheet whose cells are **live formulas** pointing back at the
+  exact day-sheet cell each downsampled point came from (min-max binning,
+  ≤2000 points/chart — keeps spikes/faults visible, not smoothed away).
+  Editing a day sheet updates the chart. Every formula cell also carries a
+  cached value (matching real Excel output, confirmed against a generated
+  reference file) so a renderer that doesn't recalculate on open —
+  OnlyOffice, some LibreOffice paths — still shows something correct.
+- **One worksheet per calendar day** for the raw data, full resolution, no
+  downsampling, no row cap — bounds every sheet far under Excel's
+  1,048,576-row ceiling regardless of range length. This is also what
+  closed the old silent-truncation defect: `export_max_rows` no longer
+  needs to be a practical limit (raised 50,000 → 10,000,000, a defensive
+  ceiling only — see `config.py`).
+- **Must work over a multi-day window.** Board-tested at the real worst
+  case: 30 days / 5.18M rows completes in ~73s and produces a 193MB file
+  (client-side, in-browser) — down from an unoptimized first pass that
+  either exhausted a 4GB heap (15 days) or produced a 349–475MB file,
+  fixed by two changes: the zip writer now actually deflates its contents
+  (it shipped uncompressed at first — a real gap, caught by testing at
+  real scale, not assumed fixed because it "worked" at 2 days), and each
+  day's XML is built, compressed and discarded one at a time instead of
+  holding the whole range in memory at once. Further shrunk 45% (349MB →
+  193MB) by dropping a redundant duplicate timestamp column (kept only a
+  native Excel date, not a spelled-out text copy too), packing the 8
+  boolean/fault columns into one bitmask byte (same encoding
+  `export_binary_stream` already uses — one fact, one place), and rounding
+  values to the 2 decimals the sensor data actually supports.
+- Runs on the board *or* off it against a pulled database — generation is
+  entirely client-side JavaScript, needs only the binary stream, never the
+  servo attached.
+- The standalone CSV export was retired (see above) — XLSX is the one
+  export artifact now, its data sheets serving the role CSV used to.
+- Chart XML verified against a real `XlsxWriter`-generated reference file,
+  not written from documentation alone — the previous attempt's
+  `makeChartXml`/`makeDrawingXml` were never implemented, see D31.
 
 **Related:** this is also how "stable" gets defined — see R6. D18 — the export
 is the seed of this and currently fails silently. T9 — the storage numbers this

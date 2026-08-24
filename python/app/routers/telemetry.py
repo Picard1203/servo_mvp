@@ -1,8 +1,8 @@
-"""Telemetry endpoints: CSV export by time range."""
+"""Telemetry endpoints: binary telemetry stream export."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
 
 from app.deps import get_telemetry_service
@@ -13,12 +13,11 @@ router = APIRouter(prefix="/api/v1/telemetry", tags=["telemetry"])
 TelemetryDep = Annotated[TelemetryService, Depends(get_telemetry_service)]
 
 
-@router.get("/export")
-def export_csv(telemetry: TelemetryDep,
-                     ts_from: Annotated[float, Query(alias="from")],
-                     ts_to: Annotated[float, Query(alias="to")]
-                     ) -> StreamingResponse:
-    """Streams telemetry samples in a time range as CSV.
+@router.get("/binary")
+def export_binary(telemetry: TelemetryDep,
+                  ts_from: Annotated[float, Query(alias="from")],
+                  ts_to: Annotated[float, Query(alias="to")]) -> StreamingResponse:
+    """Exports compact packed binary telemetry data for client-side rendering.
 
     Args:
         telemetry: Injected telemetry service.
@@ -26,8 +25,7 @@ def export_csv(telemetry: TelemetryDep,
         ts_to: Range end, unix timestamp.
 
     Returns:
-        A streaming CSV response (row cap applies, see settings).
+        Binary stream response (compressed via GZipMiddleware).
     """
-    return StreamingResponse(
-        telemetry.export_csv(ts_from, ts_to), media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=telemetry.csv"})
+    stream = telemetry.export_binary_stream(ts_from, ts_to)
+    return StreamingResponse(stream, media_type="application/octet-stream")

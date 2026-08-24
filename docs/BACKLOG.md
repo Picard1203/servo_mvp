@@ -16,8 +16,13 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | Session | What it does | Board needed |
 |---|---|---|
 | **1 — Batch 1 & 2 DONE 8 Aug 2026** | **Session 2 next** — the soak | no (desk work both batches) |
-| **2 — IN PROGRESS, 8 + 10 Aug 2026** | **D4 still open.** The soak found a reopened D4 (8 Aug); two fixes tried and reverted 10 Aug — see below. **Next: SSE (Session 3), not another relay tweak.** | yes |
-| **3** | **SSE first** (collapse 3 poll connections/operator to 1 — see D4), **then Batch 4** — motor isolation, and the export as XLSX with embedded charts | yes, throughout |
+| **2 — DONE, 8 + 10 Aug 2026** | D4 closed via SSE in Session 3 | yes |
+| **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
+| **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
+| **5 — next** | **R5's UX gap table** (BACKLOG.md, under R5): unreadable timestamp column (`####`, needs a column width), no actual day/range selector on the charts (the formula plumbing exists, the picker doesn't), the packed flags column reads too narrow — reconsider the tradeoff, and an LCARS visual pass on the workbook (operator recalls asking Antigravity for this previously). Also still open: D10's real root cause (a real stack trace now exists, not chased down yet), Batch 4's motor isolation. | yes, for a real cross-app open-and-look each time a chart/layout change is made — this session's whole lesson was that "it opens in one lenient tool" is not validation |
+
+**Read `docs/BACKLOG.md` R5's entry in full before starting Session 5** — the gap
+table there is the actual punch list, this row is just the pointer to it.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
 **Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
@@ -179,6 +184,8 @@ isolation (ADR first) and the XLSX export. Use `--since` in **local** time
 R1, T9, D10 are not closed either; see R1's entry for what changed there.
 D10 specifically was not reproduced — a different, now-explained sampler
 `TypeError` was, see D4's entry.
+
+**Update 11 August 2026:** The UI export button failed repeatedly with "controller busy or did not answer". Two backend bottlenecks caused the Arduino proxy to drop the connection during export. See **D31** below.
 
 ## Session 3 — SSE first, then Batch 4
 
@@ -492,262 +499,6 @@ local-timezone cutoff but inside the UTC one, asserting it's still counted.
 
 ---
 
-### D4 — Connection drops after a few commands; requires a page refresh
-**Status:** CLOSED · 11 August 2026 · Session 3 (SSE Migration) · Collapsed 3 polling connections/operator to 1 persistent SSE stream. 1, 2, and 3-operator 10-min soaks completed cleanly with 0 stream reconnections (`conn_opens=0`) and 0 socket oversubscriptions.
-
-**Cause: the W5500 was accessed from two threads with nothing serialising them.**
-`Poll()` runs on the loop thread; `WriteToClient()` and `CloseClient()` run on
-the Bridge thread via `net_tx` / `net_shutdown`. Six sockets, but **one chip and
-one SPI bus** — so the two threads interleaved mid-transaction. There was no
-mutex anywhere in `sketch/src/`.
-
-The candidates listed below were all wrong, and cheaply eliminated:
-
-- **Chunk size — not the cause.** Still 128 on both sides. Untested as a
-  *throughput* question; see D6.
-- **Slot exhaustion — not the cause.** Drops reproduced with slots free.
-- **Slot lifecycle — not the cause.** `Poll()` implements relay rules 1, 2 and 4
-  correctly. Those rules govern ordering *within* one thread; this was
-  contention *between* threads, which none of them covered.
-
-**Fix:** a `k_mutex` around every W5500 touch, sinks dispatched outside the lock
-(holding it across a sink deadlocks against `net_tx`), and a bounded 50 ms wait
-on the Bridge side so a busy chip fails a write instead of hanging the RPC
-thread. New rule 7 in `RELAY_NOTES.md`.
-
-**Measured, same board, same UI, before and after:**
-
-| | before | after |
-|---|---|---|
-| Sampler gaps in the 10–12 s band | 3 | 0 |
-| Longest gap | 11.00 s | 2.00 s |
-| Fabricated positions stored | 7 | 0 |
-
-416 samples over 6.9 minutes of live driving. Operator report: "feels calmer
-than the chaos of before."
-
-**Why not closed (original reasoning, still correct):** seven minutes is not
-a soak, and a race that stops reproducing has not been proved absent.
-
-**What Session 2's soak found, night of 8 August 2026 — two runs:**
-
-| | 3 operators, ~22 min (Ctrl-C'd) | 1 operator, 15 min (completed) |
-|---|---|---|
-| MCU connections rejected | 1462 | 49 |
-| `servo_read` timeout episodes | continuous, 18:23–18:38 UTC, **never self-recovered** — required an app restart | 2 (20:33:33, 20:33:44 UTC), **self-recovered**, run continued clean |
-| Sampler stall | — | one 30 s gap (worse than the original 11 s signature) |
-| Fabricated position (`counts <= 0`) | 1 | 1 |
-| MCU write-lock timeouts (the mutex fix's own counter) | **0** | **0** |
-
-**The headline: this reproduces at 1 operator, nowhere near the 6-slot
-ceiling** — so it is not purely a connection-oversubscription problem, and
-raising `kMaxRelaySockets` or tuning `timeout_keep_alive` alone will not
-close it. **`write_lock_timeouts` stayed at zero through both runs**,
-including the fully-latched 15-minute episode — the diagnostic the mutex
-fix added to prove itself never fired once. Either the trigger for this
-stall is a different path through the W5500 than the one the mutex
-serialises, or the counter itself has a gap.
-
-**Two live hypotheses, neither confirmed:**
-1. **Load-correlated persistence, not load-correlated onset.** The stall
-   happens regardless of load; how long it *lasts* (self-recovers in
-   seconds vs. latches until restart) may scale with concurrent churn.
-2. **`DiagLog` heap exhaustion under sustained rejection traffic.**
-   `BridgeApi::DrainDiagLog()` allocates two `String`s per record on a
-   device `App.cpp` documents as otherwise heap-free (flagged, unmeasured,
-   in the Batch 3 note below) — 1462 rejections is a lot of allocation
-   churn; 49 is much less, which is at least consistent with (but does not
-   prove) a fragmentation threshold.
-
-**Correction, 10 August 2026 — both runs in the table above were run with an
-extra real browser open and watching, undocumented at the time.** Neither
-the 3-operator nor the 1-operator run was actually operator-count-clean: a
-real browser (its own poll timers, per D27) was open throughout both. So
-"reproduces at 1 operator, nowhere near the 6-slot ceiling" overstates the
-isolation — true load was closer to 2 operators' worth. The qualitative
-finding (`write_lock_timeouts` stays 0, this is not purely oversubscription)
-still holds, since even 2 operators' worth stays under the 6-slot ceiling.
-Caught before it could affect a third run — see below.
-
-**2 operators, 15 min, clean — run 10 August 2026, 14:22:20–14:37:20 local,
-no browser open:**
-
-| | |
-|---|---|
-| Requests / transport failures (client side) | 1518 / 58 |
-| `move` rejections | 50 of 66 attempted — the ceiling refusing real commands |
-| Sampler gaps > 2 s | 7, of which 2 in the 9–13 s stall band |
-| Worst gap | **23.06 s** (14:27:39) — worse than both prior signatures (11 s, 30 s) |
-| Other stall-band gaps | 12.07 s ×2 (14:29:33, 14:33:04) |
-| Fabricated positions | 0 |
-| MCU connections rejected | 12 |
-| MCU write-lock timeouts | **0** — fourth run in a row at zero |
-| Board after the run | healthy, no restart needed — self-recovered every time |
-
-**The stall reproduced three times in this one 15-minute run, exactly at the
-ceiling, with far less rejection churn (12 vs. 1462) than the run that
-produced hypothesis 2.** That weakens hypothesis 2 (`DiagLog` heap exhaustion
-under rejection churn) — 12 rejections is little allocation pressure —
-without confirming hypothesis 1 either: three episodes here is more
-*frequent*, not clearly longer, than the single 30 s gap at the
-(uncorrected) ~1-operator run. **Neither hypothesis is confirmed or
-eliminated.**
-
-**Hypothesis 3, found reading the code 10 August 2026, not yet measured:**
-**the yield is fixed, the work it is yielding around is not.** `App::Tick()`
-(`App.cpp:78-92`) calls `g_relay.Poll()` then a single `delay(1)` —
-regardless of how much real work `Poll()` just did. `RELAY_NOTES.md` rule 3
-already documents this exact failure shape (`loop()` starves the Bridge RPC
-thread, `servo_read` misses its 10 s deadline, "Response for unknown
-msgid") and the `delay(1)` is its fix — but rule 3's own framing is
-`Poll()` busy-spinning on *nothing to do*. Under real load `Poll()` is not
-idle: step 3 (`NetworkRelay.cpp:191-203`) takes and releases `chip_lock_`
-**once per slot**, up to 6 times a pass, each a real SPI read, with **no
-yield between slots** — only the one `delay(1)` at the very end of `Tick()`.
-`write_lock_timeouts` cannot see this: that counter only fires inside
-`net_tx`'s bounded wait, and this path never touches it. That is consistent
-with **all four runs to date reading zero** on that counter while the stall
-still occurs, and with the stall getting *more frequent*, not necessarily
-longer, as socket count rises — more slots with real data means more
-back-to-back chip work with no yield in between, every single pass.
-
-**Distinct from hypotheses 1 and 2 — neither assumed anything about
-`Tick()`'s own timing, both stayed near the mutex/heap.** Not yet measured:
-whether `Poll()`'s wall-clock cost per pass actually grows the way this
-predicts under 2-operator load, and whether it correlates with the three gap
-timestamps already captured (14:27:39, 14:29:33, 14:33:04). Cheapest way to
-find out: instrument `Tick()`'s own duration (`millis()` before/after),
-log it via `DiagLog` only when it crosses a threshold (say 20 ms), and
-correlate against the next run's sampler gaps — measurement before any code
-change, same discipline as Batch 1's own title.
-
-**1 operator, 10 min, clean — run 10 August 2026, 14:45:03–14:55:03 local, no
-browser open:**
-
-| | |
-|---|---|
-| Requests / transport failures (client side) | 646 / 6 |
-| `move` refused (client-reported) | 15 — **board's own count for the same window is 0**, an unexplained discrepancy, not yet investigated |
-| Sampler gaps > 2 s | 1, **none in the stall band** |
-| Fabricated positions | 0 |
-| MCU connections rejected | 0 |
-| MCU write-lock timeouts | 0 |
-| `soak_report.py` verdict | **`clean` — no stall signature at all** |
-
-**This overturns the headline conclusion at the top of this entry.** "D4
-reopened — the stall reproduces even without socket contention" was written
-from the two contaminated runs. The genuinely clean 1-operator baseline shows
-**zero** stall-band gaps in 10 minutes, against **three** in the clean
-2-operator run's 15 minutes. Read plainly: **the stall's onset looks
-load-correlated after all** — it just takes more than one real operator's
-worth of traffic to trigger it, which the contamination was masking by
-adding roughly one operator's worth of hidden load to what looked like a
-"1-operator" test.
-
-**This makes hypothesis 3 the strongest of the three**, not weaker: it is
-exactly a load-scaling mechanism (`Poll()` doing proportionally more real
-work as active sockets carry more traffic, against a fixed 1 ms yield that
-does not scale with it), and it is the only hypothesis that predicted *onset*
-scaling with load rather than just persistence. Hypotheses 1 and 2 remain
-open but now weaker: hypothesis 1 assumed onset was load-independent, which
-this data contradicts; hypothesis 2 (heap exhaustion) has no mechanism for
-why 12 rejections in 15 minutes would matter but a session with effectively
-zero rejections (1-operator, clean) would not.
-
-**Hypothesis 3 confirmed by direct measurement, 10 August 2026.** Added
-`kSlowPollThresholdMs` (20 ms, `Config.h`) and a timer around `Poll()` in
-`App::Tick()` (`App.cpp:78-92`), logged via `DiagLog` as
-`mcu.relay.slow_poll` (arg1 = pass duration in ms) whenever crossed.
-Rebuilt and reflashed clean (143368 bytes program/18%, 54693 bytes RAM/20%),
-`tools/soak_report.py` updated to tally it.
-
-**3 operators, 10 min, clean — run 10 August 2026, 15:14:57–15:24:57 local,
-freshly reflashed:**
-
-| | |
-|---|---|
-| Requests / transport failures (client side) | 596 / 495 (83%) |
-| Worst request latencies | `state` max 16.3 s, `events_poll` max 13.8 s, `zeros_poll` max 12.8 s |
-| **MCU slow `Poll()` passes** | **2200, worst pass 1000 ms** |
-| MCU write-lock timeouts | 0 |
-| MCU bus-refresh stalls | 0 |
-| MCU connections rejected | 0 |
-| Sampler gaps > 2 s | 1, none in the stall band |
-| Fabricated positions | 1 (`counts=-1` at 15:20:17) |
-| Board after the run | intermittently reachable, not fully wedged — recovered without a restart |
-
-**This is no longer circumstantial.** `Poll()` genuinely took up to a full
-second in a single pass, 2200 times in ten minutes, while
-`write_lock_timeouts` and `bus_stalls` both stayed at zero — direct proof
-the mutex diagnostic cannot see this failure mode, because it isn't chip
-contention. A `Poll()` pass that long, with only a fixed 1 ms yield after
-it, starves everything downstream: the Bridge RPC thread (`servo_read` and
-friends) and every client HTTP request queued at the relay, which is the
-likely explanation for this run's 83% client-side failure rate — a
-different-looking symptom (mass request failure, not sampler gaps) from the
-*same* mechanism, this time not clustering into the classic 9–13 s sampler
-signature.
-
-**Not yet known: which step inside `Poll()` costs the second** — disconnect
-detection, accept, or the per-slot bulk read (`NetworkRelay.cpp:191-203`,
-the prime suspect since it is the one step scaling with active-socket
-count). `DiagLog::dropped_total()` read 0 after the run, so the 2200 figure
-is complete, not undercounted by ring overflow.
-
-**Done, 10 August 2026 — result: dominated by probe frequency (~1600
-lock acquisitions/sec across all 6 slots), not one slow call. The fix built
-from that finding (batch step 3 into 1 lock acquisition) made client
-failures worse, not better, combined with an independently-real Python
-async/blocking fix (see Session 2 log, steps 8-11). Both reverted; root
-cause of the regression itself was not established.** A shield swap does
-not raise the 6-socket ceiling (W5500/W6100 both cap at 8 hardware sockets)
-— **decided instead: replace the 3-connections-per-operator polling model
-with one SSE stream per operator**, next session, before re-attempting any
-C++-side fix. See the Session 2 log above for the full sequence and numbers.
-
-**Also found, not yet filed as its own item:** a single truncated/malformed
-JSON body from `/api/v1/system/events` during the 1-operator run, and a
-robustness gap in `synthetic_operator.py` itself — `get()` catches
-`http.client.HTTPException`/`OSError` but not `json.JSONDecodeError`, so one
-malformed reply permanently kills that operator's poll thread for the rest
-of the run instead of retrying like every other failure path.
-
-**Remaining, separate:** the UI declares a disconnection on a *single* failed
-poll — see D11.
-
-**Original report follows.**
-
-**Severity:** high · **Needs investigation**
-
-After a handful of commands the UI loses its connection and only a refresh
-restores it. Reproduces **with a single UI instance open**, so this is not purely
-a concurrency-limit problem.
-
-Candidate causes, none confirmed:
-- **Relay chunk size is half the proven value.** `RELAY_NOTES.md` §5 states
-  plainly: *"256 is the value the working relay used."* The code ships
-  `kRelayChunkBytes = 128` (`sketch/src/Config.h:43`) and `RELAY_CHUNK_BYTES=128`
-  (`python/.env.example:10`). The two sides agree with each other, so the contract
-  checker is happy — but both differ from the reference implementation. Chunk size
-  is bytes per Bridge message, so **halving it doubles the number of Bridge round
-  trips for identical payload.** Given that the Bridge starving is already a known
-  failure mode (rule 3, the `loop()` yield), doubling its traffic is a plausible
-  contributor to both this and D6. Cheapest experiment on the list: set it to 256
-  on both sides and re-run.
-- Relay slot exhaustion. `kMaxRelaySockets = 6` (`sketch/src/Config.h:45`) is the
-  **only** connection limit in the system — there is no Python-side cap. A single
-  browser opens up to 6 connections per host on its own, and `app.js` polls
-  continuously, so one operator can plausibly occupy every slot if slots are not
-  released promptly.
-- Slot lifecycle bugs of the class already documented in `RELAY_NOTES.md`.
-
-**Acceptance:** a single operator can drive the UI indefinitely without a
-refresh. Determine and document the true concurrent-connection ceiling.
-
-**Related:** D5, R1.
-
----
-
 ### D5 — Log output is dominated by connect/disconnect noise, and is not useful
 **Status:** open · **Severity:** medium · **cause identified 7 August 2026**
 
@@ -793,28 +544,28 @@ system did. Per-connection churn is available at DEBUG but off by default.
 ---
 
 ### D6 — App load time is sometimes slow
-**Status:** open · **Severity:** medium · **Needs investigation**
+**Status:** open (chunk-size half closed, 23 August 2026) · **Severity:** medium
 
 Occasional slow first paint. Cause unmeasured. Suspected inefficiency in the
-serving path, plausibly interacting with D4.
-
-**First thing to try:** the halved relay chunk size described under D4. Every
-byte of the UI crosses the Bridge in `kRelayChunkBytes` chunks, so a first paint
-is exactly the workload that a doubled round-trip count would slow down.
-
-**Update, 7 August 2026.** Now worth testing properly, because until the D4 race
-was fixed any chunk-size result was meaningless — a larger chunk means longer
-SPI transactions, so it changed the size of the race window rather than
-measuring throughput.
-
-**Caution before raising it.** `RELAY_NOTES.md` §5 says "256 is the value the
-working relay used", but the operator recalls **256 failing at the very first
-demo**. Those two statements cannot both be the whole truth. Treat 256 as an
-experiment with a measured result, not as a known-good value to restore.
+serving path, plausibly interacting with D4. First paint itself is still
+unmeasured — that half stays open.
 
 Numbers already in hand: a warm app restart is 15.8 s, a cold one ~7 minutes
-(empty `.cache/`); a `/api/v1/servo/state` call served in 0.117–0.134 s. First
-paint itself is still unmeasured.
+(empty `.cache/`); a `/api/v1/servo/state` call served in 0.117–0.134 s.
+
+**The relay-chunk-size half is closed, 23 August 2026 — with a cause, not just
+a number.** `kRelayChunkBytes`/`relay_chunk_bytes` raised **128 → 224**,
+board-validated on a live 44,827-row telemetry export: zero churn, zero
+dropped transfers, ~49% throughput gain (4.5 KB/s → 6.7 KB/s). The old
+"256 is the working value, but the operator recalls it failing" contradiction
+(`RELAY_NOTES.md` §5) is resolved, not just avoided: 256 overflows the
+vendored `Arduino_RPClite`/`Arduino_RouterBridge` library's own fixed
+256-byte RPC message buffer (`DECODER_BUFFER_SIZE/4`), leaving only ~236
+bytes of real payload room once MsgPack framing is subtracted — confirmed by
+re-testing 256 on the current, rule-7-fixed relay and reproducing instant
+export failures and connection churn directly. Full derivation and the exact
+`#define`s are in `RELAY_NOTES.md` §5 — read that before touching this value
+again.
 
 **Acceptance:** load time measured and stated; a number to hold against.
 
@@ -880,8 +631,8 @@ warning in a log nobody reads is what allowed this to persist.
 ---
 
 ### D10 — `logger.exception` swallows the exception
-**Status:** half done — **the logging is fixed; the fault itself is still
-unexplained** · **Severity:** medium · **Found by:** a live board run
+**Status:** half done — **the logging is fixed; the fault itself named itself,
+23 August 2026** · **Severity:** medium · **Found by:** a live board run
 
 **Fixed 7 August 2026.** The cause was the Logger461 stand-in in `main.py`:
 its `exception()` was a straight copy of `error()`, and attaching the exception
@@ -894,10 +645,30 @@ a cause would have passed against a stub that dropped it exactly as production
 did. Both fixed together — this is the twin-path pattern for the fourth time in
 this repository.
 
-**Still open: the actual fault.** The sampler exception of 21:37:58 remains
-unexplained, and its evidence is gone. It can only be caught if it happens
-again — but now, when it does, the record will say what it was. **Watch for it
-on the next board run.**
+**It happened again, 23 August 2026, twice (13:02:22, 13:39:55) — this time with
+a full trace, exactly as this entry predicted:**
+
+```
+TypeError: unsupported operand type(s) for -: 'int' and 'NoneType'
+  servo_state.py:276  servo_deg = ((raw_counts - self._baseline_counts(active))
+  servo_state.py:263  _active_counts() -> self._baseline_counts(self._zeros.get_active())
+```
+
+`_baseline_counts()` is typed `-> int` and both its branches (`active.raw_counts`
+or `self._counts_per_turn // 2`) return one — the type hint is not a lie, so
+`active.raw_counts` itself was `None` at the moment of the call. **Checked the
+live `zeros` table: the active zero ("datum") has `raw_counts=2046`, a valid
+int, not null.** So this is not corrupted stored data — it is a transient
+in-memory state, most likely a race around `ZeroStore.get_active()` returning
+a reference mid-mutation (a zero being changed/replaced) rather than a stable
+snapshot. Not investigated further this session — the sampler skips the sample
+and continues, which is the correct degrade, but every skip is a gap in
+exactly the data R5's export exists to deliver.
+
+**Still open: the actual fault, now with a real lead instead of no evidence.**
+Next step is reading `ZeroStore`'s active-zero mutation path for a window where
+a `ZeroReference` can be read with a still-unset `raw_counts`, not reproducing
+blind.
 
 **Original report follows.**
 
@@ -959,38 +730,6 @@ worth fixing before the demo.
 
 ---
 
-### D18 — A failed CSV export navigates the operator out of the application
-**Status:** open · **Severity:** medium · **Found by:** operator lens, 8 August 2026
-
-`doExport()` (`app.js:522`) sets `window.location.href` to the export endpoint.
-That is not a request the page can observe: there is no `catch`, no status, no
-notice. If the endpoint errors, or the relay refuses the connection, the browser
-replaces the control UI with its own error page and the operator has to find
-their way back — from a machine-control screen.
-
-It is also a **new connection** every time, spending from the same six-slot
-budget as D13, taken at the moment an operator is most likely to also be driving.
-
-**Sharpened by the twin-review of Batch 1, 8 August 2026.** D15's in-flight
-guard went into `bind()`, and `doExport()` is the one handler it cannot hold:
-it is **synchronous**, so `await handler()` resolves on the next microtask and
-the control is released before the operator can see it was ever busy. Three
-presses therefore start three concurrent exports, each a `StreamingResponse`
-holding a relay socket — and the endpoint sets `Content-Disposition:
-attachment`, so the browser does not cancel the previous one the way it cancels
-a navigation. **The slowest, heaviest request in the application is the only
-command with no press guard.** Making it a background fetch fixes both halves
-at once.
-
-**Acceptance:** export fetches in the background, reports success or failure like
-every other command, never navigates away from the control page, and is covered
-by the same in-flight guard as every other control.
-
-**Related:** D13, D14, R5 — the export is the seed of the benchmarking pack, so
-it will be used more, not less.
-
----
-
 ### D19 — Saved positions are listed against a baseline of 0 when no zero is active
 **Status:** open · **Severity:** medium · **Needs confirmation on hardware**
 · **Found by:** operator lens, 8 August 2026
@@ -1017,51 +756,6 @@ not reachable, the defect is that a fallback exists at all for a state that
 cannot happen, and it should be an error rather than a silent 0.
 
 **Related:** D9, D12.
-
----
-
-### D22 — The only export control is fixed at 24 hours
-**Status:** open · **Severity:** high · **Raised by:** the operator, 8 August 2026
-
-`doExport()` (`app.js:522`) hardcodes the window:
-
-```js
-const from = now - 24 * 3600;
-```
-
-**The handover benchmark is the receiving team running the system for several
-days unattended, after which the record is loaded and read.** With a 24-hour
-button, four days of a five-day run cannot be retrieved from the UI at all —
-they exist in the database and are reachable only by someone with `adb` or the
-sshfs mount, which is not the receiving team.
-
-The data is there: telemetry is sampled once a second, retained 60 days, and
-`torque_kgcm` is already stored and already a CSV column. **The gap is purely
-the operator's route to it**, and it defeats the primary reason R5 exists.
-
-**Scope confirmed and widened by the operator, 8 August 2026.** Two deliverables,
-not one, and **both must exist on the backend *and* in the UI** — a tool that
-only runs from a shell is unreachable for the team who ran the test:
-
-1. **Export over a chosen range, as XLSX** (revised 10 August 2026 — see R5;
-   was CSV). The operator picks start and end. The backend endpoint already
-   takes `from` and `to`; it is the UI that hardcodes 24 hours. So the range
-   control is mostly unchanged — but the range picker has to cope with a
-   five-day window without the operator typing epoch seconds.
-2. **The chart set, embedded in that same workbook.** Same range. **Decided
-   10 August 2026 (R5): native Excel chart objects, not server-rendered
-   images** — avoids exactly the sampler-contention risk this entry used to
-   flag as the open question, since writing chart objects isn't rasterising
-   a plot.
-
-**Acceptance:** from the UI, the operator picks a time range spanning days and
-gets one XLSX file, data and charts together, for exactly that range; it does
-not navigate away from the control page (D18); the export is reachable from
-the backend alone for anyone working over `adb`.
-
-**Related:** R5 (this is its delivery path), D18 (same control, silent failure),
-T9 (a multi-day pull must not exhaust memory — stream it, same discipline as
-the current CSV export).
 
 ---
 
@@ -1250,7 +944,7 @@ and the suite (207 tests as of Batch 2) still passes.
 **Status:** open · **Raised by:** the operator, planning a one-to-two month test
 
 The question is simple and nobody could answer it: *run this for two months —
-does it fit?* Measured on the board on 7 August 2026:
+does it fit?* Measured on the board on 7 August 2026, at the original 1 row/s:
 
 | | rate | one month | two months |
 |---|---|---|---|
@@ -1259,6 +953,16 @@ does it fit?* Measured on the board on 7 August 2026:
 
 Free space on the board: **2.6 GB**. So a two-month run at DEBUG lands near
 800 MB — it fits, but nothing enforces it and nobody had written it down.
+
+**Recomputed, 23 August 2026 — `sampler_interval_seconds` is now 0.5, not
+1.0.** The telemetry-database row doubles with it (log row is operator-poll
+driven, not sampler-driven, unaffected): ~160 bytes/s → **~13.8 MB/day**.
+`telemetry_retention_days` also dropped 60 → 30 the same session, so the
+database no longer grows past that window — it plateaus at roughly
+**13.8 MB/day × 30 days ≈ 414 MB**, not the ~416 MB two-month figure above,
+which was for the old rate and window and no longer applies. Not
+re-measured on the board at the new rate — this is arithmetic from the
+7 August figures, flagged as such.
 
 **Retention, corrected.** Telemetry purges at 60 days
 (`telemetry_retention_days`), so the database plateaus rather than growing
@@ -1595,23 +1299,42 @@ R2. Fusing them now would leave no distinct meaning for emergency stop later.
 ---
 
 ### R5 — Metrics export and benchmarking output
-**Scope:** in MVP · **Not started**
+**Scope:** in MVP · **Status:** core mechanism done and validated (not corrupted, works cross-app) · 23 August 2026 · **known UX gaps open, see table below — not fully done**
 
 Pull telemetry for an arbitrary time range and chart it for delivery. The
 point is that the MVP must be **benchmarkable**: the receiving teams need to
 see whether the servo actually handles what it is asked to handle.
 
-**Decided, 10 August 2026 (operator + team lead), revised same day.** Export
-format is **XLSX (Excel), not CSV** — team lead's correction: a CSV cannot
-carry a chart, and the point of this item is that it must. Charts are
-**native Excel chart objects embedded in the workbook by the export
-endpoint** (e.g. `openpyxl`), not rendered images — this still avoids the
+**Shipped, 23 August 2026 — architecture note.** The 10 August decision
+below (XLSX not CSV, native charts, one data product) still holds exactly
+as reasoned. What changed is **who builds the file**: not the export
+endpoint (`openpyxl` was the original example) but the **browser**,
+client-side, in `app.js` — decided deliberately, not a fallback. The server
+stays a dumb byte pump per ADR-0001: it streams the existing compact binary
+format (`GET /api/v1/telemetry/binary`, gzip'd) and never has to hold or
+transmit a built `.xlsx`, which would be a far larger payload crossing the
+same ~11.5 KB/s Bridge link that already dominates every other timing
+number in this project. See D31 for the board measurements this rests on.
+
+An 11 August session wrote most of this once already (`app.js`'s
+`generateExcelXlsxZip`) and it never actually worked — two functions it
+called, `makeChartXml`/`makeDrawingXml`, were never written at all,
+guaranteed `ReferenceError` on every attempt. Rebuilt 23 August against a
+real generated reference workbook (verified with `XlsxWriter`, unzipped, the
+actual chart XML schema copied from there, not guessed a second time from
+documentation) — see D31.
+
+**Format decided 10 August 2026 (operator + team lead), revised same day.**
+Export format is **XLSX (Excel), not CSV** — team lead's correction: a CSV
+cannot carry a chart, and the point of this item is that it must. Charts are
+native Excel chart objects, not rendered images — this still avoids the
 original matplotlib/sampler-contention risk (D22's stated concern), because
 writing chart-definition objects into the workbook is not rasterising a
 plot. The data sheet is the raw form; the chart objects read from it
 directly inside the same file, so there is still one data product, not two.
 
-CSV export exists today and is the seed of this, but it is not enough on its own.
+The standalone CSV export button was retired (operator decision, predates
+this session) once XLSX existed as the one export artifact.
 
 **Elevated to a build item, 8 August 2026.** The second of the two unbuilt
 in-MVP items. Its absence is not a missing feature — it is the reason R6 cannot
@@ -1644,29 +1367,75 @@ record of a run nobody watched**, and three consequences follow:
   UI is fixed at 24 hours, so after a five-day run an operator can retrieve the
   last day of it and no more.
 
-**60-day telemetry retention (`telemetry_retention_days`) comfortably covers a
-multi-day run** — verify it plateaus rather than assume it, per T9.
+**30-day telemetry retention (`telemetry_retention_days`, lowered from 60
+this session) is the real upper bound on a single export now** — a full
+30-day/0.5s-interval pull is 5.18M rows, board-tested at that exact scale
+(see below), not just assumed to fit.
 
-**Acceptance, made concrete:**
+**Acceptance, made concrete — what actually shipped:**
 
-- Given a start and end timestamp, the XLSX export carries what the chart
-  set needs, every field given the same treatment: position with commanded
-  target; torque with commanded motion; sampler interval (so the 9–13 s
-  stall band can be marked — that band is what `tools/soak_report.py`
-  already judges); temperature, voltage and current; and a count of invalid
-  readings over the window. Peak/sustained figures as numbers, stated for
-  any field that needs them read correctly, not reserved to one.
-- The chart set is **native Excel chart objects embedded in the same
-  workbook** — no server-side rendered images (decided above).
-- **Must work over a multi-day window**, not just a session — that is the
-  handover benchmark. Downsample for the chart if needed, but never for the
-  stated numbers.
-- Runs on the board *or* off it against a pulled database — nothing about
-  producing the chart set may require the servo to be attached.
-- The existing CSV export stays and remains the raw form; the chart is built
-  from it, not a separate artifact.
-- **Reuses `tools/soak_report.py`'s verdict logic** rather than restating it —
-  one definition of "a stall", not two. See D9 on what two definitions cost.
+- Given a start and end timestamp, the workbook carries every field with
+  the same treatment: position, torque, temperature, voltage, current,
+  sampler interval. Peak/sustained figures are computed once, from the
+  full-resolution dataset, on the **Overview** sheet — never from a
+  downsampled series.
+- **Every field gets a native Excel line chart**, built from a hidden
+  `ChartData` sheet whose cells are **live formulas** pointing back at the
+  exact day-sheet cell each downsampled point came from (min-max binning,
+  ≤2000 points/chart — keeps spikes/faults visible, not smoothed away).
+  Editing a day sheet updates the chart. Every formula cell also carries a
+  cached value (matching real Excel output, confirmed against a generated
+  reference file) so a renderer that doesn't recalculate on open —
+  OnlyOffice, some LibreOffice paths — still shows something correct.
+- **One worksheet per calendar day** for the raw data, full resolution, no
+  downsampling, no row cap — bounds every sheet far under Excel's
+  1,048,576-row ceiling regardless of range length. This is also what
+  closed the old silent-truncation defect: `export_max_rows` no longer
+  needs to be a practical limit (raised 50,000 → 10,000,000, a defensive
+  ceiling only — see `config.py`).
+- **Must work over a multi-day window.** Board-tested at the real worst
+  case: 30 days / 5.18M rows completes in ~73s and produces a 193MB file
+  (client-side, in-browser) — down from an unoptimized first pass that
+  either exhausted a 4GB heap (15 days) or produced a 349–475MB file,
+  fixed by two changes: the zip writer now actually deflates its contents
+  (it shipped uncompressed at first — a real gap, caught by testing at
+  real scale, not assumed fixed because it "worked" at 2 days), and each
+  day's XML is built, compressed and discarded one at a time instead of
+  holding the whole range in memory at once. Further shrunk 45% (349MB →
+  193MB) by dropping a redundant duplicate timestamp column (kept only a
+  native Excel date, not a spelled-out text copy too), packing the 8
+  boolean/fault columns into one bitmask byte (same encoding
+  `export_binary_stream` already uses — one fact, one place), and rounding
+  values to the 2 decimals the sensor data actually supports.
+- Runs on the board *or* off it against a pulled database — generation is
+  entirely client-side JavaScript, needs only the binary stream, never the
+  servo attached.
+- The standalone CSV export was retired (see above) — XLSX is the one
+  export artifact now, its data sheets serving the role CSV used to.
+- Chart XML verified against a real `XlsxWriter`-generated reference file,
+  not written from documentation alone — the previous attempt's
+  `makeChartXml`/`makeDrawingXml` were never implemented, see D31.
+
+**A real corruption bug shipped with the first "done" claim, found by the
+operator opening a real export in OnlyOffice, fixed the same session.**
+The central directory's general-purpose-flag and compression-method
+fields were at swapped byte offsets — `unzip -t` doesn't catch this,
+`zipfile`/`openpyxl`/OnlyOffice do, and did. Fixed and re-verified against
+the exact real board data with `zipfile.testzip()` and
+`openpyxl.load_workbook()`, not just `unzip -t` again. **The lesson, not
+just the fix: a file "opening" in one lenient tool is not proof it's
+correct — validate with the strictest available reader, and test cross-app
+compatibility for real, not by inspection.**
+
+**Known gaps, found live the same session — deferred to next session, not
+forgotten:**
+
+| Gap | What was seen | What's needed |
+|---|---|---|
+| Day-sheet timestamp column unreadable | Shows `########` — column too narrow for the date format | Set an explicit column width for the date column (and probably the others) in `makeDaySheetXml`'s `<cols>` |
+| No actual range/day selector | Charts always plot every downsampled day concatenated; the x-axis is unreadable at any real range (see the operator's screenshot — dozens of truncated repeated date labels) | The `ChartData` formula mechanism (fetch from day sheets) exists, but nothing lets the operator pick which day(s) a chart shows — the interactivity itself was never built, only its plumbing |
+| Flags column too compact | Packed 8 booleans into one bitmask int for file size — operator reports it now reads as "narrow data" versus the richer column set before | Revisit the size-vs-readability tradeoff; likely keep `moving`/`locked` as their own readable columns and pack only the rare fault flags, or add a decoded-text column |
+| LCARS visual styling | Operator recalls asking Antigravity for this previously (matching the app's own theme) — not present in the rebuild | Design pass needed — out of scope for a same-session fix, genuinely a new piece of work |
 
 **Related:** this is also how "stable" gets defined — see R6. D18 — the export
 is the seed of this and currently fails silently. T9 — the storage numbers this

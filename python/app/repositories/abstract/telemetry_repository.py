@@ -21,6 +21,10 @@ class TelemetryRepository(ABC):
         """
 
     @abstractmethod
+    def count_range(self, ts_from: float, ts_to: float, limit: int) -> tuple[int, float]:
+        """Counts samples in range and returns count and base timestamp."""
+
+    @abstractmethod
     def query(self, ts_from: float, ts_to: float,
               limit: int) -> Iterator[TelemetrySample]:
         """Yields samples inside a time range, oldest first.

@@ -566,6 +566,7 @@ const EVENT_LABELS = {
   "zero.activated": "position used",
   "zero.deleted": "position removed",
   "app.boot": "started",
+  "telemetry.exported": "export delivered",
 };
 
 /* backend timestamp is an ISO string ("2026-07-22T14:22:07"); parse as Date,
@@ -679,15 +680,777 @@ async function doRemove() {
   try { await apiDelete("/zeros/" + state.selectedZeroId); state.selectedZeroId = null; /* success: no notice */ fetchZeros(); }
   catch (err) { sayError(err); }
 }
-function doExport() {
-  clearNotice();
-  const now = Math.floor(Date.now() / 1000);
-  const from = now - 24 * 3600;
-  window.location.href = API + "/telemetry/export?from=" + from + "&to=" + now;
-  /* success: no notice */
+function formatLocalDatetimeInput(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  return `${y}-${m}-${d}T${hh}:${mm}`;
 }
 
-/* ---------------- wiring ---------------- */
+function setExportPreset(rangeKey) {
+  const now = new Date();
+  let past = new Date(now);
+  if (rangeKey === "1h") past.setHours(past.getHours() - 1);
+  else if (rangeKey === "6h") past.setHours(past.getHours() - 6);
+  else if (rangeKey === "24h") past.setHours(past.getHours() - 24);
+  else if (rangeKey === "7d") past.setDate(past.getDate() - 7);
+
+  const fromEl = $("exportFrom");
+  const toEl = $("exportTo");
+  if (fromEl && toEl) {
+    fromEl.value = formatLocalDatetimeInput(past);
+    toEl.value = formatLocalDatetimeInput(now);
+  }
+
+  document.querySelectorAll(".preset-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.range === rangeKey);
+  });
+}
+
+function parseBinaryTelemetry(buffer) {
+  const view = new DataView(buffer);
+  if (buffer.byteLength < 12) return [];
+  const baseTs = view.getFloat64(0, true);
+  const count = view.getUint32(8, true);
+
+  const samples = [];
+  let offset = 12;
+  for (let i = 0; i < count && offset + 18 <= buffer.byteLength; i++) {
+    const rawCounts = view.getUint16(offset, true);
+    const outputDeg = view.getInt16(offset + 2, true) / 100.0;
+    const tempC = view.getInt16(offset + 4, true) / 100.0;
+    const voltageV = view.getUint16(offset + 6, true) / 100.0;
+    const currentA = view.getUint16(offset + 8, true) / 100.0;
+    const torque = view.getInt16(offset + 10, true) / 100.0;
+    const flags = view.getUint8(offset + 12);
+    const dtMs = view.getUint32(offset + 13, true);
+    offset += 18;
+
+    samples.push({
+      timestamp: baseTs + (dtMs / 1000.0),
+      raw_counts: rawCounts,
+      output_deg: outputDeg,
+      temperature_c: tempC,
+      voltage_v: voltageV,
+      current_a: currentA,
+      torque_kgcm: torque,
+      moving: (flags & 1) !== 0,
+      locked: (flags & 2) !== 0,
+      overload: (flags & 4) !== 0,
+      overcurrent: (flags & 8) !== 0,
+      overheat: (flags & 16) !== 0,
+      voltage_fault: (flags & 32) !== 0,
+      sensor_fault: (flags & 64) !== 0,
+      angle_fault: (flags & 128) !== 0,
+    });
+  }
+  return samples;
+}
+
+function crc32(strOrUint8) {
+  let table = window._crc32Table;
+  if (!table) {
+    table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) {
+        c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[i] = c;
+    }
+    window._crc32Table = table;
+  }
+  let crc = -1;
+  const process = (data) => {
+    const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+    for (let i = 0; i < bytes.length; i++) {
+      crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xff];
+    }
+  };
+  if (Array.isArray(strOrUint8)) {
+    for (const chunk of strOrUint8) process(chunk);
+  } else {
+    process(strOrUint8);
+  }
+  return (crc ^ (-1)) >>> 0;
+}
+
+/* Raw DEFLATE (no zlib/gzip wrapper) - exactly what a ZIP local file
+   header's compression-method-8 entry expects. Native browser API, no
+   library. */
+async function deflateRaw(bytes) {
+  /* Blob.stream().pipeThrough() instead of manually driving a writer:
+     the earlier version called writer.write()/writer.close() without
+     awaiting either, a real race that let the read side start before
+     writing finished on some inputs - reproduced live, 23 August 2026:
+     openpyxl rejected a real board-generated file with "Bad CRC-32 for
+     [Content_Types].xml" even though it was the file's first, smallest
+     entry. pipeThrough's spec-guaranteed backpressure/completion
+     handling removes the race entirely rather than papering over one
+     symptom of it. */
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/* entries: array of [filename, content]. `content` may be a string,
+   Uint8Array/ArrayBuffer, array of chunks (as before) - OR a zero-arg
+   function that PRODUCES the content when called. Day-sheet content is
+   passed as a function so only one day's uncompressed XML string exists
+   in memory at a time: built, compressed, written, then eligible for GC
+   before the next one is built - a 30-day export no longer needs the
+   whole range's raw text resident at once (board/browser-measured: 5 days
+   uncompressed hit 475MB and 15 days exhausted a 4GB heap before this). */
+async function createZipArchive(entries, onProgress) {
+  const enc = new TextEncoder();
+  const fileEntries = [];
+  let offset = 0;
+  const parts = [];
+  let done = 0;
+
+  for (const [filename, contentOrFn] of entries) {
+    const content = typeof contentOrFn === "function" ? contentOrFn() : contentOrFn;
+    const filenameBytes = enc.encode(filename);
+
+    let rawBytes;
+    if (Array.isArray(content)) {
+      let total = 0;
+      const chunks = content.map((c) => {
+        const b = typeof c === "string" ? enc.encode(c) : c;
+        total += b.length;
+        return b;
+      });
+      rawBytes = new Uint8Array(total);
+      let o = 0;
+      for (const b of chunks) { rawBytes.set(b, o); o += b.length; }
+    } else {
+      rawBytes = typeof content === "string" ? enc.encode(content) : new Uint8Array(content);
+    }
+
+    const crc = crc32(rawBytes);
+    const uncompressedSize = rawBytes.length;
+    const compressed = await deflateRaw(rawBytes);
+    const compressedSize = compressed.length;
+
+    const lh = new ArrayBuffer(30 + filenameBytes.length);
+    const v = new DataView(lh);
+    v.setUint32(0, 0x04034b50, true);
+    v.setUint16(4, 20, true);
+    v.setUint16(6, 0, true);
+    v.setUint16(8, 8, true);          /* compression method: deflate */
+    v.setUint16(10, 0, true);
+    v.setUint16(12, 0, true);
+    v.setUint32(14, crc, true);
+    v.setUint32(18, compressedSize, true);
+    v.setUint32(22, uncompressedSize, true);
+    v.setUint16(26, filenameBytes.length, true);
+    v.setUint16(28, 0, true);
+
+    const lhArr = new Uint8Array(lh);
+    lhArr.set(filenameBytes, 30);
+
+    fileEntries.push({ filenameBytes, crc, compressedSize, uncompressedSize, offset });
+    parts.push(lhArr, compressed);
+    offset += lhArr.length + compressedSize;
+    done += 1;
+    if (onProgress) onProgress(done, entries.length, filename);
+  }
+
+  const cdStart = offset;
+  for (const entry of fileEntries) {
+    const cd = new ArrayBuffer(46 + entry.filenameBytes.length);
+    const v = new DataView(cd);
+    v.setUint32(0, 0x02014b50, true);
+    v.setUint16(4, 20, true);         /* version made by */
+    v.setUint16(6, 20, true);         /* version needed to extract */
+    v.setUint16(8, 0, true);          /* general purpose bit flag - was
+                                          swapped with compression method
+                                          below (real bug, reproduced live
+                                          23 August 2026: every reader that
+                                          honors the central directory,
+                                          including openpyxl/zipfile and
+                                          OnlyOffice, read flag=8 "data
+                                          descriptor follows" and rejected
+                                          the whole file; unzip's more
+                                          lenient path masked it) */
+    v.setUint16(10, 8, true);         /* compression method: deflate */
+    v.setUint16(12, 0, true);
+    v.setUint16(14, 0, true);
+    v.setUint32(16, entry.crc, true);
+    v.setUint32(20, entry.compressedSize, true);
+    v.setUint32(24, entry.uncompressedSize, true);
+    v.setUint16(28, entry.filenameBytes.length, true);
+    v.setUint16(30, 0, true);
+    v.setUint16(32, 0, true);
+    v.setUint16(34, 0, true);
+    v.setUint16(36, 0, true);
+    v.setUint32(38, 0, true);
+    v.setUint32(42, entry.offset, true);
+
+    const cdArr = new Uint8Array(cd);
+    cdArr.set(entry.filenameBytes, 46);
+
+    parts.push(cdArr);
+    offset += cdArr.length;
+  }
+
+  const cdSize = offset - cdStart;
+  const eocd = new ArrayBuffer(22);
+  const ev = new DataView(eocd);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, fileEntries.length, true);
+  ev.setUint16(10, fileEntries.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, cdStart, true);
+  ev.setUint16(20, 0, true);
+
+  parts.push(new Uint8Array(eocd));
+  return new Blob(parts, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+
+/* Charts read from a bounded, downsampled block on a hidden ChartData
+   sheet, never from the raw day sheets - each cell there is a formula
+   pointing at the exact day-sheet cell it was picked from (min-max
+   binning, see minMaxDownsampleRefs), so the chart is genuinely fetching
+   from the day sheets, live, without holding one giant series. */
+const CHART_DOWNSAMPLE_MAX_POINTS = 2000;
+const DAY_SHEET_COLS = { output_deg: "C", temperature_c: "D", voltage_v: "E",
+                         current_a: "F", torque_kgcm: "G", interval: "I" };
+
+function groupSamplesByDay(samples) {
+  const days = [];
+  const index = new Map();
+  for (const s of samples) {
+    const dateStr = new Date(s.timestamp * 1000).toISOString().slice(0, 10);
+    let day = index.get(dateStr);
+    if (!day) {
+      day = { dateStr, samples: [] };
+      index.set(dateStr, day);
+      days.push(day);
+    }
+    day.samples.push(s);
+  }
+  return days;
+}
+
+/* Attaches interval-since-previous-sample to each sample in place, and
+   returns the peak/sustained figures - computed once, over the FULL
+   dataset, never the downsampled one (R5: numbers are never downsampled,
+   only the charted series is). */
+function computeStatsAndIntervals(samples) {
+  let prevTs = null, stallCount = 0, maxInterval = 0.0;
+  let peakTorque = 0.0, peakCurrent = 0.0, maxTemp = -999.0, minTemp = 999.0;
+  let minVoltage = 999.0, maxVoltage = 0.0, minAngle = 999.0, maxAngle = -999.0;
+  const faultCounts = { overload: 0, overcurrent: 0, overheat: 0, voltage: 0, sensor: 0, angle: 0 };
+  samples.forEach((s) => {
+    const interval = prevTs !== null ? Math.round((s.timestamp - prevTs) * 1000) / 1000 : 0.0;
+    s.interval = interval;
+    prevTs = s.timestamp;
+    maxInterval = Math.max(maxInterval, interval);
+    if (interval >= 9.0) stallCount++;
+    peakTorque = Math.max(peakTorque, s.torque_kgcm);
+    peakCurrent = Math.max(peakCurrent, s.current_a);
+    maxTemp = Math.max(maxTemp, s.temperature_c);
+    minTemp = Math.min(minTemp, s.temperature_c);
+    minVoltage = Math.min(minVoltage, s.voltage_v);
+    maxVoltage = Math.max(maxVoltage, s.voltage_v);
+    minAngle = Math.min(minAngle, s.output_deg);
+    maxAngle = Math.max(maxAngle, s.output_deg);
+    if (s.overload) faultCounts.overload++;
+    if (s.overcurrent) faultCounts.overcurrent++;
+    if (s.overheat) faultCounts.overheat++;
+    if (s.voltage_fault) faultCounts.voltage++;
+    if (s.sensor_fault) faultCounts.sensor++;
+    if (s.angle_fault) faultCounts.angle++;
+  });
+  if (samples.length === 0) {
+    maxTemp = minTemp = minVoltage = maxVoltage = minAngle = maxAngle = 0.0;
+  }
+  return { stallCount, maxInterval, peakTorque, peakCurrent, maxTemp, minTemp,
+           minVoltage, maxVoltage, minAngle, maxAngle, faultCounts };
+}
+
+/* Min-max binning over the flattened (day, row) sequence: for each bin,
+   keeps the highest and lowest sample of `field` - preserves spikes and
+   faults, which matter more here than a smooth-looking average would.
+   Returns refs {dayIdx, row}, in ascending row order, ready to become
+   formula cells. */
+function minMaxDownsampleRefs(days, field) {
+  const flat = [];
+  days.forEach((day, dayIdx) => {
+    day.samples.forEach((s, i) => flat.push({ value: s[field], ts: s.timestamp, dayIdx, row: i + 2 }));
+  });
+  const n = flat.length;
+  if (n === 0) return [];
+  if (n <= CHART_DOWNSAMPLE_MAX_POINTS) return flat;
+  const bins = Math.max(1, Math.floor(CHART_DOWNSAMPLE_MAX_POINTS / 2));
+  const binSize = Math.ceil(n / bins);
+  const picked = [];
+  for (let start = 0; start < n; start += binSize) {
+    const end = Math.min(n, start + binSize);
+    let lo = flat[start], hi = flat[start];
+    for (let i = start; i < end; i++) {
+      if (flat[i].value < lo.value) lo = flat[i];
+      if (flat[i].value > hi.value) hi = flat[i];
+    }
+    if (lo === hi) picked.push(lo);
+    else if (lo.row <= hi.row) picked.push(lo, hi);
+    else picked.push(hi, lo);
+  }
+  return picked;
+}
+
+function dayCellRef(days, ref, colLetter) {
+  return `'${days[ref.dayIdx].dateStr}'!${colLetter}${ref.row}`;
+}
+
+/* Excel stores dates as a serial number: days since 1899-12-30, fractional
+   part is time-of-day. 25569 is the number of days between that epoch and
+   the Unix epoch (1970-01-01) - the standard conversion constant. Storing
+   this instead of a spelled-out ISO text string (which needed its own
+   verbose inlineStr XML wrapper) is both smaller AND a real Excel date -
+   sortable/filterable natively, not a lookalike string. */
+function excelSerialDate(unixSeconds) {
+  return unixSeconds / 86400 + 25569;
+}
+
+/* Same bit layout export_binary_stream already uses server-side
+   (telemetry_service.py) - one encoding, not a second one invented here. */
+function packFlags(s) {
+  return (s.moving ? 1 : 0) | (s.locked ? 2 : 0) | (s.overload ? 4 : 0) |
+    (s.overcurrent ? 8 : 0) | (s.overheat ? 16 : 0) | (s.voltage_fault ? 32 : 0) |
+    (s.sensor_fault ? 64 : 0) | (s.angle_fault ? 128 : 0);
+}
+
+const RAW_HEADERS = [
+  "Timestamp", "Raw Counts", "Output Angle (deg)", "Temperature (C)",
+  "Voltage (V)", "Current (A)", "Torque (kg.cm)", "Flags (bit0=moving,1=locked,2=overload,3=overcurrent,4=overheat,5=voltage,6=sensor,7=angle)",
+  "Interval (s)"
+];
+const RAW_COLS = ["A","B","C","D","E","F","G","H","I"];
+const TIMESTAMP_COL = "A";
+
+/* One worksheet per day, full resolution - this is the raw form; nothing
+   downsamples it, and there is no row cap, so a day is always well under
+   Excel's 1,048,576-row ceiling regardless of range length or sample rate.
+   Values rounded to 2 decimals: the sensor data itself is only ever
+   accurate to that (see telemetry_service.py's *100-then-int packing) -
+   writing more digits is false precision, not more information. */
+function makeDaySheetXml(day) {
+  const hRowXml = `<row r="1" ht="20" customHeight="1">` +
+    RAW_HEADERS.map((h, i) => `<c r="${RAW_COLS[i]}1" t="inlineStr" s="1"><is><t>${h}</t></is></c>`).join("") +
+    `</row>`;
+  let body = "";
+  day.samples.forEach((s, idx) => {
+    const r = idx + 2;
+    body += `<row r="${r}">` +
+      `<c r="A${r}" s="2"><v>${excelSerialDate(s.timestamp)}</v></c>` +
+      `<c r="B${r}"><v>${s.raw_counts}</v></c>` +
+      `<c r="C${r}"><v>${Math.round(s.output_deg * 100) / 100}</v></c>` +
+      `<c r="D${r}"><v>${Math.round(s.temperature_c * 100) / 100}</v></c>` +
+      `<c r="E${r}"><v>${Math.round(s.voltage_v * 100) / 100}</v></c>` +
+      `<c r="F${r}"><v>${Math.round(s.current_a * 100) / 100}</v></c>` +
+      `<c r="G${r}"><v>${Math.round(s.torque_kgcm * 100) / 100}</v></c>` +
+      `<c r="H${r}"><v>${packFlags(s)}</v></c>` +
+      `<c r="I${r}"><v>${Math.round(s.interval * 1000) / 1000}</v></c>` +
+      `</row>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n` +
+    `<sheetData>${hRowXml}${body}</sheetData>\n</worksheet>`;
+}
+
+const CHART_FIELDS = [
+  { key: "output_deg", title: "Measured Output Angle", axis: "Degrees (deg)", color: "FF9900" },
+  { key: "torque_kgcm", title: "Shaft Torque Load", axis: "kg.cm", color: "FF9900" },
+  { key: "current_a", title: "Electrical Current Draw", axis: "Amperes", color: "7077A1" },
+  { key: "temperature_c", title: "Motor Temperature", axis: "Celsius", color: "C0392B" },
+  { key: "voltage_v", title: "Supply Voltage", axis: "Volts", color: "4A7C59" },
+  { key: "interval", title: "Sampler Interval Jitter", axis: "Seconds", color: "7077A1" },
+];
+
+/* Builds the hidden ChartData sheet: one (timestamp, value) formula-cell
+   pair of columns per chart field, each cell a live reference into a day
+   sheet - not a value, so editing a day sheet updates the chart. Bounded
+   to CHART_DOWNSAMPLE_MAX_POINTS rows per field regardless of range. */
+function makeChartDataSheetXml(days) {
+  const colPairs = CHART_FIELDS.map((_, i) => [
+    RAW_COLS[i * 2] || String.fromCharCode(65 + i * 2),
+    RAW_COLS[i * 2 + 1] || String.fromCharCode(65 + i * 2 + 1),
+  ]);
+  let maxRows = 0;
+  const perField = CHART_FIELDS.map((f) => {
+    const refs = minMaxDownsampleRefs(days, f.key === "interval" ? "interval" : f.key);
+    maxRows = Math.max(maxRows, refs.length);
+    return refs;
+  });
+
+  let hRow = `<row r="1">`;
+  CHART_FIELDS.forEach((f, i) => {
+    const [tsCol, valCol] = colPairs[i];
+    hRow += `<c r="${tsCol}1" t="inlineStr"><is><t>${f.title} - time</t></is></c>` +
+            `<c r="${valCol}1" t="inlineStr"><is><t>${f.title}</t></is></c>`;
+  });
+  hRow += `</row>`;
+
+  let body = "";
+  for (let r = 0; r < maxRows; r++) {
+    const rowN = r + 2;
+    let rowXml = `<row r="${rowN}">`;
+    CHART_FIELDS.forEach((f, i) => {
+      const refs = perField[i];
+      if (r >= refs.length) return;
+      const ref = refs[r];
+      const valCol = f.key === "interval" ? DAY_SHEET_COLS.interval : DAY_SHEET_COLS[f.key];
+      const [tsColOut, valColOut] = colPairs[i];
+      /* Formula AND cached value on every cell - real Excel output never
+         ships a formula alone (confirmed against a reference file), and
+         a renderer that doesn't recalculate on open (some OnlyOffice/
+         LibreOffice paths) would otherwise show these blank. */
+      /* Cached value must match what the day-sheet cell actually holds
+         (an Excel serial date now, not raw Unix seconds) - otherwise the
+         cache and the live formula would disagree the moment anything
+         recalculates. */
+      rowXml += `<c r="${tsColOut}${rowN}" s="2"><f>${dayCellRef(days, ref, TIMESTAMP_COL)}</f><v>${excelSerialDate(ref.ts)}</v></c>` +
+                `<c r="${valColOut}${rowN}"><f>${dayCellRef(days, ref, valCol)}</f><v>${ref.value}</v></c>`;
+    });
+    rowXml += `</row>`;
+    body += rowXml;
+  }
+
+  return {
+    xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n` +
+      `<sheetData>${hRow}${body}</sheetData>\n</worksheet>`,
+    colPairs,
+    maxRows,
+    perField,
+  };
+}
+
+/* Real, verified OOXML chart structure - generated with XlsxWriter and
+   unzipped to confirm the exact schema, not guessed from documentation
+   (the previous session's version of this function was never written at
+   all: every call to makeChartXml/makeDrawingXml threw ReferenceError). */
+function numCacheXml(values) {
+  const pts = values.map((v, i) => `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join("");
+  return `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${values.length}"/>${pts}</c:numCache>`;
+}
+
+function makeChartXml(title, axisTitle, seriesName, colorHex, catFormula, valFormula,
+                      catCache, valCache) {
+  /* Cache embedded alongside the reference, matching real Excel output -
+     a renderer that shows the chart before/without resolving cross-sheet
+     formulas (some OnlyOffice/LibreOffice paths) still has something
+     correct to draw. */
+  const catCacheXml = catCache ? numCacheXml(catCache) : "";
+  const valCacheXml = valCache ? numCacheXml(valCache) : "";
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<c:chart>
+<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>${title}</a:t></a:r></a:p></c:rich></c:tx><c:layout/></c:title>
+<c:plotArea><c:layout/>
+<c:lineChart><c:grouping val="standard"/>
+<c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>${seriesName}</c:v></c:tx>
+<c:spPr><a:ln><a:solidFill><a:srgbClr val="${colorHex}"/></a:solidFill></a:ln></c:spPr>
+<c:marker><c:symbol val="none"/></c:marker>
+<c:cat><c:numRef><c:f>${catFormula}</c:f>${catCacheXml}</c:numRef></c:cat>
+<c:val><c:numRef><c:f>${valFormula}</c:f>${valCacheXml}</c:numRef></c:val>
+</c:ser>
+<c:axId val="111111111"/><c:axId val="222222222"/>
+</c:lineChart>
+<c:catAx><c:axId val="111111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="222222222"/></c:catAx>
+<c:valAx><c:axId val="222222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="111111111"/><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${axisTitle}</a:t></a:r></a:p></c:rich></c:tx></c:title></c:valAx>
+</c:plotArea>
+<c:legend><c:legendPos val="b"/></c:legend>
+<c:plotVisOnly val="1"/>
+</c:chart>
+</c:chartSpace>`;
+}
+
+/* Anchors: [{rId, fromCol, fromRow, toCol, toRow}]. One drawing part can
+   anchor several charts on the same sheet - used to lay all 6 charts on
+   the Overview sheet in a 2-column grid. */
+function makeDrawingXml(anchors) {
+  const frames = anchors.map((a, i) =>
+    `<xdr:twoCellAnchor><xdr:from><xdr:col>${a.fromCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.fromRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${a.toCol}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.toRow}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${i + 2}" name="Chart ${i + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${a.rId}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`
+  ).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/spreadsheetml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n` +
+    `${frames}\n</xdr:wsDr>`;
+}
+
+function makeOverviewSheetXml(days, samples, stats) {
+  const dtStart = new Date(samples[0]?.timestamp * 1000 || 0).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  const dtEnd = new Date(samples[samples.length - 1]?.timestamp * 1000 || 0).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  const totalFaults = Object.values(stats.faultCounts).reduce((a, b) => a + b, 0);
+  const rows = [
+    ["Total samples", String(samples.length)],
+    ["Days covered", String(days.length)],
+    ["Window start", dtStart],
+    ["Window end", dtEnd],
+    ["Physical range", `${stats.minAngle.toFixed(2)} to ${stats.maxAngle.toFixed(2)} deg`],
+    ["Peak torque", `${stats.peakTorque.toFixed(2)} kg.cm`],
+    ["Peak current", `${stats.peakCurrent.toFixed(2)} A`],
+    ["Temperature range", `${stats.minTemp.toFixed(1)} - ${stats.maxTemp.toFixed(1)} C`],
+    ["Voltage range", `${stats.minVoltage.toFixed(2)} - ${stats.maxVoltage.toFixed(2)} V`],
+    ["Sampler stalls (>= 9s gap)", String(stats.stallCount)],
+    ["Max sampler interval", `${stats.maxInterval.toFixed(3)} s`],
+    ["Fault trips (any type)", String(totalFaults)],
+  ];
+  let body = `<row r="1"><c r="A1" t="inlineStr"><is><t>Servo Telemetry Export - Summary</t></is></c></row>`;
+  rows.forEach(([k, v], idx) => {
+    const r = idx + 3;
+    body += `<row r="${r}"><c r="A${r}" t="inlineStr"><is><t>${k}</t></is></c>` +
+            `<c r="B${r}" t="inlineStr"><is><t>${v}</t></is></c></row>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n` +
+    `<sheetData>${body}</sheetData>\n<drawing r:id="rId1"/>\n</worksheet>`;
+}
+
+async function generateExcelXlsxZip(samples, fromTs, toTs, onProgress) {
+  const stats = computeStatsAndIntervals(samples);
+  const days = groupSamplesByDay(samples);
+  const chartData = makeChartDataSheetXml(days);
+  const overviewXml = makeOverviewSheetXml(days, samples, stats);
+  /* Day-sheet XML is NOT built here - each is built lazily, one at a
+     time, inside the filesMap entries below, so createZipArchive can
+     compress and discard one day's text before building the next
+     rather than holding every day's raw XML in memory simultaneously. */
+
+  const chartXmls = CHART_FIELDS.map((f, i) => {
+    const [tsCol, valCol] = chartData.colPairs[i];
+    const lastRow = chartData.maxRows + 1;
+    const refs = chartData.perField[i];
+    return makeChartXml(f.title, f.axis, f.title, f.color,
+                        `ChartData!$${tsCol}$2:$${tsCol}$${lastRow}`,
+                        `ChartData!$${valCol}$2:$${valCol}$${lastRow}`,
+                        refs.map((r) => excelSerialDate(r.ts)), refs.map((r) => r.value));
+  });
+  const drawing1Xml = makeDrawingXml(
+    chartXmls.map((_, i) => ({ rId: `rId${i + 1}`, fromCol: (i % 2) * 8, fromRow: 1 + Math.floor(i / 2) * 15,
+                               toCol: (i % 2) * 8 + 7, toRow: 1 + Math.floor(i / 2) * 15 + 14 })));
+
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1">
+  <numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm:ss"/>
+</numFmts>
+<fonts count="2">
+  <font><sz val="10"/><name val="Calibri"/></font>
+  <font><b/><sz val="10"/><name val="Calibri"/></font>
+</fonts>
+<fills count="1"><fill><patternFill patternType="none"/></fill></fills>
+<borders count="1"><border/></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="3">
+  <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+  <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+  <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+</cellXfs>
+</styleSheet>`;
+
+  /* Sheet order: Overview (charts), ChartData (hidden, formula-fed),
+     then one sheet per day. Workbook-level rIds and part filenames are
+     assigned in that order, 1-based. */
+  const daySheetCount = days.length;
+  const overviewSheetNum = 1;
+  const chartDataSheetNum = 2;
+  const firstDaySheetNum = 3;
+
+  const contentTypeOverrides = [
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>`,
+    `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>`,
+  ];
+  for (let i = 1; i <= 2 + daySheetCount; i++) {
+    contentTypeOverrides.push(`<Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+  }
+  contentTypeOverrides.push(`<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
+  chartXmls.forEach((_, i) => contentTypeOverrides.push(`<Override PartName="/xl/charts/chart${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`));
+
+  const workbookSheets = [
+    `<sheet name="Overview" sheetId="1" r:id="rId${overviewSheetNum}"/>`,
+    `<sheet name="ChartData" sheetId="2" r:id="rId${chartDataSheetNum}" state="hidden"/>`,
+  ];
+  days.forEach((d, i) => {
+    workbookSheets.push(`<sheet name="${d.dateStr}" sheetId="${3 + i}" r:id="rId${firstDaySheetNum + i}"/>`);
+  });
+
+  const workbookRels = [];
+  for (let i = 1; i <= 2 + daySheetCount; i++) {
+    workbookRels.push(`<Relationship Id="rId${i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i}.xml"/>`);
+  }
+  workbookRels.push(`<Relationship Id="rId${3 + daySheetCount}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`);
+
+  const fileEntries = [
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n` +
+      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n` +
+      `<Default Extension="xml" ContentType="application/xml"/>\n` +
+      contentTypeOverrides.join("\n") + `\n</Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`],
+    ["xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n` +
+      `<sheets>\n${workbookSheets.join("\n")}\n</sheets>\n` +
+      /* ChartData's cells are formulas with no cached <v> - force a full
+         recalc on open so they (and the charts reading them) are
+         populated immediately, not left blank until manual recalc. */
+      `<calcPr calcId="0" fullCalcOnLoad="1"/>\n</workbook>`],
+    ["xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n` +
+      workbookRels.join("\n") + `\n</Relationships>`],
+    [`xl/worksheets/_rels/sheet${overviewSheetNum}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>`],
+    ["xl/drawings/_rels/drawing1.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n` +
+      chartXmls.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${i + 1}.xml"/>`).join("\n") +
+      `\n</Relationships>`],
+    ["xl/styles.xml", stylesXml],
+    [`xl/worksheets/sheet${overviewSheetNum}.xml`, overviewXml],
+    [`xl/worksheets/sheet${chartDataSheetNum}.xml`, chartData.xml],
+    ["xl/drawings/drawing1.xml", drawing1Xml],
+  ];
+  days.forEach((d, i) => {
+    fileEntries.push([`xl/worksheets/sheet${firstDaySheetNum + i}.xml`, () => makeDaySheetXml(d)]);
+  });
+  chartXmls.forEach((xml, i) => {
+    fileEntries.push([`xl/charts/chart${i + 1}.xml`, xml]);
+  });
+
+  return await createZipArchive(fileEntries, onProgress);
+}
+
+async function doExport() {
+  clearNotice();
+  const fromEl = $("exportFrom");
+  const toEl = $("exportTo");
+
+  let fromTs = 0;
+  let toTs = Math.floor(Date.now() / 1000);
+
+  if (fromEl && fromEl.value) {
+    const d = new Date(fromEl.value);
+    if (!isNaN(d.getTime())) fromTs = Math.floor(d.getTime() / 1000);
+  } else {
+    fromTs = toTs - 24 * 3600;
+  }
+
+  if (toEl && toEl.value) {
+    const d = new Date(toEl.value);
+    if (!isNaN(d.getTime())) toTs = Math.floor(d.getTime() / 1000);
+  }
+
+  if (fromTs >= toTs) {
+    sayError(new Error("Start time must be earlier than end time"));
+    return;
+  }
+
+  const btn = $("exportBtn");
+  const fillEl = $("exportFill");
+  const labelEl = $("exportLabel");
+  const origText = labelEl.textContent;
+
+  btn.classList.add("exporting");
+  btn.disabled = true;
+  fillEl.style.width = "0%";
+  labelEl.textContent = "Downloading stream…";
+
+  try {
+    const url = API + "/telemetry/binary?from=" + fromTs + "&to=" + toTs;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Export failed with HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let receivedBytes = 0;
+    let totalUncompressedBytes = Math.max(1, (toTs - fromTs) * 18 + 12);
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      receivedBytes += value.length;
+
+      if (chunks.length === 1 && value.length >= 12) {
+        const view = new DataView(value.buffer, value.byteOffset, value.byteLength);
+        const sampleCount = view.getUint32(8, true);
+        if (sampleCount > 0) {
+          totalUncompressedBytes = (sampleCount * 18) + 12;
+        }
+      }
+
+      const recKb = Math.round(receivedBytes / 1024);
+      const totKb = Math.round(totalUncompressedBytes / 1024);
+      /* Stage 1 of 3: downloading the compact stream, 0-50%. */
+      const pct = Math.min(50, Math.round((receivedBytes / totalUncompressedBytes) * 50));
+
+      labelEl.textContent = "Downloading data… " + recKb + " / " + totKb + " KB (" + pct + "%)";
+      fillEl.style.width = pct + "%";
+    }
+
+    /* Stage 2 of 3: parsing the binary payload into samples. */
+    labelEl.textContent = "Parsing telemetry…";
+    fillEl.style.width = "52%";
+
+    const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
+    const fullBuffer = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      fullBuffer.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const samples = parseBinaryTelemetry(fullBuffer.buffer);
+
+    /* Stage 3 of 3: building the workbook - real progress per file (each
+       day sheet, plus charts/overview/etc), not a frozen percentage. A
+       30-day export takes well over a minute here, so this is the stage
+       that actually needed honest feedback. */
+    labelEl.textContent = "Building workbook…";
+    fillEl.style.width = "55%";
+    const xlsxBlob = await generateExcelXlsxZip(samples, fromTs, toTs,
+      (done, total, filename) => {
+        const pct = 55 + Math.round((done / total) * 40);
+        fillEl.style.width = pct + "%";
+        labelEl.textContent = `Building workbook… ${filename.split("/").pop()} (${done}/${total})`;
+      });
+
+    fillEl.style.width = "100%";
+    labelEl.textContent = "Saving file…";
+
+    const downloadUrl = window.URL.createObjectURL(xlsxBlob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = downloadUrl;
+
+    const fromDateStr = new Date(fromTs * 1000).toISOString().slice(0, 10);
+    const toDateStr = new Date(toTs * 1000).toISOString().slice(0, 10);
+    a.download = `servo_telemetry_${fromDateStr}_to_${toDateStr}.xlsx`;
+
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    a.remove();
+  } catch (err) {
+    sayError(err);
+  } finally {
+    btn.classList.remove("exporting");
+    btn.disabled = false;
+    labelEl.textContent = origText;
+  }
+}
 
 function nudge(inputId, delta) {
   const input = $(inputId);
@@ -696,37 +1459,9 @@ function nudge(inputId, delta) {
   input.value = stepped.toFixed(2);
 }
 
-/* Wires a control, and refuses a second press until the first answers.
- *
- * Every handler below awaits an HTTP round trip that can take up to the
- * Bridge's 10 s timeout. The only feedback was flash()'s 400 ms blink,
- * and success is deliberately silent - so for the remaining nine
- * seconds a command in flight looked exactly like one that had done
- * nothing. The operator pressed again, and the second press opened
- * another connection, spending another of the relay's six W5500 slots.
- * The UI's answer to slowness was feeding its cause (D15, D13).
- *
- * The guard lives here rather than in the handlers because this is the
- * one place all nine are wired, so a tenth added later inherits it.
- * `disabled` is what stops the press: it blocks the event outright
- * rather than relying on the handler to check, and it is what the
- * browser already renders as "not available now".
- *
- * The screen is a mouse-driven operator screen, confirmed 8 August
- * 2026 - so hover affordances are safe here. Revisit if that changes:
- * on a touch screen a tap leaves hover state stuck and the busy
- * styling would have to stand on its own.
- *
- * The guard covers the WHOLE handler, dialogs included, so a second
- * press cannot open a second confirm dialog on top of the first.
- *
- * The slow-command notice is NOT here. It belongs to the request, not
- * to the press: three of these handlers open a dialog first, so a timer
- * started on the click announced "the controller has not answered"
- * while the operator was still reading the confirmation - and the thing
- * that had not answered was the operator. It lives in request(). */
 function bind(id, handler) {
   const el = $(id);
+  if (!el) return;
   let inFlight = false;
   el.addEventListener("click", async () => {
     if (inFlight) return;              /* the second press never leaves */
@@ -755,7 +1490,12 @@ function initUi() {
   bind("saveBtn", doSave);
   bind("useBtn", doUse);
   bind("removeBtn", doRemove);
-  bind("exportCube", doExport);
+  bind("exportBtn", doExport);
+
+  setExportPreset("24h");
+  document.querySelectorAll(".preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setExportPreset(btn.dataset.range));
+  });
 
   document.querySelectorAll(".step").forEach((btn) => {
     btn.addEventListener("click", () =>

@@ -9,6 +9,7 @@ explicitly in main.py.
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.version)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.include_router(servo.router)
     app.include_router(stream.router)
     app.include_router(zeros.router)

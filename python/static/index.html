@@ -46,10 +46,34 @@
           </div>
         </section>
 
-        <section class="card stretch" id="activity">
-          <h2>Recent activity</h2>
-          <div class="scrolllist" id="eventList"></div>
-        </section>
+        <div style="display: flex; gap: var(--gap); flex: 1; min-height: 0;">
+          <section class="card stretch" id="activity" style="flex: 1.2;">
+            <h2>Recent activity</h2>
+            <div class="scrolllist" id="eventList"></div>
+          </section>
+
+          <section class="card stretch" id="exportSection" style="flex: 0.8; display: flex; flex-direction: column;">
+            <h2>Telemetry Export</h2>
+            <div class="preset-bar">
+              <button class="preset-btn" data-range="1h">1H</button>
+              <button class="preset-btn" data-range="6h">6H</button>
+              <button class="preset-btn active" data-range="24h">24H</button>
+              <button class="preset-btn" data-range="7d">7D</button>
+            </div>
+            <div class="range-inputs">
+              <div class="range-field">
+                <label for="exportFrom">Start (Local Time)</label>
+                <input type="datetime-local" id="exportFrom">
+              </div>
+              <div class="range-field">
+                <label for="exportTo">End (Local Time)</label>
+                <input type="datetime-local" id="exportTo">
+              </div>
+            </div>
+            <div style="flex: 1;"></div>
+            <button class="btn small export-btn" id="exportBtn"><span class="export-fill" id="exportFill"></span><span id="exportLabel">Download Excel (.xlsx)</span></button>
+          </section>
+        </div>
       </div>
 
       <div class="col">
@@ -82,7 +106,6 @@
           <div class="cubes">
             <button class="cube" id="lockCube">Lock</button>
             <button class="cube" id="calCube">Calibrate</button>
-            <button class="cube" id="exportCube">Export 24h CSV</button>
           </div>
         </section>
 
@@ -126,7 +149,6 @@
     </div>
   </dialog>
 
-  <script src="/app.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

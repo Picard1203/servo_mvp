@@ -62,6 +62,9 @@ class BridgeRelay:
         try:
             sock = socket.create_connection(
                 (self._settings.api_host, self._settings.api_port), timeout=5)
+            # Clear the connect timeout so recv() in _pump_replies blocks
+            # indefinitely while FastAPI generates large responses (e.g. XLSX).
+            sock.settimeout(None)
         except OSError as exc:
             logger.error("FastAPI unreachable for client",
                          metadata={"event": "relay.connect.failed",

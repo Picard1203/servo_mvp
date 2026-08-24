@@ -37,6 +37,17 @@ class SqliteTelemetryRepository:
                  int(sample.sensor_fault), int(sample.angle_fault)))
             self._db.connection.commit()
 
+    def count_range(self, ts_from: float, ts_to: float, limit: int) -> tuple[int, float]:
+        """Counts samples in range and returns count and base timestamp."""
+        cursor = self._db.connection.execute(
+            "SELECT COUNT(*), MIN(timestamp) FROM telemetry "
+            "WHERE timestamp BETWEEN ? AND ?", (ts_from, ts_to))
+        row = cursor.fetchone()
+        c = row[0] if row and row[0] is not None else 0
+        c = min(c, limit)
+        m = row[1] if row and row[1] is not None else ts_from
+        return c, m
+
     def query(self, ts_from: float, ts_to: float,
               limit: int) -> Iterator[TelemetrySample]:
         """Yields samples inside a time range, oldest first.

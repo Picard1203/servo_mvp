@@ -78,7 +78,12 @@ class Settings(BaseSettings):
         sampler_interval_seconds: Telemetry persistence period.
         telemetry_retention_days: Telemetry rows older than this are purged.
         telemetry_purge_interval_seconds: How often retention runs.
-        export_max_rows: Safety cap for a single CSV export.
+        export_max_rows: Defensive ceiling for a single binary export
+            query, not a practical limit - the day-per-sheet XLSX design
+            removes the reason to cap this near the real data volume.
+            Set well above what 30-day retention can ever hold
+            (5.18M rows at 0.5s sampling), only to stop a truly
+            pathological request (e.g. an accidental from=0).
     """
 
     # ABSOLUTE path, anchored to this module. A relative "env_file" is
@@ -135,7 +140,7 @@ class Settings(BaseSettings):
     sampler_interval_seconds: float = 0.5
     telemetry_retention_days: int = 30
     telemetry_purge_interval_seconds: float = 3600.0
-    export_max_rows: int = 50_000
+    export_max_rows: int = 10_000_000
 
 
 @lru_cache

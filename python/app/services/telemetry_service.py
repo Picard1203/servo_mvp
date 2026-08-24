@@ -1,7 +1,7 @@
-"""Telemetry: periodic sampling, retention, and CSV export."""
+"""Telemetry: periodic sampling, retention, and binary export."""
 
-import csv
 import io
+import struct
 from threading import Thread
 from time import monotonic, sleep, time
 from typing import Iterator
@@ -13,10 +13,20 @@ from app.models.entities import TelemetrySample
 from app.repositories.abstract.telemetry_repository import TelemetryRepository
 from app.services.servo_state import ServoStateStore
 
-_CSV_COLUMNS = ("timestamp", "raw_counts", "output_deg", "moving", "locked",
-                "temperature_c", "voltage_v", "current_a", "torque_kgcm",
-                "overload", "overcurrent", "overheat", "voltage_fault",
-                "sensor_fault", "angle_fault")
+# Binary telemetry payload struct format:
+# Base Header: <dI (8-byte base timestamp, 4-byte sample count)
+# Per Sample (18 bytes):
+# H: raw_counts (uint16)
+# h: output_deg * 100 (int16)
+# h: temperature_c * 100 (int16)
+# H: voltage_v * 100 (uint16)
+# H: current_a * 100 (uint16)
+# h: torque_kgcm * 100 (int16)
+# B: flags bitmask
+# I: dt_ms (uint32)
+# B: pad
+SAMPLE_STRUCT = struct.Struct("<HhhhhhBIB")
+HEADER_STRUCT = struct.Struct("<dI")
 
 
 class TelemetryService:
@@ -41,40 +51,57 @@ class TelemetryService:
                     extra={"interval_s":
                            self._settings.sampler_interval_seconds})
 
-    def export_csv(self, ts_from: float, ts_to: float) -> Iterator[str]:
-        """Streams a CSV of samples in the range, capped for the relay.
+    def export_binary_stream(self, ts_from: float, ts_to: float) -> Iterator[bytes]:
+        """Packs telemetry samples in range into a compact binary byte stream.
 
         Args:
             ts_from: Range start, unix timestamp.
             ts_to: Range end, unix timestamp.
 
         Returns:
-            An iterator of CSV text chunks, header first.
+            An iterator over the packed binary bytes.
         """
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(_CSV_COLUMNS)
-        yield buffer.getvalue()
+        count, base_ts = self._telemetry.count_range(ts_from, ts_to, self._settings.export_max_rows)
+        yield HEADER_STRUCT.pack(base_ts, count)
 
-        rows = 0
-        for sample in self._telemetry.query(ts_from, ts_to,
-                                            self._settings.export_max_rows):
-            buffer.seek(0)
-            buffer.truncate()
-            writer.writerow((sample.timestamp, sample.raw_counts, sample.output_deg,
-                             int(sample.moving), int(sample.locked),
-                             sample.temperature_c, sample.voltage_v,
-                             sample.current_a, sample.torque_kgcm,
-                             int(sample.overload), int(sample.overcurrent),
-                             int(sample.overheat), int(sample.voltage_fault),
-                             int(sample.sensor_fault),
-                             int(sample.angle_fault)))
-            rows += 1
-            yield buffer.getvalue()
+        # Batch samples into one relay write instead of one per sample - board-
+        # validated 2026-08-23 (see BACKLOG.md D6): real gain, but the Bridge's
+        # 224-byte-per-message ceiling (RELAY_NOTES.md S5) still dominates.
+        _BATCH = 500
+        samples = self._telemetry.query(ts_from, ts_to, self._settings.export_max_rows)
+        buf = bytearray()
+        for sample in samples:
+            dt_ms = int(max(0.0, sample.timestamp - base_ts) * 1000)
+            flags = (
+                (1 if sample.moving else 0) |
+                ((1 if sample.locked else 0) << 1) |
+                ((1 if sample.overload else 0) << 2) |
+                ((1 if sample.overcurrent else 0) << 3) |
+                ((1 if sample.overheat else 0) << 4) |
+                ((1 if sample.voltage_fault else 0) << 5) |
+                ((1 if sample.sensor_fault else 0) << 6) |
+                ((1 if sample.angle_fault else 0) << 7)
+            )
+            buf += SAMPLE_STRUCT.pack(
+                max(0, min(65535, int(sample.raw_counts))),
+                max(-32768, min(32767, int(round(sample.output_deg * 100)))),
+                max(-32768, min(32767, int(round(sample.temperature_c * 100)))),
+                max(0, min(65535, int(round(sample.voltage_v * 100)))),
+                max(0, min(65535, int(round(sample.current_a * 100)))),
+                max(-32768, min(32767, int(round(sample.torque_kgcm * 100)))),
+                flags,
+                dt_ms,
+                0
+            )
+            if len(buf) >= _BATCH * SAMPLE_STRUCT.size:
+                yield bytes(buf)
+                buf.clear()
+        if buf:
+            yield bytes(buf)
 
-        logger.info("telemetry export served",
+        logger.info("telemetry binary export served",
                     metadata={"event": "telemetry.exported"},
-                    extra={"rows": rows, "ts_from": ts_from, "ts_to": ts_to})
+                    extra={"rows": count, "ts_from": ts_from, "ts_to": ts_to})
 
     def _run(self) -> None:
         """Samples until the process ends, at the configured interval.

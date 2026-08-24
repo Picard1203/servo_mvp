@@ -92,36 +92,53 @@ class TestSampling:
 
 
 class TestExport:
-    """CSV export contract."""
+    """Binary telemetry export contract.
 
-    EXPECTED_HEADER = ("timestamp,raw_counts,output_deg,moving,locked,"
-                      "temperature_c,voltage_v,current_a,torque_kgcm,"
-                      "overload,overcurrent,overheat,voltage_fault,"
-                      "sensor_fault,angle_fault")
+    XLSX assembly is client-side (app.js) by design - see BACKLOG.md R5 -
+    so the server's contract is the compact binary stream only: a header
+    (base timestamp, sample count) followed by one 18-byte packed record
+    per sample. These tests replace an earlier version written against a
+    server-side export_xlsx() that was never implemented (see D31/R5).
+    """
 
-    def test_header_contract(self, service):
-        chunks = list(service.export_csv(0, time.time()))
-        assert chunks[0].strip() == self.EXPECTED_HEADER
+    def test_header_and_stream_length(self, backend, service, sim):
+        from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
+        service._sample_once()
+        service._sample_once()
+        chunks = list(service.export_binary_stream(0, time.time() + 1))
+        stream = b"".join(chunks)
+        base_ts, count = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
+        assert count == 2
+        assert base_ts > 0
+        assert len(stream) == HEADER_STRUCT.size + count * SAMPLE_STRUCT.size
 
     def test_rows_and_flag_encoding(self, backend, service, sim):
+        from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
         sim.simulate_overload()
         service._sample_once()
         sim.command_move(sim.read_raw_counts(), 1000, 50)  # clears fault
         service._sample_once()
-        chunks = list(service.export_csv(0, time.time() + 1))
-        rows = [c.strip() for c in chunks[1:]]
-        assert len(rows) == 2
-        assert rows[0].endswith(",1,0,0,0,0,0")   # overload=1
-        assert rows[1].endswith(",0,0,0,0,0,0")
+        stream = b"".join(service.export_binary_stream(0, time.time() + 1))
+        _, count = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
+        assert count == 2
+        offset = HEADER_STRUCT.size
+        first = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
+        flags = first[6]
+        assert flags & 0b00000100  # bit 2: overload set on the first sample
+        offset += SAMPLE_STRUCT.size
+        second = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
+        assert not (second[6] & 0b00000100)  # cleared by the second sample
 
     def test_range_limits_rows(self, backend, service):
+        from app.services.telemetry_service import HEADER_STRUCT
         service._sample_once()
         time.sleep(0.05)
         boundary = time.time()
         time.sleep(0.05)
         service._sample_once()
-        chunks = list(service.export_csv(0, boundary))
-        assert len(chunks) == 2   # header + first row only
+        stream = b"".join(service.export_binary_stream(0, boundary))
+        _, count = HEADER_STRUCT.unpack(stream[:HEADER_STRUCT.size])
+        assert count == 1  # only the sample before the boundary
 
 
 class TestRetention:

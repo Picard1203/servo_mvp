@@ -40,10 +40,11 @@ class SqliteTelemetryRepository:
 
     def count_range(self, ts_from: float, ts_to: float, limit: int) -> tuple[int, float]:
         """Counts samples in range and returns count and base timestamp."""
-        cursor = self._db.connection.execute(
-            "SELECT COUNT(*), MIN(timestamp) FROM telemetry "
-            "WHERE timestamp BETWEEN ? AND ?", (ts_from, ts_to))
-        row = cursor.fetchone()
+        with self._db.write_lock:
+            cursor = self._db.connection.execute(
+                "SELECT COUNT(*), MIN(timestamp) FROM telemetry "
+                "WHERE timestamp BETWEEN ? AND ?", (ts_from, ts_to))
+            row = cursor.fetchone()
         c = row[0] if row and row[0] is not None else 0
         c = min(c, limit)
         m = row[1] if row and row[1] is not None else ts_from
@@ -53,6 +54,14 @@ class SqliteTelemetryRepository:
               limit: int) -> Iterator[TelemetrySample]:
         """Yields samples inside a time range, oldest first.
 
+        Fetches the whole matching set while holding the lock, then
+        yields from that list - the connection is shared across threads
+        with no per-row isolation, so a generator that kept the lock
+        held across `yield` (blocking every writer for the caller's
+        entire consumption time) or dropped it before finishing the
+        fetch (the unguarded-read bug this replaced) were the only two
+        other options.
+
         Args:
             ts_from: Range start, unix timestamp.
             ts_to: Range end, unix timestamp.
@@ -61,10 +70,12 @@ class SqliteTelemetryRepository:
         Returns:
             An iterator over matching samples.
         """
-        cursor = self._db.connection.execute(
-            "SELECT * FROM telemetry WHERE timestamp BETWEEN ? AND ?"
-            " ORDER BY timestamp ASC LIMIT ?", (ts_from, ts_to, limit))
-        for row in cursor:
+        with self._db.write_lock:
+            rows = self._db.connection.execute(
+                "SELECT * FROM telemetry WHERE timestamp BETWEEN ? AND ?"
+                " ORDER BY timestamp ASC LIMIT ?",
+                (ts_from, ts_to, limit)).fetchall()
+        for row in rows:
             yield TelemetrySample(
                 timestamp=row["timestamp"], raw_counts=row["raw_counts"],
                 output_deg=row["output_deg"], moving=bool(row["moving"]),

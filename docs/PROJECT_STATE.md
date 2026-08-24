@@ -30,7 +30,7 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-222 Python tests (confirmed after Session 5's backend work; line coverage
+223 Python tests (confirmed after Session 6's D10 fix; line coverage
 not remeasured this session — see backlog D24 on why a stale coverage
 figure is worse than none)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
@@ -44,6 +44,8 @@ Bridge contract checker: both sides agree
 **A real corruption bug shipped with the first "done" claim, same session.** The rebuilt export's zip central directory had two fields at swapped byte offsets — every generated `.xlsx` opened fine in lenient tools (`unzip -t`) but was rejected outright by strict ones (Python's `zipfile`, `openpyxl`) and, live, by the operator's own OnlyOffice. Found because the operator actually opened a real export rather than trusting "board-validated," fixed the same session, re-verified with the strict tools this time. **R5's mechanism is now genuinely validated cross-app — but real UX gaps remain (unreadable timestamp column, no actual day/range selector despite the interactivity mechanism existing, an over-compressed flags column, no LCARS styling) and are deferred to next session, see BACKLOG.md R5's gap table.**
 
 **23 August 2026 — Session 5 closed that whole gap table, plus two new fields the operator asked for live, mid-session: target angle and servo (pre-ratio) angle, both captured, persisted, and shown in the UI's own target marker/Δ readout and in the export.** Also shipped: angle-correlated charts (mechanical team's request — a genuine `c:scatterChart`, verified against a reference, because a category axis cannot carry a real numeric angle axis), a typed chart-range selector confirmed live to actually narrow the charts, decoded flags, full column widths, LCARS styling, and a per-day summary table. One real regression happened and was caught the same session: an automatic date-axis tick spacing that looked fine against synthetic test data produced an illegible label smear against real board data — reverted to an explicitly computed tick interval, re-verified live. R5's remaining gap (no persisted move/event narrative) is now the only open row in its table. Full detail in `BACKLOG.md`'s R5 entry — this is the distilled version.
+
+**24 August 2026 — Session 6, first half: D10 closed for the real reason.** The prior writeup's theory (a race on the active zero being edited) didn't survive a check of the actual logs — no zero write happened near either crash, and the schema rules out a stored `NULL`. The real cause: `Database` shares one SQLite connection across every thread and only serialized writes, not reads; reproduced with a stress test that broke the *unlocked reads* using nothing but ordinary telemetry writes, then confirmed the fix (every statement, not just writes, through the same lock) holds under 185k+ concurrent reads. Full record, including the twin-path sweep that found the same gap in four more places, is in `CLOSED.md`. **Session 6's second half is R2 (motor isolation)** — see `BACKLOG.md`'s START HERE row 6; a `/grilling` pass on its open design questions is queued first, and can run as a fresh session.
 
 **Batch 2 landed the same day** — D3, D13 closed, desk work only (see "Known
 gaps" below: the sketch side of D3 has never been compiled or flashed). It

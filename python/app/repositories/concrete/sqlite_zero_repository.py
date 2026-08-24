@@ -37,8 +37,9 @@ class SqliteZeroRepository:
         Returns:
             All stored zeros.
         """
-        rows = self._db.connection.execute(
-            "SELECT * FROM zeros ORDER BY id DESC").fetchall()
+        with self._db.write_lock:
+            rows = self._db.connection.execute(
+                "SELECT * FROM zeros ORDER BY id DESC").fetchall()
         return [self._to_entity(row) for row in rows]
 
     def get(self, zero_id: int) -> Optional[ZeroReference]:
@@ -50,8 +51,9 @@ class SqliteZeroRepository:
         Returns:
             The entity, or None when missing.
         """
-        row = self._db.connection.execute(
-            "SELECT * FROM zeros WHERE id = ?", (zero_id,)).fetchone()
+        with self._db.write_lock:
+            row = self._db.connection.execute(
+                "SELECT * FROM zeros WHERE id = ?", (zero_id,)).fetchone()
         return self._to_entity(row) if row is not None else None
 
     def delete(self, zero_id: int) -> bool:
@@ -82,9 +84,9 @@ class SqliteZeroRepository:
             self._db.connection.execute(
                 "UPDATE zeros SET is_active = (id = ?)", (zero_id,))
             self._db.connection.commit()
-        row = self._db.connection.execute(
-            "SELECT COUNT(*) AS n FROM zeros WHERE id = ? AND is_active = 1",
-            (zero_id,)).fetchone()
+            row = self._db.connection.execute(
+                "SELECT COUNT(*) AS n FROM zeros WHERE id = ? AND is_active = 1",
+                (zero_id,)).fetchone()
         return row["n"] > 0
 
     def get_active(self) -> Optional[ZeroReference]:
@@ -93,8 +95,9 @@ class SqliteZeroRepository:
         Returns:
             The active zero, or None.
         """
-        row = self._db.connection.execute(
-            "SELECT * FROM zeros WHERE is_active = 1").fetchone()
+        with self._db.write_lock:
+            row = self._db.connection.execute(
+                "SELECT * FROM zeros WHERE is_active = 1").fetchone()
         return self._to_entity(row) if row is not None else None
 
     def upsert_datum(self, raw_counts: int, created_at: str) -> ZeroReference:

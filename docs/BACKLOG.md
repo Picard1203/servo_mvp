@@ -20,8 +20,8 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
 | **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
-| **6 — next** | **D10's real root cause** (a real stack trace exists now) and **Batch 4's motor isolation (R2)** — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. | yes |
-| **7 — after Session 6** | **T14** — the maintenance pass: triage the ten items an audit found with no batch at all (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13 — the "Not yet slotted" table, end of the Ordering section), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
+| **6 — D10 half DONE, 24 Aug 2026; R2 next, can start fresh** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** This can start in a new chat; nothing from Session 6's D10 work is a prerequisite for it. | R2: yes, for the operator-visible part |
+| **7 — after Session 6** | **T14** — the maintenance pass: triage the unslotted items ("Not yet slotted" table, end of the Ordering section — now twelve: the original ten plus **D32** and **T15**, both raised 24 August 2026 during Session 6), and sweep every index/summary table in the docs for the same kind of drift (an item closed or moved without every place that lists it being updated). Desk work, deliberately scheduled rather than done by accident the way this session found its own gaps. | no |
 
 **Read `docs/BACKLOG.md` T14's entry in full before starting Session 7** — the
 actual punch list, this row is just a pointer to it.
@@ -394,6 +394,8 @@ just surfaced so the next planning pass starts from the truth:
 | D30 | — | Code fixed (the timezone bug that made a bad soak read "clean"); regression test still needed |
 | T12 | medium | Decide the status of `tools/check_client_behaviour.js` |
 | T13 | medium | Distil the remaining documents |
+| D32 | unknown | Arrow keys on Angle/Speed inputs step by an odd amount — raised 24 Aug, not yet reproduced |
+| T15 | medium | Code-level docs/comments called unprofessional and token-costly — contradicts current `CONVENTIONS.md`, needs a decision first |
 
 **What is not in any batch is as important as what is:** if a batch slips, the
 cut line in `PROJECT_STATE.md` says what ships anyway.
@@ -421,6 +423,7 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D18** | A failed CSV export navigates the operator out of the application | 11 August 2026 |
 | **D22** | The only export control is fixed at 24 hours | 11 August 2026 · R5's delivery path |
 | **D31** | Telemetry export drops instantly with "controller busy" | 23 August 2026 · real cause was a client-side `ReferenceError`, not the Pydantic hypothesis — see `CLOSED.md` |
+| **D10** | `logger.exception` swallows the exception; recurred as an unexplained sampler crash | 24 August 2026 · Session 6 · real cause was every read on the shared SQLite connection running unlocked, not a zero-table race — see `CLOSED.md` |
 
 ---
 
@@ -521,6 +524,24 @@ with the fix produced the real numbers now in D4 and R1.
 local-timezone cutoff but inside the UTC one, asserting it's still counted.
 
 **Related:** D24, D3 (introduced the MCU log this bug hides).
+
+---
+
+### D32 — Arrow keys on the Angle/Speed inputs step by an odd amount
+**Status:** open, not yet investigated · **Severity:** unknown · **Raised by:**
+the operator, 24 August 2026, pending the post-R2 triage session
+
+Pressing Left/Right (or Up/Down) inside the MOVE panel's ANGLE or SPEED number
+field steps the value by an amount that reads as arbitrary rather than a clean
+increment — screenshot from the session showed the fields sitting at `89.94`
+deg and `34.98` deg/s after arrow-key use, not round numbers. Not yet
+reproduced or root-caused: could be the input's own `step` attribute, a
+JS handler doing arithmetic in output-degrees against a non-round
+servo-to-output ratio, or floating-point drift accumulating over repeated
+presses. Needs a live repro with an exact press-by-press value log before
+diagnosing.
+
+**Related:** none identified yet — first pass needed.
 
 ---
 
@@ -652,72 +673,6 @@ count 2049, mid-travel, and it behaves correctly. The `AUDIT.md` warning that it
 **Acceptance:** the deployed board cannot run against the simulator by accident.
 Either the manual step is removed, or startup refuses to proceed silently — a
 warning in a log nobody reads is what allowed this to persist.
-
----
-
-### D10 — `logger.exception` swallows the exception
-**Status:** half done — **the logging is fixed; the fault itself named itself,
-23 August 2026** · **Severity:** medium · **Found by:** a live board run
-
-**Fixed 7 August 2026.** The cause was the Logger461 stand-in in `main.py`:
-its `exception()` was a straight copy of `error()`, and attaching the exception
-is the entire difference between the two. It now records the exception type, its
-message and the traceback, and the console prints the traceback under the record
-instead of flattening it into the single-line format.
-
-**The test stub in `conftest.py` had the identical gap**, so a test asserting on
-a cause would have passed against a stub that dropped it exactly as production
-did. Both fixed together — this is the twin-path pattern for the fourth time in
-this repository.
-
-**It happened again, 23 August 2026, twice (13:02:22, 13:39:55) — this time with
-a full trace, exactly as this entry predicted:**
-
-```
-TypeError: unsupported operand type(s) for -: 'int' and 'NoneType'
-  servo_state.py:276  servo_deg = ((raw_counts - self._baseline_counts(active))
-  servo_state.py:263  _active_counts() -> self._baseline_counts(self._zeros.get_active())
-```
-
-`_baseline_counts()` is typed `-> int` and both its branches (`active.raw_counts`
-or `self._counts_per_turn // 2`) return one — the type hint is not a lie, so
-`active.raw_counts` itself was `None` at the moment of the call. **Checked the
-live `zeros` table: the active zero ("datum") has `raw_counts=2046`, a valid
-int, not null.** So this is not corrupted stored data — it is a transient
-in-memory state, most likely a race around `ZeroStore.get_active()` returning
-a reference mid-mutation (a zero being changed/replaced) rather than a stable
-snapshot. Not investigated further this session — the sampler skips the sample
-and continues, which is the correct degrade, but every skip is a gap in
-exactly the data R5's export exists to deliver.
-
-**Still open: the actual fault, now with a real lead instead of no evidence.**
-Next step is reading `ZeroStore`'s active-zero mutation path for a window where
-a `ZeroReference` can be read with a still-unset `raw_counts`, not reproducing
-blind.
-
-**Original report follows.**
-
-One `ERROR telemetry sampling failed` was recorded at 21:37:58 on 7 August 2026.
-It cost one skipped sample — the only sampler gap over 2 s in the whole run.
-
-**The cause cannot be determined, because the record contains no exception text
-and no traceback.** `telemetry_service.py:91` calls `logger.exception(...)`, and
-what reached both the JSONL file and the container log was the message alone
-with `extra: {}`.
-
-So the system logged that something failed, and nothing about what. That is
-worse than not logging it: it looks like diagnosis.
-
-**Two things to do, and they are separate:**
-
-1. Fix the logging so an exception carries its type, message and traceback. Then
-   check every other `logger.exception` call site for the same loss.
-2. **Find the actual error.** It is still unexplained, and a sampler that throws
-   once in seven minutes will throw during a demo.
-
-**Acceptance:** an exception in the sampler produces a record from which the
-fault can be identified without reproducing it; and the 21:37:58 failure is
-explained.
 
 ---
 
@@ -987,6 +942,39 @@ reason it doesn't; every index table matches what is actually in the file
 it indexes.
 
 **Related:** T13 (overlaps in spirit, not in scope — see above).
+
+---
+
+### T15 — Code-level documentation reads as unprofessional and costs tokens
+**Status:** open, needs a decision before work · **Raised by:** the operator,
+24 August 2026, pending the post-R2 triage session
+
+The operator's read on the current docstrings/comments: too long, contains
+inline comments (disapproved of), and carries "insider information" — project
+history, rationale, incident narrative — that belongs in `docs/` markdown, not
+in the source. Beyond style, this has a real cost: every session re-reads this
+code, so verbose in-code narrative is paid for out of the same token budget as
+the actual work, every time.
+
+**This contradicts current, deliberate policy, and that must be resolved
+first, not silently overridden either way:** `CONVENTIONS.md` (Docstrings,
+~L30) currently says the opposite — "if a docstring needs three sentences of
+prose to explain the mechanism, the explanation belongs in a comment at the
+relevant line, not in the docstring" — and the repo's own defect history
+(`AUDIT.md`, D2, D9) is full of cases where exactly this kind of in-line
+"why" comment (e.g. `_baseline_counts`'s note about the 212.7°-on-90°
+incident) is what stopped the same mistake recurring nearby. A wholesale
+"move it to docs/" pass needs an explicit decision on which of those two
+failure modes the project would rather risk, not just a style pass.
+
+**Scope, once decided:** a full-repo pass — `CONVENTIONS.md`'s own Docstrings
+section rewritten first if the decision changes it, then every docstring and
+inline comment in `python/app/` and `sketch/src/` brought into line, with any
+genuinely load-bearing rationale relocated to the matching `docs/adr/` entry,
+`AUDIT.md`, or `CLOSED.md` record rather than deleted.
+
+**Related:** T1 (mechanical `CONVENTIONS.md` gaps, different axis), CLAUDE.md
+§4's "write every document distilled" rule (same cost, different location).
 
 ---
 

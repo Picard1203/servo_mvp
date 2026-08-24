@@ -102,7 +102,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 | | Why it is non-negotiable |
 |---|---|
 | **D13 decided** — **done** 8 Aug 2026, **ADR-0009** (D14, D15 also done) | "Press it twice" is what a procurement audience remembers. Both the operator halves and the ceiling decision are closed; the real lever stays unmeasured until Session 2 |
-| **D4 closed** | Reopened by Session 2's soak, deepened 10 Aug — not a chip-mutex race, now believed to be socket-count pressure; SSE is the next attempt, see `BACKLOG.md` D4 |
+| **D4 closed** | Reopened by Session 2's soak, deepened 10 Aug — not a chip-mutex race, now believed to be socket-count pressure; SSE was the next attempt and closed it for real, 11 Aug — see `docs/CLOSED.md` D4 |
 | **R1 answered** | The one capacity number anyone will ask for |
 | **R2** motor isolation | Scoped in MVP explicitly *so MVP testing exercises it* |
 | **R5** metrics export, **torque included** | Without it there is nothing to judge, and R6 cannot be written |
@@ -248,7 +248,7 @@ Nine ADRs in `docs/adr/`. Do not re-litigate these without reopening the ADR:
 
 - **The relay and controller have no automated coverage.** Every bug in this
   project has lived there. The native tests cover pure maths only. The W5500
-  mutex (backlog D4) was verified by compiling, running and measuring on the
+  mutex (`docs/CLOSED.md` D4) was verified by compiling, running and measuring on the
   board — **not by a single test**, because no test in this repository can
   reach it.
 - **`sketch/tests/OnTarget/` has never been uploaded** (backlog T3).

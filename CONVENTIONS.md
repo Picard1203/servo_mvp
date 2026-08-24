@@ -212,10 +212,29 @@ This repo already follows the pattern: SQLite sits behind `ZeroRepository` and
 
 ## Git
 
-- Branch from `dev`: `feature/<name>`.
-- Commit messages in plain English:
+- Branch from `dev`: `feature/<name>`, one branch per **feature**, not per
+  session or per date. A session commonly produces several feature branches;
+  a feature that spans several sessions (a defect reopened and later closed,
+  for instance) still gets one branch. This was written down 8 August 2026
+  and not followed for 16 days (24 Aug audit, `BACKLOG.md` T15) because
+  nothing enforced it — **the `deliver` skill now creates the branch as its
+  first step**, so this rule should not need restating again. `<name>`
+  describes what the branch does, e.g. `feature/fix-sqlite-concurrent-read-corruption`,
+  not a session label or a date.
+- Commit messages in plain English, grounded in the actual diff (not a
+  rehash of a planning conversation):
   `add <thing> to <place>` / `fix <issue> in <place>` / `refactor <thing> in <place>`.
 - **Never** Conventional-Commits style — no `feat(backend):`, no `chore:`.
+- **No backlog codes (`D10`, `R5`, `T14`, "Batch 2") in commit messages.**
+  Those mean nothing outside this project's own docs; `git log` should read
+  as a standalone record. Cross-reference the backlog entry in the doc that
+  closes the item, not in the commit that ships the fix.
+- Concise by word choice, not by meaning — trim filler (articles, "in order
+  to", restating context already obvious from the diff), don't compress the
+  actual content.
+- No hyphens in commit-message prose. Write compound modifiers as separate
+  words (`busy state`, not `busy-state`) even where hyphenation would be
+  normal English style elsewhere.
 
 ## C++ (sketch side)
 

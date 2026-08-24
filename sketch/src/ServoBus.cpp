@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <SCServo.h>
 
+#include "DiagLog.h"
 #include "ServoRegisters.h"
 
 namespace servo {
@@ -20,6 +21,11 @@ bool ServoBus::Ping() {
     if (driver_.Ping(servo_id_) == servo_id_) return true;
     delay(kRetryDelayMs);
   }
+  diag::DiagLog::Push(diag::log_level::kWarn,
+                      "Servo did not answer ping after retries",
+                      "mcu.servo.ping_failed",
+                      static_cast<int32_t>(servo_id_),
+                      static_cast<int32_t>(retries_));
   return false;
 }
 
@@ -29,6 +35,10 @@ int ServoBus::ReadByte(uint8_t address) {
     if (value != -1) return value;
     delay(kRetryDelayMs);
   }
+  diag::DiagLog::Push(diag::log_level::kWarn,
+                      "Servo bus byte read failed after retries",
+                      "mcu.servo.read_byte_failed",
+                      static_cast<int32_t>(address));
   return -1;
 }
 
@@ -38,6 +48,10 @@ int ServoBus::ReadWord(uint8_t address) {
     if (value != -1) return value;
     delay(kRetryDelayMs);
   }
+  diag::DiagLog::Push(diag::log_level::kWarn,
+                      "Servo bus word read failed after retries",
+                      "mcu.servo.read_word_failed",
+                      static_cast<int32_t>(address));
   return -1;
 }
 
@@ -74,6 +88,13 @@ bool ServoBus::Refresh() {
     if (driver_.FeedBack(servo_id_) != -1) return true;
     delay(kRetryDelayMs);
   }
+  // The sampler calls this once a second, so exhaustion here is the same
+  // signature as the D4/D10 stalls - worth its own event, not folded into
+  // the byte/word read failures above.
+  diag::DiagLog::Push(diag::log_level::kWarn,
+                      "Servo feedback refresh failed after retries",
+                      "mcu.servo.refresh_failed",
+                      static_cast<int32_t>(servo_id_));
   return false;
 }
 

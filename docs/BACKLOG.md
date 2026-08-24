@@ -15,7 +15,7 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 
 | Session | What it does | Board needed |
 |---|---|---|
-| **1 — Batch 1 DONE 8 Aug 2026** | **Batch 2 next** — make the MCU diagnosable | Batch 2 only |
+| **1 — Batch 1 & 2 DONE 8 Aug 2026** | **Session 2 next** — the soak | no (desk work both batches) |
 | **2** | **The soak** — one long supervised run | yes |
 | **3** | **Batch 4** — motor isolation, and the export with graphs | yes, at the end |
 
@@ -54,28 +54,48 @@ busy state, D14's message under a real refusal, D16's blanking during a real
 stall — and **D11**, unconfirmed since 7 August in the same render path. One
 sitting closes all four.
 
-## Session 1, Batch 2 — Make the machine diagnosable
+## Session 1, Batch 2 — DONE, 8 August 2026
 
-| # | Item | Where |
-|---|---|---|
-| 6 | **The C++ side has no logging** (D3) | `ServoBus`, `ServoController`, `NetworkRelay`, `BridgeApi` in `sketch/src/` |
-| 7 | **Decide the connection ceiling** (D13) | An ADR in `docs/adr/`, not a code change |
+D3, D13 closed. Suite 198 → 207; native checks 164 → 194; bridge contract gains
+`mcu_log` (MCU → Linux) and still agrees. Detail in `docs/CLOSED.md`.
 
-**Read `sketch/src/RELAY_NOTES.md` before touching any of it.** The hard
-constraint: `loop()` must keep yielding or the Bridge thread starves into a 10 s
-timeout. Size the log volume against T9's budget *before* adding it — relay
-chatter is the highest-rate traffic in the system.
+New: a `DiagLog` singleton (`sketch/src/DiagLog.h/.cpp`) — a bounded ring
+buffer (`LogRing.h`, its own native tests) fed by `NetworkRelay`, `ServoBus`
+and `ServoController`, drained by `BridgeApi::DrainDiagLog()` over a new
+`mcu_log` Bridge notify. Received on the Python side
+(`app/relay/mcu_log.py`) into `logs/mcu.jsonl` — a file separate from the
+main log, with its own rotation, so a volume spike on either side cannot
+evict the other's history. `tools/soak_report.py` now pulls and reports it,
+including the D4 write-lock-timeout signature.
 
-**Two counters already exist and cannot be read from the board**:
-`write_lock_timeouts()` and `rejected_total()`. Exposing them is the point of
-this batch, because Session 2 needs them — including to settle whether the
-USB-C session bypasses the relay (R1).
+**ADR 0009**: `kMaxRelaySockets` stays at 6. The wall is fixed (7 sockets,
+hardware); the real lever (`timeout_keep_alive`) stays unmeasured, and this
+batch does not tune it blind — see the ADR for why. New finding folded in:
+`app.js` runs independent poll timers, so a single browser can transiently
+open two connections, meaning the real margin under the 7-socket wall is
+smaller than `OPEN_QUESTIONS.md` Q2's answer implied.
 
-**The ceiling decision is a choice, not a fix.** The measurement is done. The
-W5500 has 8 hardware sockets and the listener takes one (`Config.h:44`), so **7
-is a wall** and raising `kMaxRelaySockets` from 6 buys exactly one slot. The
-real lever is `timeout_keep_alive=5` (`main.py:142`). Write the ADR before
-Session 2, or the soak measures a system nobody has decided the shape of.
+**Built, flashed, and checked on the real board the same day.** Compiled
+clean (143224 bytes program/18%, 54649 bytes RAM/20%), flashed via
+OpenOCD/SWD, app started. `Arduino_RouterBridge`'s `notify()` read directly
+off the board: a variadic template with no fixed argument ceiling — the
+six-argument `mcu_log` concern is resolved, not assumed. Live health check
+via the relay IP (`192.168.10.60:8000` — the board's own OS network does not
+expose the port at all, per ADR-0001) returned
+`diag_dropped=0` in `get_status`, confirming the counter works end to end.
+
+**D27 fixed**, not just raised — `tools/synthetic_operator.py` rewritten
+around kept-alive persistent connections (fixing a bigger, related fidelity
+gap: the old `urllib`-based version opened a fresh connection on *every*
+poll, not just missing the concurrent-timer pattern) and now reproduces
+`app.js`'s three independent timers exactly. Detail in `docs/CLOSED.md`.
+
+**D28 raised, real not hypothetical**: the boot-time `mcu.relay.ready`
+notify was lost on the actual board — confirmed by its total absence after
+several minutes of uptime. Likely a startup race (Python registers the
+`mcu_log` handler after the MCU has already sent it), likely confined to
+boot-time events only. See `docs/CLOSED.md`'s D3 entry and D28 in this file
+for the detail and the two possible next steps.
 
 ## Session 2 — The soak
 
@@ -190,20 +210,34 @@ four of its five items, so `tools/check_client_behaviour.js` was written to
 execute them rather than reporting them as read. That tool is now an open
 decision — **T12**.
 
-### Batch 2 — Make the machine diagnosable (board present)
+### Batch 2 — Make the machine diagnosable — **DONE 8 August 2026** (desk work)
 
-| | Item | Size | Why here |
+| | Item | Size | Outcome |
 |---|---|---|---|
-| 5 | **D3** C++ side has no logging | M | `write_lock_timeouts()` and `rejected_total()` both exist and **cannot be read from the board.** Two diagnostics, unreachable |
-| 6 | **D13** decision: is six slots enough? | M | Not a bug — an architectural limit. **Wants an ADR**, see below |
+| 5 | **D3** C++ side has no logging | M | done — `DiagLog` ring + `mcu_log` Bridge notify; both counters now visible; detail in `docs/CLOSED.md` |
+| 6 | **D13** decision: is six slots enough? | M | done (decided) — **ADR-0009**: stays at 6, real lever unmeasured until Session 2 |
 
-D13's numbers are already measured. What is missing is a *decision*: raise
-`kMaxRelaySockets`, drop `timeout_keep_alive`, pool on the client, or accept the
-ceiling and surface refusals properly. That decision changes R1's answer, so it
-comes before R1 is measured — and it belongs in `docs/adr/` because it will
-otherwise be re-litigated on every future connection bug.
+D13's decision is recorded in `docs/adr/0009-connection-ceiling.md`: the wall
+is fixed by hardware, `timeout_keep_alive` is the real lever and is left
+unmeasured rather than tuned blind, and Session 2 measures it as the first
+experiment.
+
+**Built and flashed the same day, after this batch's desk work landed** —
+see the note above. `check_bridge_contract.py`'s "both sides agree" is
+backed by reading the actual `Arduino_RouterBridge` source now, not just a
+comma count.
 
 ### Batch 3 — The measurement session (board, supervised, one long run)
+
+**Firmware built, flashed, and running — done 8 August 2026.** The relay and
+`get_status`/`diag_dropped` path are confirmed live (see Batch 2 above).
+**Not yet confirmed: `mcu.jsonl` and `mcu.*` log lines** — see D28. Trigger a
+real rejection or write-lock timeout early in Session 2 and check whether
+that specific event arrives, before trusting `soak_report.py`'s MCU-side
+numbers for anything that matters. Also watch for heap fragmentation over a
+long run: the drain allocates two `String`s per diagnostic record on a
+device `App.cpp` documents as otherwise heap-free — unmeasured, not assumed
+safe.
 
 | | Item | Size |
 |---|---|---|
@@ -283,18 +317,33 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 
 ## Defects
 
-### D3 — The C++ side has no logging
-**Status:** open · **Severity:** high · **Flow:** `WORKFLOWS.md` W3
+### D28 — MCU boot-time `mcu_log` notify lost to a startup race
+**Status:** open · **Severity:** low · **Found on real hardware, 8 August 2026**
 
-Only `App.cpp` produces any output (13 `Serial.print` calls). `ServoBus`,
-`ServoController`, `NetworkRelay` and `BridgeApi` have **zero** logging — and
-every bug in this project has lived in exactly those four files.
+Confirmed while checking D3's firmware after the first real flash:
+`NetworkRelay::Begin()` pushes `mcu.relay.ready` during `App::Begin()`, and
+the first `Tick()` drains and sends it within milliseconds of `setup()`
+returning. Python's `get_mcu_log().register()` (`main.py:_start_background()`)
+runs later — after the telemetry sampler starts and the relay registers —
+which is well into Python's own container startup. `Bridge.notify` is
+fire-and-forget with no acknowledgement (confirmed by reading
+`Arduino_RouterBridge`'s source), so a notify sent before Python's handler
+is registered is silently lost. After several minutes of uptime on the real
+board, no `mcu.relay.ready` line and no `mcu.jsonl` file existed at all.
 
-There is currently no way to tell from the board what the MCU side is doing.
+**Likely confined to boot-time events** — nothing else has been observed
+lost, but nothing else has fired yet either (0 rejections, 0 timeouts in
+that run). Whether a steady-state event (fired minutes into a session, long
+past the startup race) has the same problem is untested — it needs an
+actual rejection or write-lock timeout to occur.
 
-**Acceptance:** each of the four files logs its significant transitions and every
-failure path, at a level that can be turned down. Log volume must not starve
-`loop()` — see `RELAY_NOTES.md` on the yield requirement.
+**Acceptance:** either move `get_mcu_log().register()` earlier in Python's
+startup (before the uvicorn serving thread starts) to shrink the race
+window, or confirm via a deliberately-triggered post-boot event that
+steady-state notifies are not affected, whichever is cheaper to establish
+first.
+
+**Related:** D3, `docs/adr/0009-connection-ceiling.md`.
 
 ---
 
@@ -568,70 +617,6 @@ explained.
 
 ---
 
-### D13 — Requests arriving faster than slots free up are refused
-**Status:** open · **Severity:** high · **Measured 7 August 2026**
-
-**This is the "first press does nothing, press it again" symptom**, and it now
-reproduces on demand. Identical requests, from one machine, differing only in
-spacing:
-
-| pattern | requests | failures |
-|---|---|---|
-| back to back, new connection each | 10 | **5** |
-| paced at 1 s, as the UI polls | 10 | **0** |
-
-**The ceiling, measured:** `kMaxRelaySockets = 6` slots, each held for about
-five seconds after use by uvicorn's `timeout_keep_alive=5` (`main.py:142`, set
-deliberately so idle sockets do not park a slot). That is a sustained ceiling of
-roughly **one new connection per second**, with a burst tolerance of six.
-
-A browser hides this while it is only polling, because it reuses one socket. It
-surfaces the moment an action needs a *new* connection and every slot is busy —
-the request is refused, the operator sees nothing happen, and pressing again
-works because a slot has freed by then.
-
-**This is what R1 has to be measured against.** The target is roughly three
-remote operators plus one local session. A single browser may open up to six
-connections to one host on its own, so the slot budget can be spent by one
-person before the second connects.
-
-Not a race, and not fixed by the W5500 mutex: the relay is refusing politely and
-correctly (`Poll()` calls `fresh.stop()` and increments `rejected_total_`). The
-question is whether six is enough, and what should happen when it is not — a
-refusal is currently indistinguishable from a failure at the browser.
-
-**`rejected_total()` already counts these and cannot be read from the board**,
-exactly like `write_lock_timeouts()`. Two diagnostics, both unreachable; see D3.
-
-**Acceptance:** the ceiling is stated in numbers here (done above), the target in
-R1 is either met or the limit is raised deliberately, and a refused connection
-produces something an operator can understand rather than silence.
-
-**Promoted and reframed, 8 August 2026 (operator lens).** This is the most
-demo-damaging behaviour in the product: in a room of people deciding whether to
-procure a full project, "press it twice" is what they will remember. Two things
-follow.
-
-**First, it is a decision, not a fix.** The measurement is done. What is missing
-is a choice between raising `kMaxRelaySockets`, dropping uvicorn's
-`timeout_keep_alive=5`, pooling connections on the client, or accepting the
-ceiling and surfacing refusals honestly — each with a different cost, and the
-choice changes what R1 can possibly measure. **It needs an ADR**, or it will be
-re-argued at every future connection bug, exactly as the chunk-size question was.
-
-**Second, the operator half is now two separate defects**, because "the operator
-sees nothing" turned out to be two mechanisms, not one:
-
-- **D14** — when the refusal *does* reach the client, it is shown as the browser
-  string "Failed to fetch".
-- **D15** — nothing marks a command as in flight, so the operator presses again,
-  opening another connection and spending another slot. **The UI's reaction to
-  the symptom feeds the cause.**
-
-Fix both before measuring R1, or the measurement includes the operator's
-double-presses as load.
-
----
 
 ### D12 — No way to return to the datum after activating a saved zero
 **Status:** open · **Severity:** medium · **Reported:** operator, on hardware
@@ -950,7 +935,7 @@ lines missing `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list
 comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
 
 **Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
-and 198 tests still pass.
+and the suite (207 tests as of Batch 2) still passes.
 
 ---
 

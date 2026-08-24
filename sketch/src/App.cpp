@@ -6,6 +6,7 @@
 
 #include "BridgeApi.h"
 #include "Config.h"
+#include "DiagLog.h"
 #include "NetworkRelay.h"
 #include "ServoBus.h"
 #include "ServoController.h"
@@ -32,6 +33,11 @@ bool g_servo_ready = false;
 }  // namespace
 
 void App::Begin() {
+  // Before anything else can fail and want to log it. Single-threaded here
+  // (setup(), before Poll() or any Bridge callback can run), so this is the
+  // one safe place to initialise the shared lock without a race.
+  diag::DiagLog::Init();
+
   Serial.begin(config::kConsoleBaud);
   const uint32_t started = millis();
   while (!Serial && millis() - started < 2000) {
@@ -71,6 +77,12 @@ void App::Begin() {
 
 void App::Tick() {
   g_relay.Poll();
+
+  // Drain the diagnostic ring toward the Bridge. Bounded per tick, same
+  // reasoning as the delay() below: a burst of events must never make
+  // loop() spin instead of yield.
+  g_api.DrainDiagLog();
+
   // Yield. The Bridge RPC runs on its own thread; a loop() that spins
   // without ever giving up the CPU starves it, and servo_read then misses
   // its deadline and the late reply comes back as an unknown msgid.

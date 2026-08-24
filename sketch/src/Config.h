@@ -44,5 +44,15 @@ constexpr uint16_t kRelayChunkBytes = 128;
 // The W5500 has 8 hardware sockets and the listener consumes one.
 constexpr uint8_t  kMaxRelaySockets = 6;
 
+// ---- diagnostics (backlog D3) --------------------------------------------
+// Capacity is sized against a state-transition/counter rate, not per-packet
+// relay chatter - see BACKLOG.md D3. 32 entries comfortably absorbs a burst
+// between Tick() drains without costing meaningful RAM.
+constexpr uint8_t kLogRingCapacity   = 32;
+// Bounded so a burst can never make Tick() (and therefore loop()) take
+// longer than a fixed number of Bridge.notify() calls - see RELAY_NOTES.md
+// rule 3, loop() must keep yielding.
+constexpr uint8_t kMcuLogDrainPerTick = 4;
+
 }  // namespace config
 #endif  // CONFIG_H

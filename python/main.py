@@ -153,7 +153,7 @@ from Logger461 import logger
 from app.app import create_app
 from app.core.config import get_settings
 from app.core.logging_setup import setup_logging
-from app.deps import get_relay, get_telemetry_service
+from app.deps import get_mcu_log, get_relay, get_telemetry_service
 
 
 def _serve(app) -> None:
@@ -184,6 +184,12 @@ def _start_background() -> None:
     except Exception as exc:  # off-board: no arduino module
         logger.warning("relay not registered (off-board?)",
                        metadata={"event": "app.relay.skipped",
+                                 "error": str(exc)})
+    try:
+        get_mcu_log().register()
+    except Exception as exc:  # off-board: no arduino module
+        logger.warning("mcu_log not registered (off-board?)",
+                       metadata={"event": "app.mcu_log.skipped",
                                  "error": str(exc)})
 
 

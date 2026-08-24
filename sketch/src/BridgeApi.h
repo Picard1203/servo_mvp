@@ -13,6 +13,11 @@
 //   servo_configure_range   "multiturn,amplification"-> "ok" | "err"
 //   get_status              (no payload)             -> "ready" | "no-servo"
 //
+// Notifies (sketch -> Linux):
+//   mcu_log   level, message, event, arg1, arg2, uptime_s  (backlog D3)
+//     Drained from DiagLog, one event at a time - not batched, so an older
+//     one is never held up behind delivery of a newer one.
+//
 // ServoController::CentreHere() is deliberately NOT exposed here. Our
 // calibration is a software relabel recorded in SQLite; letting the servo
 // also hold a position offset would create two competing sources of truth
@@ -38,6 +43,10 @@ class BridgeApi {
 
   /// Registers every Bridge callback. Call once at startup.
   void Register();
+
+  /// Drains the diagnostic ring (DiagLog) toward the Bridge, bounded by
+  /// Config::kMcuLogDrainPerTick per call. Call from Tick().
+  void DrainDiagLog();
 
   /// @return The singleton instance, used by the C-style Bridge callbacks.
   static BridgeApi* instance() { return instance_; }

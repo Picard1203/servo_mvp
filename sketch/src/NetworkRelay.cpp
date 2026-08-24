@@ -6,6 +6,7 @@
 #include <SPI.h>
 
 #include "Config.h"
+#include "DiagLog.h"
 #include "SpiRemap.h"
 
 namespace net {
@@ -57,6 +58,9 @@ bool NetworkRelay::Begin(const uint8_t mac[6], const uint8_t ip[4],
 
   if (Ethernet.hardwareStatus() == EthernetNoHardware) {
     ready_ = false;
+    diag::DiagLog::Push(diag::log_level::kError,
+                        "Ethernet shield not detected",
+                        "mcu.relay.not_ready");
     return false;
   }
 
@@ -64,6 +68,8 @@ bool NetworkRelay::Begin(const uint8_t mac[6], const uint8_t ip[4],
   g_server = &server;
   g_server->begin();
   ready_ = true;
+  diag::DiagLog::Push(diag::log_level::kInfo, "Ethernet relay ready",
+                      "mcu.relay.ready", static_cast<int32_t>(api_port_));
   return true;
 }
 
@@ -82,6 +88,13 @@ bool NetworkRelay::WriteToClient(uint8_t slot, const uint8_t* data,
   // the relay" - it does NOT make anything safe on its own).
   if (!LockChip(K_MSEC(kChipLockTimeoutMs))) {
     ++write_lock_timeouts_;
+    // arg2 carries the running total, same as the rejected-connection event
+    // below - lets soak_report.py cross-check log-line counts against the
+    // on-device counter and notice if DiagLog ever dropped one.
+    diag::DiagLog::Push(diag::log_level::kWarn, "W5500 write-lock timeout",
+                        "mcu.relay.write_lock_timeout",
+                        static_cast<int32_t>(slot),
+                        static_cast<int32_t>(write_lock_timeouts_));
     return false;
   }
   EthernetClient& client = g_clients[slot];
@@ -151,6 +164,10 @@ void NetworkRelay::Poll() {
     if (slot < 0) {
       fresh.stop();                       // full: refuse politely
       ++rejected_total_;
+      diag::DiagLog::Push(diag::log_level::kWarn,
+                          "Relay connection rejected: no slot",
+                          "mcu.relay.rejected",
+                          static_cast<int32_t>(rejected_total_));
     } else {
       g_clients[slot] = fresh;
       ++connections_total_;

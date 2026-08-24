@@ -1315,5 +1315,33 @@ live.
 
 ---
 
+### T14 — Triage the unslotted items; audit backlog and doc hygiene deliberately
+**Status:** CLOSED · 24 August 2026 · **Severity:** medium · **Raised by:**
+the operator, 23 August 2026
+
+All fourteen unslotted items given a real session (D24, D26, D30, T12, D8,
+D29, D23, D25 in Session 8; D28, D35 in Session 10) or an explicit reason
+they don't get one (T13 stays deliberately opportunistic per its own entry;
+T15 is blocked on an operator decision, moved to `OPEN_QUESTIONS.md` Q10).
+The Closed index table gained the three items it had silently dropped (D3,
+D27, D13). **D33 and D34 were pre-diagnosed going into this session and
+closed immediately after, rather than slotted** — see their own entries.
+
+**Two further instances of the same drift class, caught closing this item
+out rather than by accident, same as the two it was opened to fix:**
+`CLAUDE.md` §3's quoted Python test count was stale (222, actual 223 at the
+time — confirmed by running the suite; later 226 after this session's own
+fixes and their tests); and two live references to "R2 next" (`BACKLOG.md`'s
+Session 6 row, `PROJECT_STATE.md`'s own Session 7 paragraph — the second one
+introduced by this very session, in the act of writing this item's own
+closure) had gone stale the moment Session 8 was inserted ahead of R2.
+
+**Acceptance held:** every open item in `BACKLOG.md` now has a batch or a
+stated reason it doesn't; every index table matches what it indexes.
+
+**Related:** T13 (overlaps in spirit, not in scope).
+
+---
+
 ## Requirements captured but not yet designed
 

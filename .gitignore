@@ -19,6 +19,11 @@ python/.env
 *.log
 *.jsonl
 
+# Soak run artifacts (tools/synthetic_operator.py, tools/soak_report.py) —
+# regenerated every run; the board's own db/log/mcu-log are the record.
+soak*.json
+soak_report*.txt
+
 # Arduino App Lab build and runtime cache.
 #
 # Created on the board by `arduino-app-cli app start` / the App Lab Run

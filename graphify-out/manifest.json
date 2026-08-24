@@ -530,8 +530,8 @@
     "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
   },
   "docs/BACKLOG.md": {
-    "mtime": 1786209854.0,
-    "ast_hash": "d83770aed6fe5515f56ecfbbd8635126",
+    "mtime": 1786222075.0,
+    "ast_hash": "d3b28e8b8875324bc9bcf9c5ad1c1921",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -2370,8 +2370,8 @@
     "semantic_hash": ""
   },
   "tools/soak_report.py": {
-    "mtime": 1786207675.0,
-    "ast_hash": "6cd01ce59be8d335f7a07cb51f843574",
+    "mtime": 1786221790.0,
+    "ast_hash": "2b866322ade5f9c5c8f33c01f1ae113d",
     "semantic_hash": ""
   },
   "tools/synthetic_operator.py": {
@@ -2437,6 +2437,16 @@
   "docs/adr/0009-connection-ceiling.md": {
     "mtime": 1786207713.0,
     "ast_hash": "947f47fb7bf07e173e9ad97e3b89d361",
+    "semantic_hash": ""
+  },
+  "soak_report_1op.txt": {
+    "mtime": 1786221684.0,
+    "ast_hash": "b436f1eea1455f856d0168aded656213",
+    "semantic_hash": ""
+  },
+  "soak_report_3op_final.txt": {
+    "mtime": 1786221812.0,
+    "ast_hash": "bbfe0b2f24d661841aa4bb5830f1208b",
     "semantic_hash": ""
   }
 }

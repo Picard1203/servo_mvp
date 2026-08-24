@@ -16,7 +16,7 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | Session | What it does | Board needed |
 |---|---|---|
 | **1 — Batch 1 & 2 DONE 8 Aug 2026** | **Session 2 next** — the soak | no (desk work both batches) |
-| **2** | **The soak** — one long supervised run | yes |
+| **2 — IN PROGRESS, night of 8 Aug 2026** | **The soak found a real, reopened D4** — see below, not the four-item close-out originally planned | yes |
 | **3** | **Batch 4** — motor isolation, and the export with graphs | yes, at the end |
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
@@ -97,20 +97,36 @@ several minutes of uptime. Likely a startup race (Python registers the
 boot-time events only. See `docs/CLOSED.md`'s D3 entry and D28 in this file
 for the detail and the two possible next steps.
 
-## Session 2 — The soak
+## Session 2 — The soak — IN PROGRESS, picked up here tomorrow
 
-One long supervised run closing four things at once: the connection-drop defect
-(D4), the operator ceiling (R1), storage growth over hours rather than minutes
-(T9), and a watch for the unexplained sampler exception (D10). Tooling exists:
+Planned as one run closing four things (D4, R1, T9, D10). What actually
+happened, night of 8 August 2026 — **read D4 and R1 first, this is the
+short version:**
 
-```bash
-python3 tools/synthetic_operator.py --host <board> --minutes 120 \
-    --operators 3 --report soak.json
-python3 tools/soak_report.py --since <ISO timestamp>
-```
+1. **Ran 3 operators, 120 min planned.** Relay slot ceiling (6) hit
+   immediately — 1462 rejections in ~22 min — ending in a `servo_read`
+   stall that never self-recovered. Ctrl-C'd; the board stayed wedged
+   (unreachable) until restarted.
+2. First `soak_report.py` reading said `VERDICT: clean` — **it was wrong**,
+   a timezone bug (**D30**, now code-fixed) silently excluded the whole run.
+3. **Restarted, ran 1 operator, 15 min, completed clean-ish** — no
+   oversubscription, but the *same stall* happened twice anyway (self-
+   recovered this time) plus a 30 s sampler gap and a fabricated position.
+4. **Conclusion: D4 is reopened, not closed by the original mutex fix**
+   — the stall reproduces even without socket contention, and the mutex
+   fix's own diagnostic (`write_lock_timeouts`) stayed at zero through
+   both runs. Full evidence and two live hypotheses in D4's entry.
 
-Run it **supervised**. An unattended failure at 03:00 is a gap in a log; a
-watched one is an observation.
+**Tomorrow, cold start: read D4's entry, then run the next diagnostic step
+written there** — 2 operators (exactly at the slot ceiling, no
+oversubscription) to test whether the stall's *duration* tracks load. Use
+`--since` in **local** time (D30's fix expects that; don't hand-convert to
+UTC, that was tonight's second mistake). Board should be healthy — last
+checked responsive after the 1-operator run.
+
+R1, T9, D10 are not closed either; see R1's entry for what changed there.
+D10 specifically was not reproduced — a different, now-explained sampler
+`TypeError` was, see D4's entry.
 
 ## Session 3 — Batch 4
 
@@ -347,9 +363,77 @@ first.
 
 ---
 
+### D29 — `LOG_LEVEL` is inert: the Logger461 stand-in logs everything regardless
+**Status:** open · **Severity:** medium · **Found prepping Session 2's soak,
+8 August 2026**
+
+The real `Logger461` wheel is not installed on this board — `main.py`'s
+fallback (`_ensure_logger461()`) is active, the same gap T9 already named for
+rotation. Its stand-in's `setup(**kwargs)` reads only `kwargs.get("file")`;
+`level` and `serialize` are accepted and silently discarded. Every level
+method (`debug()` through `critical()`) calls `_emit()` unconditionally —
+there is no level filter anywhere in the stand-in.
+
+**So `LOG_LEVEL` has never done anything on this board.** Confirmed directly:
+`.env` carried a leftover `DEBUG` from the W1 board run; changing it to
+`INFO` and restarting the app still produced `relay.conn.open`/
+`relay.conn.close` DEBUG lines immediately after boot.
+
+**Revises two existing entries:**
+- **D5's closing claim — "at INFO the lines are already silent" — is false
+  on this board.** True of the real Logger461/loguru; not true of the
+  stand-in actually running.
+- **T9's storage table should treat the DEBUG rate as the operative number,
+  not a worst case**, until the real wheel is installed (T2, air-gapped).
+
+**Acceptance:** the stand-in's `_emit` gates on a level ordering matching the
+real library, or the gap is stated plainly in D5/T9 rather than assumed.
+Cheap either way — found, not designed around.
+
+**Related:** D5, T9, T2.
+
+---
+
+### D30 — `soak_report.py` compared a local cutoff string against UTC logs,
+### and reported a catastrophic run as clean
+**Status:** code fixed 8 August 2026 · **regression test still needed**
+· **Severity:** high · **Found running Session 2's soak**
+
+Both JSONL logs are written in **UTC** (`mcu_log.py` uses `time.gmtime()`
+explicitly; the Linux-side stand-in's `datetime.now()` is also UTC because
+the container's system clock is UTC — confirmed against `date -u`).
+`parse_since()` correctly converts a **local**-time `--since` string to an
+absolute unix timestamp. The bug was one step later: `report_log()` and
+`report_mcu_log()` each rebuilt a cutoff *string* from that timestamp with
+`datetime.fromtimestamp(since).isoformat()` — local again — then compared
+it directly against the logs' UTC-stamped strings. A 3-hour local/UTC gap
+(IDT) meant every real record from the run sorted as "before the cutoff."
+
+First report after the 3-operator soak (1462 MCU rejections, 11+ minutes of
+continuous `servo_read` timeouts) printed:
+```
+VERDICT: clean - no stall signature, no fabricated positions, no errors.
+```
+**The D24 species again — a number nobody checked, reporting the opposite
+of what happened** — on the one tool whose entire job is catching this.
+
+**Fixed:** both call sites now use a new `_utc_cutoff()` helper
+(`datetime.fromtimestamp(since, tz=UTC).replace(tzinfo=None).isoformat()`)
+instead of the local reformat. `--since` itself is still typed in the
+operator's own local time, matching what `synthetic_operator.py` itself
+prints — that half was never the bug. Re-running both of tonight's soaks
+with the fix produced the real numbers now in D4 and R1.
+
+**Not yet done:** a regression test — a record just outside a
+local-timezone cutoff but inside the UTC one, asserting it's still counted.
+
+**Related:** D24, D3 (introduced the MCU log this bug hides).
+
+---
+
 ### D4 — Connection drops after a few commands; requires a page refresh
-**Status:** cause found and fixed · **needs a longer soak before it is closed**
-· 7 August 2026
+**Status:** REOPENED 8 August 2026 by Session 2's soak · the W5500-mutex fix
+below is real but does not explain what the soak found
 
 **Cause: the W5500 was accessed from two threads with nothing serialising them.**
 `Poll()` runs on the loop thread; `WriteToClient()` and `CloseClient()` run on
@@ -382,27 +466,50 @@ thread. New rule 7 in `RELAY_NOTES.md`.
 416 samples over 6.9 minutes of live driving. Operator report: "feels calmer
 than the chaos of before."
 
-**Why not closed:** seven minutes is not a soak, and a race that stops
-reproducing has not been proved absent. Close it after a long run under
-multi-operator load, which is also R1's measurement.
+**Why not closed (original reasoning, still correct):** seven minutes is not
+a soak, and a race that stops reproducing has not been proved absent.
 
-**Tooling for that run exists** (7 August 2026), so the soak is two commands:
+**What Session 2's soak found, night of 8 August 2026 — two runs:**
 
-```bash
-python3 tools/synthetic_operator.py --host <board> --minutes 120 \
-    --operators 3 --report soak.json     # drives it like people do
-python3 tools/soak_report.py --since 2026-08-08T09:00   # what the board saw
-```
+| | 3 operators, ~22 min (Ctrl-C'd) | 1 operator, 15 min (completed) |
+|---|---|---|
+| MCU connections rejected | 1462 | 49 |
+| `servo_read` timeout episodes | continuous, 18:23–18:38 UTC, **never self-recovered** — required an app restart | 2 (20:33:33, 20:33:44 UTC), **self-recovered**, run continued clean |
+| Sampler stall | — | one 30 s gap (worse than the original 11 s signature) |
+| Fabricated position (`counts <= 0`) | 1 | 1 |
+| MCU write-lock timeouts (the mutex fix's own counter) | **0** | **0** |
 
-The first simulates operators — polling once a second like the UI, moving,
-waiting for the move to arrive, thinking, locking, occasionally pulling an
-export — with randomised think time so they do not act in lockstep. The second
-pulls the database and log over `adb` and states a verdict: gaps in the 9–13 s
-stall band, positions the servo cannot have reported, logged failures, and the
-growth rates T9 needs.
+**The headline: this reproduces at 1 operator, nowhere near the 6-slot
+ceiling** — so it is not purely a connection-oversubscription problem, and
+raising `kMaxRelaySockets` or tuning `timeout_keep_alive` alone will not
+close it. **`write_lock_timeouts` stayed at zero through both runs**,
+including the fully-latched 15-minute episode — the diagnostic the mutex
+fix added to prove itself never fired once. Either the trigger for this
+stall is a different path through the W5500 than the one the mutex
+serialises, or the counter itself has a gap.
 
-Run it supervised rather than overnight. An unattended failure at 03:00 is just
-a gap in a log; a watched one is an observation.
+**Two live hypotheses, neither confirmed:**
+1. **Load-correlated persistence, not load-correlated onset.** The stall
+   happens regardless of load; how long it *lasts* (self-recovers in
+   seconds vs. latches until restart) may scale with concurrent churn.
+2. **`DiagLog` heap exhaustion under sustained rejection traffic.**
+   `BridgeApi::DrainDiagLog()` allocates two `String`s per record on a
+   device `App.cpp` documents as otherwise heap-free (flagged, unmeasured,
+   in the Batch 3 note below) — 1462 rejections is a lot of allocation
+   churn; 49 is much less, which is at least consistent with (but does not
+   prove) a fragmentation threshold.
+
+**Next diagnostic step, not yet run:** 2 operators (6 poll streams, exactly
+at the slot ceiling — no oversubscription, maximum churn) to see whether the
+stall's *duration* actually tracks load as hypothesis 1 predicts. If it
+still self-recovers at 2, heap exhaustion becomes the stronger candidate.
+
+**Also found, not yet filed as its own item:** a single truncated/malformed
+JSON body from `/api/v1/system/events` during the 1-operator run, and a
+robustness gap in `synthetic_operator.py` itself — `get()` catches
+`http.client.HTTPException`/`OSError` but not `json.JSONDecodeError`, so one
+malformed reply permanently kills that operator's poll thread for the rest
+of the run instead of retrying like every other failure path.
 
 **Remaining, separate:** the UI declares a disconnection on a *single* failed
 poll — see D11.
@@ -960,6 +1067,14 @@ too. What is *not* bounded is the **stand-in** in `main.py`, which is what runs
 on any board without the wheel installed — including this one. It opens the file
 and appends forever.
 
+**Provisional numbers from Session 2's soak, 8 August 2026 — treat with
+caution, both runs were abnormal (D4 reopened):** 3-operator run (~22 min,
+`LOG_LEVEL` inert per D29 so this is effectively the DEBUG rate regardless
+of setting): db 0.27 MB/hr → 196 MB/month, log 0.19 MB/hr → 137 MB/month,
+mcu log 0.10 MB/hr → 75 MB/month. Broadly in the range this table already
+expected, but a run dominated by connection-rejection churn is not a clean
+baseline — re-measure once D4 is actually closed.
+
 Still to do:
 
 - Confirm the telemetry purge actually plateaus the file. SQLite reuses freed
@@ -1168,6 +1283,21 @@ The only enforced limit anywhere is `kMaxRelaySockets = 6`.
   reaches uvicorn without crossing the W5500 (Q9), it costs no relay socket at
   all and the budget is the remote screens alone. **Unverified. Do not report
   R1 as met on the strength of it.**
+
+**Measured, 8 August 2026 — target not met at 3 operators, cause still open.**
+`synthetic_operator.py` models each operator as 3 independent poll streams
+(state, zeros, events), matching what `app.js` actually does per-tab, not
+the "one connection per screen" assumption above. 3 operators = up to 9
+concurrent streams against 6 slots: **1462 rejections in ~22 minutes**,
+ending in a stall that needed a restart to clear. **1 operator = 3 streams,
+comfortably under the ceiling: only 49 rejections and no oversubscription
+signature** — but the same D4 stall still occurred twice and self-recovered.
+So the socket ceiling explains the rejection *count*, but not the stall
+itself, which reproduces even without oversubscription (see D4). **R1
+cannot be closed by tuning `timeout_keep_alive` alone until D4's reopened
+cause is understood** — a faster slot turnover does not fix a fault that
+also happens with slots to spare. Still unverified: the USB-C/Q9 question
+above, unchanged by tonight's runs (no on-site session was part of either).
 
 ---
 

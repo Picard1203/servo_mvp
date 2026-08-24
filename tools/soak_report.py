@@ -80,6 +80,28 @@ def parse_since(text: Optional[str]) -> float:
     return datetime.datetime.fromisoformat(text).timestamp()
 
 
+def _utc_cutoff(since: float) -> str:
+    """Formats a unix timestamp as the board's own clock would (D30).
+
+    Both JSONL logs are written in UTC (mcu_log.py uses time.gmtime(); the
+    container's system clock is UTC regardless of the operator's own
+    timezone). --since is typed in the operator's local time and converted
+    to an absolute instant by parse_since() - this reformats that same
+    instant back out in UTC so string comparison against the log's own
+    timestamps lands on the instant actually meant, not one shifted by the
+    local/UTC offset.
+
+    Args:
+        since (float): Unix timestamp, as returned by parse_since().
+
+    Returns:
+        str: ISO-8601 UTC timestamp, no offset suffix - same shape as the
+        logs' own timestamp field.
+    """
+    return (datetime.datetime.fromtimestamp(since, tz=datetime.timezone.utc)
+            .replace(tzinfo=None).isoformat())
+
+
 def report_telemetry(db_path: str, since: float) -> dict[str, Any]:
     """Examines the telemetry table for gaps and impossible positions.
 
@@ -148,7 +170,7 @@ def report_log(log_path: str, since: float) -> dict[str, Any]:
     Returns:
         dict[str, Any]: Findings, ready to print.
     """
-    cutoff = datetime.datetime.fromtimestamp(since).isoformat()
+    cutoff = _utc_cutoff(since)
     findings: dict[str, Any] = {
         "records": 0,
         "read_failed": 0,
@@ -232,7 +254,7 @@ def report_mcu_log(mcu_log_path: str, since: float) -> dict[str, Any]:
     Returns:
         dict[str, Any]: Findings, ready to print.
     """
-    cutoff = datetime.datetime.fromtimestamp(since).isoformat()
+    cutoff = _utc_cutoff(since)
     findings: dict[str, Any] = {
         "available": True,
         "records": 0,

@@ -1109,5 +1109,103 @@ double-presses as load.
 
 ---
 
+### D10 — `logger.exception` swallows the exception; the sampler's real fault was a thread-safety bug in the SQLite layer
+**Status:** CLOSED · 24 August 2026 · **Severity:** medium · **Found by:** a
+live board run, 7 August 2026
+
+**Fixed 7 August 2026: the logging.** The cause was the Logger461 stand-in in
+`main.py`: its `exception()` was a straight copy of `error()`, and attaching
+the exception is the entire difference between the two. It now records the
+exception type, message and traceback. **The test stub in `conftest.py` had
+the identical gap** — fixed together, the twin-path pattern for the fourth
+time in this repository.
+
+**It happened again, 23 August 2026, twice (13:02:22, 13:39:55).** The
+backlog's original follow-up quoted a two-line traceback and guessed "a race
+around `ZeroStore.get_active()` returning a reference mid-mutation (a zero
+being changed/replaced)." **Both halves of that guess were wrong, found
+24 August 2026 by re-reading the actual JSONL log records instead of the
+paraphrase:** the real traceback is one call path only —
+`TelemetryService._run` → `_sample_once` → `ServoStateStore.snapshot` →
+`_to_output_deg` (`servo_state.py:276`) — the quoted `_active_counts()` frame
+was never in either real stack. And there was no zero-table write anywhere
+near either timestamp, so nothing was "being changed" — the active zero
+(`raw_counts=2046`) was untouched and still is.
+
+**Root cause, reproduced empirically:** `Database` holds one shared
+`sqlite3.Connection` (`check_same_thread=False`) across every thread — the
+sampler and every API request. Writes were serialized through `write_lock`;
+reads were not. A stress script against the real repository classes (four
+reader threads calling `get_active()` in a loop, two threads doing ordinary
+telemetry inserts — **no zero writes at all**) reproduced a `None` in the
+`raw_counts` column (`NOT NULL` in the schema) within about a second, and, in
+a second run, an outright `IndexError: tuple index out of range` from a torn
+`sqlite3.Row` — a failure mode no theory about stored data can produce. Two
+threads issuing statements on the *same* Python connection object without a
+shared lock is undefined, regardless of what's actually stored; "SQLite
+permits concurrent readers" (the class's own prior docstring) is true of
+separate connections and false of this one shared, unsynchronized object.
+Serializing every statement — reads included — through `write_lock`
+eliminated it across a 185,000-read stress run with zero failures.
+
+**Fixed by routing every statement through the lock, not just writes** —
+the identical twin-path gap existed in four more places, found by grepping
+both repository files rather than stopping at the one call site in the
+traceback: `SqliteZeroRepository.list_all/get/get_active` were unlocked, and
+`set_active`'s own verification `SELECT` sat *outside* its `with` block,
+half-protecting itself. `SqliteTelemetryRepository.count_range` was unlocked;
+`query()` streamed rows via a generator holding no lock at all across
+`yield` — rewritten to fetch the matching rows while holding the lock, then
+yield from that list, so a caller consuming results slowly doesn't hold
+`write_lock` open for the duration. `Database`'s docstring is rewritten to
+state what was actually measured instead of the assumption that caused this.
+
+**Regression test:** `test_database.py::TestConcurrentAccess::test_reads_survive_concurrent_writes`
+— the same reader/writer stress shape, run against the real `Database` and
+both repositories for a bounded 2 seconds. Confirmed **RED** on the pre-fix
+code (reproduced both the `None` and the `IndexError`, plus a third mode:
+`set_active`'s own half-protected tail read breaking under its own writer
+thread), confirmed **GREEN** after. Suite: 222 → 223. Native checks (194) and
+the bridge contract are untouched — pure Python fix, nothing in `sketch/`
+changed, no board needed to close this.
+
+**One more artifact, noted so a future session doesn't chase it as a second
+bug:** the 13:39:55 log record's traceback shows nonsensical source lines for
+two of its frames (`_run` printing `try:`, `_sample_once` printing a bare
+docstring line). That's `linecache` reading whatever was on disk *at
+exception-format time*, not at import time — a known side effect of editing
+files under a running process on the sshfs-mounted dev copy (§6,
+`CLAUDE.md`). The line *numbers* in that traceback are accurate to what was
+actually running; only the printed source text is stale.
+
+**Related:** D2, D9 (the repository's other twin-path defects). Does not
+block or interact with R2 — Session 6's second half proceeds independently.
+
+**Original report follows.**
+
+One `ERROR telemetry sampling failed` was recorded at 21:37:58 on 7 August 2026.
+It cost one skipped sample — the only sampler gap over 2 s in the whole run.
+
+**The cause cannot be determined, because the record contains no exception text
+and no traceback.** `telemetry_service.py:91` calls `logger.exception(...)`, and
+what reached both the JSONL file and the container log was the message alone
+with `extra: {}`.
+
+So the system logged that something failed, and nothing about what. That is
+worse than not logging it: it looks like diagnosis.
+
+**Two things to do, and they are separate:**
+
+1. Fix the logging so an exception carries its type, message and traceback. Then
+   check every other `logger.exception` call site for the same loss.
+2. **Find the actual error.** It is still unexplained, and a sampler that throws
+   once in seven minutes will throw during a demo.
+
+**Acceptance:** an exception in the sampler produces a record from which the
+fault can be identified without reproducing it; and the 21:37:58 failure is
+explained.
+
+---
+
 ## Requirements captured but not yet designed
 

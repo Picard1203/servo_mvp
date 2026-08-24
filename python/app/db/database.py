@@ -5,11 +5,18 @@ from threading import Lock
 
 
 class Database:
-    """Owns the SQLite connection and serializes write access.
+    """Owns the SQLite connection and serializes all access to it.
 
-    SQLite permits concurrent readers; writes are serialized through
-    ``write_lock`` because the sampler thread and API requests may write
-    at the same time.
+    ``write_lock`` guards every statement, not only writes: this class
+    holds one ``sqlite3.Connection`` (``check_same_thread=False``) shared
+    across the sampler thread and API request threads. SQLite's
+    "concurrent readers" guarantee assumes separate connections; two
+    threads calling ``execute()`` on the *same* Python connection object
+    without a shared lock can hand back a corrupted ``sqlite3.Row`` -
+    reproduced under this repo's actual read/write pattern as both a
+    silent ``None`` in a ``NOT NULL`` column and an outright
+    ``IndexError`` (D10). Every repository built on this class must run
+    its statements - reads included - through ``write_lock``.
     """
 
     def __init__(self, path: str) -> None:

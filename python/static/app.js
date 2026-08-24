@@ -782,11 +782,17 @@ function crc32(strOrUint8) {
    header's compression-method-8 entry expects. Native browser API, no
    library. */
 async function deflateRaw(bytes) {
-  const cs = new CompressionStream("deflate-raw");
-  const writer = cs.writable.getWriter();
-  writer.write(bytes);
-  writer.close();
-  return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+  /* Blob.stream().pipeThrough() instead of manually driving a writer:
+     the earlier version called writer.write()/writer.close() without
+     awaiting either, a real race that let the read side start before
+     writing finished on some inputs - reproduced live, 23 August 2026:
+     openpyxl rejected a real board-generated file with "Bad CRC-32 for
+     [Content_Types].xml" even though it was the file's first, smallest
+     entry. pipeThrough's spec-guaranteed backpressure/completion
+     handling removes the race entirely rather than papering over one
+     symptom of it. */
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
 /* entries: array of [filename, content]. `content` may be a string,
@@ -797,11 +803,12 @@ async function deflateRaw(bytes) {
    before the next one is built - a 30-day export no longer needs the
    whole range's raw text resident at once (board/browser-measured: 5 days
    uncompressed hit 475MB and 15 days exhausted a 4GB heap before this). */
-async function createZipArchive(entries) {
+async function createZipArchive(entries, onProgress) {
   const enc = new TextEncoder();
   const fileEntries = [];
   let offset = 0;
   const parts = [];
+  let done = 0;
 
   for (const [filename, contentOrFn] of entries) {
     const content = typeof contentOrFn === "function" ? contentOrFn() : contentOrFn;
@@ -847,6 +854,8 @@ async function createZipArchive(entries) {
     fileEntries.push({ filenameBytes, crc, compressedSize, uncompressedSize, offset });
     parts.push(lhArr, compressed);
     offset += lhArr.length + compressedSize;
+    done += 1;
+    if (onProgress) onProgress(done, entries.length, filename);
   }
 
   const cdStart = offset;
@@ -854,10 +863,19 @@ async function createZipArchive(entries) {
     const cd = new ArrayBuffer(46 + entry.filenameBytes.length);
     const v = new DataView(cd);
     v.setUint32(0, 0x02014b50, true);
-    v.setUint16(4, 20, true);
-    v.setUint16(6, 20, true);
-    v.setUint16(8, 8, true);          /* compression method: deflate */
-    v.setUint16(10, 0, true);
+    v.setUint16(4, 20, true);         /* version made by */
+    v.setUint16(6, 20, true);         /* version needed to extract */
+    v.setUint16(8, 0, true);          /* general purpose bit flag - was
+                                          swapped with compression method
+                                          below (real bug, reproduced live
+                                          23 August 2026: every reader that
+                                          honors the central directory,
+                                          including openpyxl/zipfile and
+                                          OnlyOffice, read flag=8 "data
+                                          descriptor follows" and rejected
+                                          the whole file; unzip's more
+                                          lenient path masked it) */
+    v.setUint16(10, 8, true);         /* compression method: deflate */
     v.setUint16(12, 0, true);
     v.setUint16(14, 0, true);
     v.setUint32(16, entry.crc, true);
@@ -1195,7 +1213,7 @@ function makeOverviewSheetXml(days, samples, stats) {
     `<sheetData>${body}</sheetData>\n<drawing r:id="rId1"/>\n</worksheet>`;
 }
 
-async function generateExcelXlsxZip(samples, fromTs, toTs) {
+async function generateExcelXlsxZip(samples, fromTs, toTs, onProgress) {
   const stats = computeStatsAndIntervals(samples);
   const days = groupSamplesByDay(samples);
   const chartData = makeChartDataSheetXml(days);
@@ -1309,7 +1327,7 @@ async function generateExcelXlsxZip(samples, fromTs, toTs) {
     fileEntries.push([`xl/charts/chart${i + 1}.xml`, xml]);
   });
 
-  return await createZipArchive(fileEntries);
+  return await createZipArchive(fileEntries, onProgress);
 }
 
 async function doExport() {
@@ -1375,14 +1393,16 @@ async function doExport() {
 
       const recKb = Math.round(receivedBytes / 1024);
       const totKb = Math.round(totalUncompressedBytes / 1024);
-      const pct = Math.min(85, Math.round((receivedBytes / totalUncompressedBytes) * 85));
+      /* Stage 1 of 3: downloading the compact stream, 0-50%. */
+      const pct = Math.min(50, Math.round((receivedBytes / totalUncompressedBytes) * 50));
 
-      labelEl.textContent = "Downloaded " + recKb + " / " + totKb + " KB (" + pct + "%)";
+      labelEl.textContent = "Downloading data… " + recKb + " / " + totKb + " KB (" + pct + "%)";
       fillEl.style.width = pct + "%";
     }
 
-    labelEl.textContent = "Compiling .xlsx workbook…";
-    fillEl.style.width = "90%";
+    /* Stage 2 of 3: parsing the binary payload into samples. */
+    labelEl.textContent = "Parsing telemetry…";
+    fillEl.style.width = "52%";
 
     const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
     const fullBuffer = new Uint8Array(totalLen);
@@ -1393,7 +1413,19 @@ async function doExport() {
     }
 
     const samples = parseBinaryTelemetry(fullBuffer.buffer);
-    const xlsxBlob = await generateExcelXlsxZip(samples, fromTs, toTs);
+
+    /* Stage 3 of 3: building the workbook - real progress per file (each
+       day sheet, plus charts/overview/etc), not a frozen percentage. A
+       30-day export takes well over a minute here, so this is the stage
+       that actually needed honest feedback. */
+    labelEl.textContent = "Building workbook…";
+    fillEl.style.width = "55%";
+    const xlsxBlob = await generateExcelXlsxZip(samples, fromTs, toTs,
+      (done, total, filename) => {
+        const pct = 55 + Math.round((done / total) * 40);
+        fillEl.style.width = pct + "%";
+        labelEl.textContent = `Building workbook… ${filename.split("/").pop()} (${done}/${total})`;
+      });
 
     fillEl.style.width = "100%";
     labelEl.textContent = "Saving file…";

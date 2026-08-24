@@ -223,6 +223,14 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
   `valid,counts,moving,temp_c,volt_v,curr_a,torque_kgcm,load,status_bits`
 - **Field 0 is `valid`.** Never discard it. Discarding it is how a failed read
   became a calibration datum of 0.
+- **`valid` governs the WHOLE snapshot, not just `counts`.** A failed read
+  yields a zeroed struct, so `temp_c`, `volt_v`, `curr_a` and `torque_kgcm` all
+  arrive as `0.0` and `moving` and every status bit arrive as `false`. Each one
+  is a plausible measurement: 0.0 V reads as *lost power*, and "not moving, no
+  faults" reads as *sitting still and healthy*. Guarding `counts` alone leaves
+  eleven fields lying. **Decide what an invalid snapshot means once, at the
+  boundary, and apply it to every field at the same time** — doing `counts`
+  first and the rest later is how you get two defects out of one bug.
 - Relay payloads are `MsgPack::bin_t<uint8_t>` — binary, must **not** be packed
   into a `String`.
 - `net_tx` / `net_shutdown` are registered with `provide_safe`: they are called
@@ -272,7 +280,7 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
 
 ## 8. Working rules
 
-- **Say what was tested versus assumed.** On this board, 100% line coverage of
+- **Say what was tested versus assumed.** On this board, near-total coverage of
   the Linux side has repeatedly meant nothing — every serious defect lived in the
   relay and the controller, which the simulator does not exercise.
 - **Port, don't re-derive.** The relay was once rewritten from scratch instead of

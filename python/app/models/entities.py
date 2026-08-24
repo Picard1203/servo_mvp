@@ -81,10 +81,17 @@ class ServoStateView:
             the position reference (multi-turn context can be lost on
             power-off); True after a successful calibrate.
         active_zero_name: Name of the active baseline, or 'factory'.
-        temperature_c: Servo temperature, Celsius.
-        voltage_v: Supply voltage, Volts.
-        current_a: Motor current, Amperes.
-        torque_kgcm: Estimated output torque, kg*cm.
+        temperature_c: Servo temperature in Celsius, or None when the
+            read failed. The rule stated for output_deg governs these
+            four readings identically: a failed read reports 0.0 for
+            each, and 0.0 V is indistinguishable from a genuine
+            measurement of a servo that has lost power.
+        voltage_v: Supply voltage in Volts, or None when the read
+            failed.
+        current_a: Motor current in Amperes, or None when the read
+            failed.
+        torque_kgcm: Estimated output torque in kg*cm, or None when the
+            read failed.
         overload: Servo overload protection tripped.
         overcurrent: Overcurrent fault flag.
         overheat: Overheat fault flag.
@@ -100,10 +107,10 @@ class ServoStateView:
     settling: bool
     position_verified: bool
     active_zero_name: str
-    temperature_c: float
-    voltage_v: float
-    current_a: float
-    torque_kgcm: float
+    temperature_c: Optional[float]
+    voltage_v: Optional[float]
+    current_a: Optional[float]
+    torque_kgcm: Optional[float]
     overload: bool
     overcurrent: bool
     overheat: bool

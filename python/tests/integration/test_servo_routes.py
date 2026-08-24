@@ -190,3 +190,58 @@ class TestInvalidReadingSurfaced:
         response = client.post("/api/v1/servo/calibrate")
         assert response.status_code == 409
         assert response.json()["reason"] == "invalid_reading"
+
+
+class TestNothingIsReportedAsMeasuredOnAFailedRead:
+    """A failed read yields no numbers at all, not a position alone.
+
+    D16. ServoStateResponse nulled output_deg and left temperature_c,
+    voltage_v, current_a and torque_kgcm as plain floats, so a dead bus
+    produced 0.0 for each and the operator was shown 0.00 V as if it had
+    been measured. One rule, five fields.
+    """
+
+    @staticmethod
+    def _kill_the_bus():
+        from app.deps import get_servo_repository
+        from app.models.entities import TelemetrySnapshot
+        get_servo_repository().read_snapshot = lambda: TelemetrySnapshot(
+            raw_counts=0, moving=False, temperature_c=0.0, voltage_v=0.0,
+            current_a=0.0, torque_kgcm=0.0, overload=False,
+            overcurrent=False, overheat=False, voltage_fault=False,
+            sensor_fault=False, angle_fault=False, valid=False)
+
+    def test_telemetry_is_null_not_zero(self, backend, client):
+        self._kill_the_bus()
+        body = client.get("/api/v1/servo/state").json()
+        assert body["reading_valid"] is False
+        assert body["output_deg"] is None
+        assert body["temperature_c"] is None
+        assert body["voltage_v"] is None
+        assert body["current_a"] is None
+        assert body["torque_kgcm"] is None
+
+    def test_the_shape_is_unchanged(self, backend, client):
+        """Nulling a field must not remove it: clients read every key."""
+        self._kill_the_bus()
+        body = client.get("/api/v1/servo/state").json()
+        assert set(body) == TestState.EXPECTED_KEYS
+
+
+class TestStepRefusalStatesTheEnforcedStep:
+    """The refusal carries the configured step, not a hardcoded one.
+
+    A regression guard, not a fix: the backend was already correct. The
+    client was throwing this message away and printing 0.1 deg from a
+    constant of its own (D21), which is the half that had to change and
+    the half this repository cannot test.
+    """
+
+    def test_the_message_states_the_configured_step(self, backend, client):
+        from app.core.config import get_settings
+        step = get_settings().output_step_deg
+        response = client.post("/api/v1/servo/move",
+                               json={"target_deg": 12.345, "speed_dps": 60})
+        assert response.status_code == 422
+        assert response.json()["reason"] == "step"
+        assert str(step) in response.json()["detail"]

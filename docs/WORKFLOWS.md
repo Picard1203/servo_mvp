@@ -23,7 +23,7 @@ Four of its skills target defects this project actually has:
 | Skill | Why it fits here |
 |---|---|
 | `defense-in-depth` | D2 *is* a defence-in-depth failure — the guard is on `calibrate()` and not `capture()`. The skill's question is "where else is one path hardened and its twin not?" |
-| `testing-anti-patterns` | 192 tests at 100% coverage caught none of six past defects and none of the current eight. |
+| `testing-anti-patterns` | 198 tests at 99% coverage caught none of six past defects, and none of the eight the operator lens found. |
 | `condition-based-waiting` | `wait_until()` (`python/tests/conftest.py:222`) is a **god node with 38 edges** — the third most connected node in the graph. That many tests hanging off one async wait is a flakiness surface. |
 | `systematic-debugging` | Four phases: reproduce → isolate → identify → verify. D4, D5 and D6 all have unknown causes. |
 
@@ -251,7 +251,7 @@ teaches something general, feed it back.
 `CLAUDE.md`:
 
 ```bash
-cd python && pytest                      # 192
+cd python && pytest                      # 198
 cd sketch/tests/native && make           # 164
 python3 tools/check_bridge_contract.py   # both sides agree
 graphify update .

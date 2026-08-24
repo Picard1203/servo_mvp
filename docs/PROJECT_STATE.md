@@ -30,10 +30,15 @@ Everything exists — backend, UI, sketch, tests — and all three verification
 commands pass:
 
 ```
-192 Python tests, 100% line coverage of app/
+198 Python tests, 99% line coverage of app/ (see backlog D24)
 164 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 ```
+
+**Batch 1 landed 8 August 2026** — D14, D15, D16, D20, D21 closed, no board
+needed. An operator now gets a readable message when the relay refuses, cannot
+double-press a command into a second connection, and is never shown a number the
+servo did not report. It raised D23, D24, D25, D26 and T12.
 
 **It has now been run on real hardware, driving the real servo** (7 August 2026,
 backlog T8). That run changed the picture more than any amount of reading could
@@ -53,42 +58,16 @@ numbers, before and after the W5500 fix:
 | Bridge timeouts logged (`servo.bridge.error`) | 3 | 0 |
 | Fabricated positions logged as such | not recorded at all | 0 to record |
 
-Coverage at 100% still means every line ran, not that every assumption was
+Coverage this high still means every line ran, not that every assumption was
 questioned. It did not prevent the six defects in `AUDIT.md`, and it did not
 prevent D9 — where the correct rule and its violation sat twelve lines apart in
 one file, both covered, both green.
 
-### The single most important open item
-
-**D10 — the sampler threw once in seven minutes and the log cannot say why.**
-`logger.exception` recorded the message without the exception or traceback.
-
-It ranks first not because it is the biggest defect but because everything
-remaining is measurement — the D4 soak, first paint, the chunk-size experiment,
-the benchmarks that define "stable" — and an unexplained exception that destroys
-its own evidence corrupts every measurement taken near it.
-
-**Amended 8 August 2026.** That reasoning held while everything remaining *was*
-measurement. It no longer is. Two things now outrank it:
-
-- **D13, and the decision it needs.** "Press it twice" is the behaviour that
-  will be remembered by the people deciding whether to procure this. It is
-  measured, its cause is understood, and what is missing is a choice — which is
-  why it is going to an ADR rather than to a fix.
-- **R2 and R5** — the only two things scoped *in MVP* that do not exist yet.
-  Defects have bounded effort because their causes are known; unbuilt features
-  do not. They were absent from the ordering entirely until this date.
-
-D10 keeps its place among the measurements, watched for on every board run. It
-is no longer the first thing.
-
-### The lesson worth carrying
-
-Three of this project's defect families are now the same defect: **a rule applied
-to one path and not to its twin.** `AUDIT.md`'s originals, D2's
-`calibrate()`-but-not-`capture()`, and D9's two baselines. When fixing anything
-here, the second question is always: *where is this rule's twin, and does it
-know?*
+**And the figure was not what the documents said.** It is 99%; seven documents
+quoted 100% because nothing ran coverage (backlog **D24**). The two uncovered
+statements are the `InvalidReadingError` guards in `ZeroService.capture()` and
+`ServoStateStore.read_counts()` — one of them the exact line D2 was filed about.
+The guard went in; its test did not.
 
 ## The cut line
 
@@ -104,7 +83,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 
 | | Why it is non-negotiable |
 |---|---|
-| **D13 decided** (+ D14, D15) | "Press it twice" is what a procurement audience remembers. The decision needs an ADR |
+| **D13 decided** (D14, D15 **done** 8 Aug 2026) | "Press it twice" is what a procurement audience remembers. The operator halves are closed; the decision still needs an ADR |
 | **D4 closed by a real soak** | A race that stopped reproducing has not been proved absent |
 | **R1 answered** | The one capacity number anyone will ask for |
 | **R2** motor isolation | Scoped in MVP explicitly *so MVP testing exercises it* |
@@ -112,7 +91,7 @@ Batch numbers refer to the ordering in `BACKLOG.md`.
 | **D22** export over any range | The benchmark is a multi-day unattended run at the receiving team's site; a 24-hour button cannot retrieve it |
 | **R6** "stable" as numbers | The delivery is judged against it |
 | **D8** made impossible to get wrong | A silent fallback to the simulator at handover is the worst failure available |
-| **D16** | The operator must not be shown 0.00 V as a measurement |
+| **D16** — **done** 8 Aug 2026 | The operator must not be shown 0.00 V as a measurement. Schema and client both; the API half for the fault flags is now **D23** |
 | **T10** the recovery runbook | The receiving team runs it unattended for days. They must know what to do when it misbehaves, and the site is three hours away |
 | **T11** the operations manual | Nothing in the repo tells anyone how to *operate* this. Every document is written for whoever is building it |
 | **Docs true** | Cheap, and the project's own standard |
@@ -132,8 +111,10 @@ explained, measured or diagnosed by the people receiving it. That is a real cost
 
 **T1, T6, T7** — the mechanical conventions pass. The MVP was written "dirty" on
 purpose. It is the right work and it is invisible to the people judging this;
-if it collides with the date, it loses. **R3, R4, R8, D19, D20** — post-MVP or
-pending an answer, by decision.
+if it collides with the date, it loses. **R3, R4, R8, D19** — post-MVP or
+pending an answer, by decision. (**D20** was on this list and is now done — it
+was two minutes' work inside Batch 1, so it was cheaper to close than to keep
+listing.)
 
 ### The branch that is not ours to choose
 

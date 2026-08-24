@@ -2,8 +2,9 @@
 
 **The work queue. This is the only list of open work in the repo.**
 
-`AUDIT.md` is the *past* tense (bugs already fixed). This file is the *present*
-tense. Do not merge them.
+Two files hold the past tense and must not be merged into this one:
+`docs/CLOSED.md` (items that entered this backlog and left it) and
+`docs/AUDIT.md` (defects found before the backlog existed, frozen).
 
 ---
 
@@ -14,43 +15,44 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 
 | Session | What it does | Board needed |
 |---|---|---|
-| **1 — next** | **Batch 1 then Batch 2** — fix the instrument, then make the MCU diagnosable | Batch 2 only |
+| **1 — Batch 1 DONE 8 Aug 2026** | **Batch 2 next** — make the MCU diagnosable | Batch 2 only |
 | **2** | **The soak** — one long supervised run | yes |
 | **3** | **Batch 4** — motor isolation, and the export with graphs | yes, at the end |
 
+**The venv is at `.venv/` in the working copy** — the suite runs, no setup.
+**Verification commands and their numbers: `CLAUDE.md` §3**, not repeated here:
+the suite figure was stale in nine documents for a month because it was copied
+into all of them (D24).
+
 Use **`/deliver`** to run a batch: it plans, **stops once** for approval, then
-runs the whole thing. Use **`/operator-lens`** before changing anything the
-operator sees, and **`/twin-review`** on the finished diff — every item in
-Batch 1 has a twin somewhere.
+runs the whole thing. **`/operator-lens`** before changing anything the operator
+sees; **`/twin-review`** on the finished diff, scoped to named paths with a
+findings cap.
 
-**Do not run the Python suite looking for 192.** There is no venv on the
-development machine and this is known, not a failure — `pip install -r
-python/requirements-dev.txt` in a venv if you want it, otherwise verify with the
-other two commands and **say plainly that the suite did not run.** The native
-checks (164) and `tools/check_bridge_contract.py` ("both sides agree") both work
-with no setup.
+## Session 1, Batch 1 — DONE, 8 August 2026
 
-## Session 1, Batch 1 — Fix the instrument before taking the measurement
+D14, D15, D16, D20, D21 closed. Suite 193 → 198; native checks and the bridge
+contract unmoved (nothing in `sketch/` changed). Detail in `docs/CLOSED.md`.
 
-Five fixes, all client-side or schema-level, **no board required.** Three of
-them change what Session 2 is able to observe, which is why they come first.
-Every location below is verified as of 8 August 2026.
+`/twin-review` on the diff found a hole in D15's fix (Enter bypassed the
+guard), a CSS regression it introduced, two false-notice bugs, and eight untrue
+statements in the docs. All fixed. **It cost ~218k tokens across three
+reviewers — scope them to named paths with a findings cap next time.**
 
-| # | Item | Where | The fix, in one line |
-|---|---|---|---|
-| 1 | **The most likely error shows "Failed to fetch"** (D14) | `app.js:220` `sayError()` | A network-level rejection has no `reason` code and never reaches `asApiError()` — give it its own branch and a sentence an operator can act on |
-| 2 | **A command in flight looks like one that did nothing** (D15) | `app.js:539` `bind()`; handlers `:441-528` | Mark the control busy and refuse a second press until it answers. **Design it touch-safe** — Q1 is unanswered, so assume a finger |
-| 3 | **A failed read shows 0.0 V as if measured** (D16) | `schemas/servo.py:106-116`; `app.js:286-289` | One rule, five fields. Either the schema nulls them all or the client blanks them all — decide once, apply to both |
-| 4 | **The UI says the step is 0.1°; it is 0.06°** (D21) | `app.js:224`; backend is right at `motion_service.py:255-258` | Stop discarding the backend's message. Confirmed leftover from an earlier design |
-| 5 | **`eventTime()` claims a fallback it does not implement** (D20) | `app.js:411-412` | Both branches identical. Delete the dead one and its comment |
+Raised, not fixed: **D23** (fault flags still reported as measured — API-shape
+decision), **D24** (two uncovered guards; coverage is 99%, not the 100% seven
+documents claimed), **D25** (an overload stops being displayed once unreadable),
+**D26** (one unreproduced suite failure in ten runs), **T12** (what to do with
+`tools/check_client_behaviour.js`, written because four of the five items had no
+other way to be verified).
 
-**Test-first where it is testable.** Items 3 and 4 have backend halves that can
-have failing tests written before the fix; items 1, 2 and 5 are browser-side and
-this repository has no browser test harness — **say so rather than claiming
-coverage.**
+**Q1's touch half answered: mouse, not touch.** The viewport half is open, so
+D7 stays blocked.
 
-**Then `/twin-review` the diff.** Item 3 is the fifth instance of the twin-path
-class in this repository; the sixth is the one nobody has found yet.
+**Wants an operator's eye on the board**, none of it blocking Batch 2: D15's
+busy state, D14's message under a real refusal, D16's blanking during a real
+stall — and **D11**, unconfirmed since 7 August in the same render path. One
+sitting closes all four.
 
 ## Session 1, Batch 2 — Make the machine diagnosable
 
@@ -108,7 +110,7 @@ the batch list further down.
 
 1. Read `../CLAUDE.md` if you have not — especially the graphify rules. **Query
    the graph before reading source; it costs a fraction of the tokens.**
-2. Run the three verification commands and note the numbers (192 / 164 / agree).
+2. Run the verification commands in `CLAUDE.md` §3 and note the numbers.
 3. Take the next **batch** from "Ordering, rewritten 8 August 2026" — not a
    single item. The unit of work here is a session; T8 proved it.
 4. Update this file as part of the change — an item is not done until its entry
@@ -169,19 +171,24 @@ Two corrections drive this rewrite:
 Sizes are **S / M / L**, meaning roughly: S = under a session; M = one focused
 session; L = more than one, or needs the board and a human watching.
 
-### Batch 1 — Desk work, no board (do now, in parallel with nothing)
+### Batch 1 — Desk work, no board — **DONE 8 August 2026**
 
-| | Item | Size | Why here |
+| | Item | Size | Outcome |
 |---|---|---|---|
-| 1 | **D14** network errors read as "Failed to fetch" | S | Every later board session produces these; unreadable errors waste the session |
-| 2 | **D15** no in-flight feedback | S | Makes D13 worse by inviting a second press. Fix before measuring D13 |
-| 3 | **D16** telemetry rendered as 0.0 on a failed read | S | Twin-path, fifth instance. One rule, five fields |
-| 4 | **D21** UI states the wrong step size (0.1° vs 0.06°) | S | Same handler as D14; a number shown to the operator that is simply wrong |
-| 5 | **D20** dead `eventTime` branch | S | Two minutes; it is a comment that lies |
+| 1 | **D14** network errors read as "Failed to fetch" | S | done — one `request()` door, `unreachable` reason code, no browser text can reach the screen |
+| 2 | **D15** no in-flight feedback | S | done — guard in `bind()`, the one place all nine controls pass through |
+| 3 | **D16** telemetry rendered as 0.0 on a failed read | S | done — **schema and client both**; raised **D23**, the sixth instance |
+| 4 | **D21** UI states the wrong step size (0.1° vs 0.06°) | S | done — reason codes split by who owns the words |
+| 5 | **D20** dead `eventTime` branch | S | done |
 
-**Rationale:** all four are client-side or schema-level, none need hardware, and
-three of them change what the *next* board session is able to observe. Fixing
-the instrument before taking the measurement.
+**The rationale held.** All five were client-side or schema-level, none needed
+hardware, and three of them change what the next board session can observe. The
+instrument is fixed before the measurement is taken.
+
+**What it cost that the plan did not predict:** the batch had no way to check
+four of its five items, so `tools/check_client_behaviour.js` was written to
+execute them rather than reporting them as read. That tool is now an open
+decision — **T12**.
 
 ### Batch 2 — Make the machine diagnosable (board present)
 
@@ -256,96 +263,25 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 
 ---
 
+## Closed — the record is in `docs/CLOSED.md`
+
+| | | closed |
+|---|---|---|
+| **D1** | A move to a negative angle stops at 0 | 7 August 2026 · **Confirmed on hardware, both halves** |
+| **D2** | `capture()` can store a failed read as position 0 | 7 August 2026 · commit `c903182` |
+| **D9** | The display and the motion path used two different baselines | 7 August 2026 · commit `c903182` · **found on hardware** |
+| **D11** | A single failed poll is presented as a disconnection | 7 August 2026 · **needs an operator's eye on the board** |
+| **D14** | The most likely error in the system shows the operator "Failed to fetch" | 8 August 2026 · Batch 1 |
+| **D15** | A command in flight looks identical to a command that did nothing | 8 August 2026 · Batch 1 |
+| **D16** | On a failed read the operator is shown 0.0 V, 0.0 A, 0.0 °C as if measured | 8 August 2026 · Batch 1 · **the answer was "both sides"** |
+| **D20** | `eventTime()` claims a compatibility fallback it does not implement | 8 August 2026 · Batch 1 |
+| **D21** | The UI tells the operator the step is 0.1°; it is 0.06° | 8 August 2026 · Batch 1 |
+| **T8** | Instrumented run on the board over adb | 7 August 2026 · **Flow:** `WORKFLOWS.md` W1 |
+| **T4** | Moves while unverified: DECIDED, permitted | (decision) · **Recorded in:** ADR-0007 |
+
+---
+
 ## Defects
-
-### D1 — A move to a negative angle stops at 0
-**Status:** done · 7 August 2026 · **Confirmed on hardware, both halves**
-
-Both acceptance conditions were exercised on the board in one session:
-
-- **Datum at count 2049 (mid-travel):** +90 and −90 both reached. Telemetry
-  shows `2055 → 3547` for +90, and a clean ramp back down at 10 deg/s. Resting
-  count 3549 = −0.06 deg, one count off target.
-- **Datum at count 3550 (near the top):** a move to +90 needs count 5051 against
-  a 4095 ceiling and was **refused as out of travel, not clamped**. The
-  off-centre warning fired at capture time with
-  `needed_either_side=1501 usable_counts=4095`.
-
-Root cause was the datum, as suspected — D1 was the symptom, D2 and D9 were the
-causes. Kept here rather than moved, because the reasoning is the record.
-
-**Original report follows.**
-
-**Severity:** high · **Reported:** observed on hardware
-
-Commanding a move from, say, +10° to −45° is accepted, the servo starts, and it
-stops at count 0 instead of reaching the target.
-
-Suspected cause (operator's read): the datum was captured at real step 0, so the
-negative half of travel maps below count 0, and the servo clamps there silently
-while still reporting success. If the datum sits mid-travel this may not
-reproduce — which makes D2 the likely root cause rather than a separate bug.
-
-**Acceptance:** with a mid-travel datum, a move from +10° to −45° lands within
-one count of target. With a datum at 0, the move is *refused* as `out_of_travel`
-rather than silently clamped.
-
-**Related:** D2, and `AUDIT.md` "Datum At Zero Strands The Negative Half".
-
----
-
-### D2 — `capture()` can store a failed read as position 0
-**Status:** done · 7 August 2026 · commit `c903182`
-
-Fixed as specified, by the preferred fix rather than the local one:
-`read_raw_counts()` is gone from the `ServoRepository` contract and from
-`BridgeServoRepository`, so no caller can obtain a position without handling a
-snapshot and its `valid` flag. `capture()` now raises `InvalidReadingError`
-exactly as `calibrate()` always did.
-
-Removing the method exposed **two further call sites nobody had counted**:
-
-- `ServoStateStore.snapshot()` — the path feeding the UI *and* the telemetry
-  database. See D9.
-- `MotionService.recover()` — clearing an overload works by re-commanding the
-  present position, so on a stalled bus it commanded count 0, driving the
-  mechanism to the bottom of travel in the name of not moving it. Now refuses.
-
-That is the argument for deleting the method rather than guarding the call site,
-made concrete: guarding `capture()` alone would have left both.
-
-Six tests added, each failing before the change. Suite 186 → 192.
-
-**Original report follows.**
-
-**Severity:** high · **Flow:** `WORKFLOWS.md` W2
-
-`ZeroService.capture()` (`python/app/services/zero_service.py:41`) calls
-`read_raw_counts()` with no validity check. `read_raw_counts()`
-(`python/app/repositories/concrete/bridge_servo_repository.py:165`) is
-`return self.read_snapshot().raw_counts` — it discards the snapshot's `valid`
-flag. On a failed or unparsable read the snapshot is `_empty_snapshot()`, so the
-call returns `0`, indistinguishable from a genuine reading of zero.
-
-`calibrate()` guards this correctly and raises `InvalidReadingError`. `capture()`
-does not. **The guard was applied to one of two paths.**
-
-This is the same defect class `AUDIT.md` was written about, through a different
-door: a bus hiccup while an operator saves a named zero stores `raw_counts=0`;
-activating that zero later strands the negative half of travel, producing D1.
-
-Not caught by the suite — `test_nothing_is_stored_when_the_read_failed` sits in
-`TestCalibrationRobustness` and exercises `calibrate()` only.
-
-**Preferred fix:** remove `read_raw_counts()` from the `ServoRepository`
-contract entirely, forcing every caller to handle a snapshot and its `valid`
-flag. Guarding `capture()` alone fixes today's call site; deleting the lying
-method fixes every call site that will ever exist.
-
-**Acceptance:** no path can convert an invalid reading into a stored position. A
-test covers `capture()` with a failed read.
-
----
 
 ### D3 — The C++ side has no logging
 **Status:** open · **Severity:** high · **Flow:** `WORKFLOWS.md` W3
@@ -528,7 +464,13 @@ paint itself is still unmeasured.
 ---
 
 ### D7 — UI is not verified on small operator screens
-**Status:** open · **Severity:** medium
+**Status:** open · **Severity:** medium · **still blocked on Q1**
+
+**Narrowed 8 August 2026: it is not a touch screen** (operator, answering the
+touch half of Q1). That settles the *interaction* model — and D15 was designed
+against it — but not the size. A wall panel and a laptop are both
+pointer-driven and lay out nothing alike, so **the viewport is still the
+blocker.**
 
 Operator screens may be small; the mechanical/ops discussion mentioned an
 iPad-class size (exact model not recorded). The layout has only been eyeballed
@@ -580,38 +522,6 @@ warning in a log nobody reads is what allowed this to persist.
 
 ---
 
-### D9 — The display and the motion path used two different baselines
-**Status:** done · 7 August 2026 · commit `c903182` · **found on hardware**
-
-With no datum captured and the servo parked at count 0, an operator pressed
-"move to 90". The mechanism swept **212.7 output degrees**.
-
-Nothing malfunctioned. Both sides were internally consistent, against different
-baselines:
-
-| | baseline used | reported |
-|---|---|---|
-| Motion (`_active_counts`) | 2048, mid-travel | `from_deg: -122.7 → to_deg: 90.0`, correct |
-| Display (`_to_output_deg`) | **0** | "0.0 deg" before, "212.74" after |
-
-The operator commanded 90 from a screen reading 0, and the machine travelled
-212.7 at 30 deg/s — seven seconds of wrong movement. Telemetry recorded the
-sweep count by count.
-
-The two definitions sat **twelve lines apart in the same file**, and the correct
-one carried a six-line docstring explaining precisely why a baseline of 0 is
-wrong. The other did it anyway.
-
-`_baseline_counts()` is now the only definition; both callers delegate. The
-display conversion also now applies `servo_direction`, which it had never done —
-the same twin-path bug would have mirrored the readout against the motion path
-under `SERVO_DIRECTION=-1`.
-
-**This is the D2 defect class again**: a rule applied to one path and not its
-twin. Third instance in this repository, counting `AUDIT.md`.
-
----
-
 ### D10 — `logger.exception` swallows the exception
 **Status:** half done — **the logging is fixed; the fault itself is still
 unexplained** · **Severity:** medium · **Found by:** a live board run
@@ -655,44 +565,6 @@ worse than not logging it: it looks like diagnosis.
 **Acceptance:** an exception in the sampler produces a record from which the
 fault can be identified without reproducing it; and the 21:37:58 failure is
 explained.
-
----
-
-### D11 — A single failed poll is presented as a disconnection
-**Status:** done · 7 August 2026 · **needs an operator's eye on the board**
-
-Both over-reactions now require `FAILURES_BEFORE_ALARM = 3` consecutive
-failures — about three seconds at one poll per second. A single lost answer is
-invisible; a real stall lasts ten seconds and still shows plainly. On an invalid
-reading inside the tolerance the readout holds the last **measured** position
-rather than blanking, and only blanks once the position is genuinely unknown.
-
-This paces what is *displayed*. It does not soften what is *reported*: the API
-still says `reading_valid: false` the moment a read fails, per ADR-0008. The
-honest contract sits underneath a calm surface, which is the split that ADR
-deliberately left open.
-
-**Not yet confirmed by eye** — the change is served from the board but wants an
-operator to drive it and say whether the flashing has stopped.
-
-**Original report follows.**
-
-`app.js:225-231`: any failed poll immediately flips the UI to OFFLINE and says
-"connection lost — retrying…". One dropped request in a continuous poll stream
-is enough, so the operator sees a connection failure that did not happen.
-
-The same over-reaction now exists on the position readout: `renderState` shows
-`--` the instant one read is invalid, so a single blip makes the position blink
-to unknown. Honest at the API — which must keep reporting `null`, see ADR-0008 —
-but it reads as "broken" to a non-programmer, and **the end users are not
-programmers.**
-
-Both want one treatment: require N consecutive failures before declaring a
-state, rather than reacting to a single sample. A real 10-second stall still
-surfaces clearly; a blip stops shouting.
-
-**Acceptance:** a single failed poll or invalid read produces no visible alarm; a
-sustained one is unmistakable. The threshold is written down here once chosen.
 
 ---
 
@@ -774,83 +646,6 @@ to the datum, and it is obvious which one it is.
 
 ---
 
-### D14 — The most likely error in the system shows the operator "Failed to fetch"
-**Status:** open · **Severity:** high · **Found by:** operator lens, 8 August 2026
-
-`sayError()` (`app.js:220`) translates five backend `reason` codes into plain
-English. Everything else falls through to `"error: " + err.message`.
-
-**A refused connection never has a reason code.** When the relay runs out of
-slots (D13) the `fetch` rejects at the network layer, so `asApiError()` is never
-reached, `err.reason` is `undefined`, and the operator is shown the browser's
-own string — **"error: Failed to fetch"**.
-
-So the single most likely failure in the whole system — the one D13 measured at
-5 in 10 back-to-back requests — produces the least intelligible message in the
-whole UI. The end users are not programmers.
-
-**Acceptance:** a network-level failure produces a sentence an operator can act
-on ("the controller is busy — try again in a moment"), distinct from a refusal
-by the servo and distinct from a fault. No browser-generated text reaches the
-screen.
-
-**Related:** D13 (the cause), D15 (why they press again).
-
----
-
-### D15 — A command in flight looks identical to a command that did nothing
-**Status:** open · **Severity:** high · **Found by:** operator lens, 8 August 2026
-
-`bind()` (`app.js:539`) flashes the button for 400 ms. Every command handler is
-then `await`-ing an HTTP round trip with **no in-flight state**: the button is
-not disabled, nothing spins, and success is deliberately silent
-(`/* success: no notice */` appears at nine call sites).
-
-A `servo_read` can take up to the Bridge's 10 s timeout. In that window the
-operator sees a 400 ms flash and then nothing, so they press again — **and the
-second press opens another connection, which is exactly what exhausts the six
-W5500 slots.** The UI's response to slowness actively worsens its cause.
-
-This is the other half of "first press does nothing, press it again". D13
-explains why the first press failed; this explains why the operator's instinct
-makes it worse.
-
-**Acceptance:** while a command is in flight the control shows it and cannot be
-pressed again. A command that has not answered within a stated time says so.
-
-**Related:** D13, D14, D6.
-
----
-
-### D16 — On a failed read the operator is shown 0.0 V, 0.0 A, 0.0 °C as if measured
-**Status:** open · **Severity:** high · **Found by:** operator lens, 8 August 2026
-
-`ServoStateResponse` (`python/app/schemas/servo.py:106`) makes `output_deg`
-`Optional[float]`, with a docstring that states the rule exactly:
-
-> *"or null when the servo did not answer. Clients must render null as
-> 'unknown' and never as 0 — a failed read is not a position."*
-
-**The four fields beside it are plain `float`.** `temperature_c`, `voltage_v`,
-`current_a` and `torque_kgcm` carry no null, so on a failed read they arrive as
-`0.0` from `_empty_snapshot()` and `renderState` (`app.js:286-289`) prints them
-unconditionally. The operator sees **Voltage 0.00 V** next to a position that
-correctly says unknown — which reads as *the servo has lost power*, and is
-false.
-
-**This is the twin-path defect for the fifth time in this repository.** The rule
-was written down, correctly, in a docstring — and applied to one field of five.
-Same shape as D2 (`calibrate()` but not `capture()`), D9 (two baselines), D10
-(production logger and its test stub).
-
-**Acceptance:** no telemetry value is rendered as a measurement when
-`reading_valid` is false. Either the schema nulls them all or the client blanks
-them all; one rule, five fields.
-
-**Related:** D2, D9, D10, ADR-0008.
-
----
-
 ### D17 — The position bar cannot show the negative half of travel
 **Status:** open · **Severity:** medium · **Found by:** operator lens, 8 August 2026
 
@@ -883,8 +678,20 @@ their way back — from a machine-control screen.
 It is also a **new connection** every time, spending from the same six-slot
 budget as D13, taken at the moment an operator is most likely to also be driving.
 
+**Sharpened by the twin-review of Batch 1, 8 August 2026.** D15's in-flight
+guard went into `bind()`, and `doExport()` is the one handler it cannot hold:
+it is **synchronous**, so `await handler()` resolves on the next microtask and
+the control is released before the operator can see it was ever busy. Three
+presses therefore start three concurrent exports, each a `StreamingResponse`
+holding a relay socket — and the endpoint sets `Content-Disposition:
+attachment`, so the browser does not cancel the previous one the way it cancels
+a navigation. **The slowest, heaviest request in the application is the only
+command with no press guard.** Making it a background fetch fixes both halves
+at once.
+
 **Acceptance:** export fetches in the background, reports success or failure like
-every other command, and never navigates away from the control page.
+every other command, never navigates away from the control page, and is covered
+by the same in-flight guard as every other control.
 
 **Related:** D13, D14, R5 — the export is the seed of the benchmarking pack, so
 it will be used more, not less.
@@ -917,64 +724,6 @@ not reachable, the defect is that a fallback exists at all for a state that
 cannot happen, and it should be an error rather than a silent 0.
 
 **Related:** D9, D12.
-
----
-
-### D20 — `eventTime()` claims a compatibility fallback it does not implement
-**Status:** open · **Severity:** low · **Found by:** operator lens, 8 August 2026
-
-`app.js:411-412`:
-
-```js
-/* backend field is `timestamp` (ISO string); tolerate legacy `timestamp` too */
-const raw = e.timestamp != null ? e.timestamp : e.timestamp;
-```
-
-Both branches are the same expression. The comment describes a tolerance for a
-legacy field name that the code does not provide — presumably `ts`, which
-`CONTEXT.md` forbids in favour of `timestamp`.
-
-Harmless today, and worth removing rather than fixing: the glossary settled the
-name, so the fallback should not exist. Filed because a comment that describes
-behaviour the code does not have is the same species as D10 — *it looks like
-diagnosis*.
-
-**Acceptance:** the dead branch and its comment are gone.
-
----
-
-### D21 — The UI tells the operator the step is 0.1°; it is 0.06°
-**Status:** open · **Severity:** medium · **Found by:** the gear-ratio audit,
-8 August 2026
-
-The backend raises the right message, derived from configuration:
-
-```python
-step = self._settings.output_step_deg          # 0.06
-raise StepError(f"angle must be in steps of {step} deg")
-```
-
-**The client throws that message away.** `sayError()` (`app.js:224`) maps the
-`step` reason code to a hardcoded string: `"refused — angle must be a multiple
-of 0.1°"`. So the operator is told a granularity that is not the one enforced,
-by roughly a factor of two, and the correct figure — which travelled all the way
-from `config.py` — is discarded on arrival.
-
-The same handler discards the backend's message for **all five** mapped reason
-codes; `step` is simply the one where the constant is provably wrong. If
-`output_step_deg` is ever retuned (the config docstring at `config.py:53`
-explicitly contemplates coarsening every step), the UI keeps saying 0.1°.
-
-**Twin-path again:** one side derives from configuration, the other hardcodes.
-
-**Confirmed by the operator, 8 August 2026:** the 0.1° figure is left over from
-an earlier design and is simply wrong. **Fix it.**
-
-**Acceptance:** the operator is shown the enforced step, and it comes from the
-backend rather than from a constant in the client.
-
-**Related:** D14 (the same handler is where unmapped errors leak "Failed to
-fetch"), ADR-0003.
 
 ---
 
@@ -1024,7 +773,174 @@ already does).
 
 ---
 
+### D23 — `moving` and the fault flags are reported as measured on a failed read
+**Status:** open · **Severity:** medium · **Raised by:** Batch 1, 8 August 2026
+
+The sixth twin-path instance, where D16's entry said to look for it.
+
+After Batch 1 six fields null on a failed read: `output_deg`, `raw_counts` and
+the four telemetry floats. `moving` and the six fault booleans still come from
+`_empty_snapshot()`, all `False` — so the API states that a servo which did not
+answer is **not moving and has no faults**. The UI no longer renders it; every
+other consumer still reads it, which after R5 and D22 is the point of the API.
+
+Not fixed in Batch 1 because `bool | None` is a tri-state that ripples into the
+CSV, `TelemetrySample`, the database schema and every client — an API-shape
+decision, not a defect fix.
+
+Three options, not equivalent:
+
+1. **Null the booleans too.** Consistent with the six that already null; most work.
+2. **Lean on `reading_valid`** and document it. Cheapest; relies on every future
+   client reading a docstring — the assumption that failed in D16.
+3. **Nest a `reading` object** that is null as a whole. Cleanest; biggest change
+   to client and CSV.
+
+**Acceptance:** one is chosen and written down, and no field of `/servo/state`
+states a measurement that was not taken. If (2), say plainly it is a documented
+convention, not an enforced one. **Amends ADR-0008.**
+
+**Related:** D16, D2, D9, ADR-0008.
+
+---
+
+### D26 — The Python suite failed once in ten runs, unreproduced
+**Status:** open · **needs investigation** · **Severity:** medium
+· **Observed:** 8 August 2026
+
+One run reported `1 failed, 197 passed`. Nine runs either side were clean and it
+did not recur, so **which test failed is not known** — the run was chained into
+one command and its traceback was consumed before it could be read. That was an
+error in how it was run.
+
+- It happened on the loaded run (pytest + `make` + two `node` invocations
+  chained, on a machine also serving an sshfs mount).
+- Batch 1's Python change is four conditional expressions and some type
+  annotations — nothing concurrent, timed or ordered.
+- The suite has timing-sensitive areas: the settle window, the sampler interval,
+  `wait_until` in `conftest.py`. A deadline under load is the natural suspect.
+
+**Acceptance:** run the suite in a loop with `--tb=long` captured to a file
+until it recurs; then fix it or document the timing sensitivity that triggers
+it. **Until then a single green run is not evidence** — any report of "198
+passed" should say how many runs it took.
+
+**Related:** D10 (a failure that destroyed its own evidence), T3.
+
+---
+
+### D25 — An overload that stops being readable disappears from the screen
+**Status:** open · **Severity:** medium · **Found by:** twin-review, 8 August 2026
+
+The servo trips overload; the banner reads `■ ALARM · Overload` and the recover
+control appears. Reads then start failing — what a strained servo on a busy bus
+does. After three failures D16's rule blanks the lamps, the banner switches to
+"Position unknown", and the recover control is hidden. **The servo is still
+overloaded and the screen no longer says so.**
+
+Not a regression — before D16, `overload:false` hid the button from the *first*
+failed read. Filed because D16 rewrote these lines: blanking a fault that **was**
+reported differs from blanking a lamp that never was.
+
+**Hiding recover is arguably correct**, and that is the tension: `recover()`
+raises `InvalidReadingError` when the position is unknown, so the control could
+only refuse. The defect is that the alarm stops being *stated*.
+
+**Acceptance:** a fault reported and never reported cleared stays visible while
+the reading is unknown, marked last-known. Decide at the same time whether
+recover is reachable or explained as unavailable — hidden and refused teach the
+operator different things.
+
+**Related:** D16, D11, D12, R2.
+
+---
+
+### D24 — Two `InvalidReadingError` guards are unexercised; the docs claimed 100%
+**Status:** open · **Severity:** medium · **Found by:** Batch 1, 8 August 2026
+
+Coverage of `app/` is **99%, not 100%**. Two statements never execute:
+
+| | |
+|---|---|
+| `zero_service.py:49` | the guard in **`ZeroService.capture()`** |
+| `servo_state.py:225` | the guard in **`ServoStateStore.read_counts()`** |
+
+**`capture()`'s guard is the line D2 exists about.** D2 states it "now raises
+`InvalidReadingError` exactly as `calibrate()` always did" and that six tests
+were added. The guard is correct; the test that runs it does not exist.
+`calibrate()`'s twin **is** covered — the twin-path shape, this time in the
+tests.
+
+Measured identically before and after Batch 1 (929 statements, 2 missed), so it
+pre-dates it. It survived because **nothing measures it**: the verification
+commands do not run coverage and `pytest.ini` sets no threshold.
+
+**Acceptance:** both guards exercised by a test that fails without them, and the
+quoted figure is one the suite enforces (`--cov-fail-under`) or is not quoted.
+
+**Related:** D2, ADR-0008, `AUDIT.md`.
+
+---
+
 ## Tasks
+
+### T12 — Decide the status of `tools/check_client_behaviour.js`
+**Status:** open · **Severity:** medium · **Raised by:** Batch 1, 8 August 2026
+
+Written during Batch 1 because four of its five items were client-side and the
+repository could check none of them. Loads `python/static/app.js` into a stubbed
+DOM under `node` and runs 44 assertions across D14, D15, D16, D20, D21. Passes.
+Deliberately **not** a fourth verification command yet.
+
+**For:** every UI defect here — D14, D15, D16, D17, D18, D19, D21 — lives in one
+600-line file with no automated coverage, and it needs nothing beyond `node`, in
+the spirit of `tools/check_bridge_contract.py`.
+
+**Against:** it makes `node` a development prerequisite, which touches ADR-0005
+(air-gapped by default) — it must never become something fetched from a network.
+And a stubbed DOM proves logic, not rendering: nothing about layout, CSS, or
+whether `disabled` really blocks a click.
+
+**Acceptance:** either it becomes a fourth command and `CLAUDE.md` §3 says so
+with its count, or it is recorded as a one-off with a reason. **Do not leave it
+undecided** — a checker nobody runs is D20's species.
+
+**Related:** ADR-0005, D7, R6.
+
+---
+
+### T13 — Distil the remaining documents
+**Status:** open · **Severity:** medium · **Raised by:** the operator, 8 August 2026
+
+Docs are re-ingested at the start of every session, so their length is a
+recurring tax on the work. Started 8 August 2026: closed items moved to
+`docs/CLOSED.md` and Batch 1's own entries cut, taking `BACKLOG.md` from 15,223
+words to ~10,600.
+
+**Not yet done.** The remaining bloat is in entries written before this rule:
+
+| | words |
+|---|---|
+| `D4` | 687 |
+| `D13` | 522 |
+| `R2` | 520 |
+| `R5`'s "use case" section | 459 |
+| `T11` | 425 |
+| `D22` | 388 |
+| `D10`, `D8`, `T10`, `D5`, `T9` | ~300 each |
+
+Also worth a pass: `docs/WORKFLOWS.md` (1,754) and `CONVENTIONS.md` (1,350).
+
+**Do it opportunistically** — distil an entry when you are already working on
+that item, not as a sweep of its own. A sweep costs the tokens it is meant to
+save, and rewriting reasoning you have not just re-derived is how facts get
+dropped.
+
+**Acceptance:** no open entry states the same thing twice, and every one keeps
+its numbers, paths, decisions and honest statements of what was not tested. The
+rule itself is in `CLAUDE.md` §4.
+
+---
 
 ### T1 — Apply `CONVENTIONS.md` across the codebase
 **Status:** open · **Flow:** `WORKFLOWS.md` W4 · suited to an executing agent
@@ -1034,7 +950,7 @@ lines missing `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list
 comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
 
 **Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
-and 192 tests still pass.
+and 198 tests still pass.
 
 ---
 
@@ -1219,41 +1135,6 @@ already has it.
 
 ---
 
-### T8 — Instrumented run on the board over adb
-**Status:** done · 7 August 2026 · **Flow:** `WORKFLOWS.md` W1
-
-Ran as designed, and it paid for itself. `.env` created, app started headlessly
-with `arduino-app-cli app start user:servo_mvp` at `LOG_LEVEL=DEBUG`, UI driven
-by the operator while logs and the database were pulled over `adb`.
-
-**Settled:** D4 (cause found: the W5500 race), D5 (uvicorn ruled out; churn is
-`timeout_keep_alive` by design), D1 (confirmed and closed against a real datum).
-**Left open:** D6 — first paint still unmeasured.
-
-**Found things nobody was looking for:** D9 (two baselines, 212.7 deg of wrong
-movement), the `recover()` hazard under D2, and D10, D11, D12.
-
-The backlog's own argument was right: planning over unknowns produces a plan you
-throw away. Three of the four unknowns fell out of one session, and the most
-serious defect of the day was not on the list at all.
-
-**Worth repeating** whenever the board is hot and a change is worth watching, at
-DEBUG for the duration and INFO afterwards.
-
-**Original entry follows.**
-
-One deliberate session that settles four open defects at once: create `.env`
-(D8), start the app, drive `adb` to pull logs and query the database while the UI
-is exercised.
-
-Run with the log level at DEBUG for this session specifically, so the relay's
-connect/disconnect lines actually appear.
-
-**Settles:** D4 (connection drops), D5 (what is really flooding the log), D6
-(load time), and confirms D1 against the real stored datum.
-
----
-
 ### T2 — Package the air-gapped bundle
 **Status:** open
 
@@ -1279,32 +1160,6 @@ writes, landing accuracy and stop-hold — the things a host cannot check.
 **Acceptance:** uploaded once with the servo free-shafted, tally recorded here.
 
 ---
-
-### T4 — Moves while unverified: DECIDED, permitted
-**Status:** done (decision) · **Recorded in:** ADR-0007
-
-Calibration is an **operator startup ritual**, not a backend startup action: on
-first start the operator drives the mechanism to mid-travel and presses Calibrate
-to set the datum. Necessary because the mechanism can be moved by hand while
-power is off.
-
-`_position_verified` is `False` after every boot (`servo_state.py:35`).
-
-**The UI half is already done** — `app.js:276` flags the Calibrate control and
-`:287` shows "Reference not set — press CALIBRATE at the physical home".
-
-`motion_service.py` never consults `position_verified`, so moves are accepted in
-that state. **That behaviour is correct and stays** — the site is ~3 hours away,
-and refusing movement until someone physically presses Calibrate turns a
-recoverable signal loss into a site visit. Full reasoning in ADR-0007.
-
-**Remaining work:** none in code. The unverified warning in `app.js` is now
-load-bearing and must not be removed — noted in ADR-0007 so it is not "tidied
-away" later.
-
----
-
-## Requirements captured but not yet designed
 
 ### R1 — Determine the real concurrent-operator ceiling
 Target: roughly three remote operators plus one local USB-C session, all

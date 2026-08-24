@@ -55,8 +55,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/models/entities.py": {
-    "mtime": 1786136756.0,
-    "ast_hash": "585182be462de3d216ed7e6c87776c9a",
+    "mtime": 1786190726.0,
+    "ast_hash": "943e6e4e4ceff6b5edf5919d357b0e01",
     "semantic_hash": ""
   },
   "python/app/relay/__init__.py": {
@@ -150,8 +150,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/schemas/servo.py": {
-    "mtime": 1786136872.0,
-    "ast_hash": "7696703325ad2df1080403e2710db6c5",
+    "mtime": 1786190726.0,
+    "ast_hash": "618a72a3ae781e5592889c563e0d59bd",
     "semantic_hash": ""
   },
   "python/app/schemas/system.py": {
@@ -175,8 +175,8 @@
     "semantic_hash": ""
   },
   "python/app/services/servo_state.py": {
-    "mtime": 1786136796.0,
-    "ast_hash": "84b861152563446a6b23c80ca1cbc50b",
+    "mtime": 1786190726.0,
+    "ast_hash": "593a2772c5793331c353858ed4c269c4",
     "semantic_hash": ""
   },
   "python/app/services/telemetry_service.py": {
@@ -200,8 +200,8 @@
     "semantic_hash": "12406d28aec8d097fed06de20b60cce7"
   },
   "python/static/app.js": {
-    "mtime": 1786140335.0,
-    "ast_hash": "380a04459bd02ff62656544765bc022c",
+    "mtime": 1786191794.0,
+    "ast_hash": "2c437547066ab157451ee5d236139245",
     "semantic_hash": ""
   },
   "python/tests/__init__.py": {
@@ -245,8 +245,8 @@
     "semantic_hash": "6eeed8377b7df8c3a8041d4a4ce93058"
   },
   "python/tests/integration/test_servo_routes.py": {
-    "mtime": 1786136924.0,
-    "ast_hash": "e08aff5de1c74341ee1b6304433d5c42",
+    "mtime": 1786190727.0,
+    "ast_hash": "c790d5cbac0f65294368970ff0db7d6e",
     "semantic_hash": ""
   },
   "python/tests/integration/test_system_routes.py": {
@@ -305,8 +305,8 @@
     "semantic_hash": ""
   },
   "python/tests/unit/test_servo_state.py": {
-    "mtime": 1786136708.0,
-    "ast_hash": "0541cfec7f61039c60b71d4d9dfcfd4d",
+    "mtime": 1786190727.0,
+    "ast_hash": "d856b9532d3f2e2e4fb60e5793292275",
     "semantic_hash": ""
   },
   "python/tests/unit/test_sign_magnitude.py": {
@@ -445,8 +445,8 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1786188793.0,
-    "ast_hash": "bb6e3010a34910d0393e24e464b78f8a",
+    "mtime": 1786203629.0,
+    "ast_hash": "7a5e88426bf57e292dfc11a4dc791ce0",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -455,8 +455,8 @@
     "semantic_hash": "996f2ee11145c5323f5dd26e980d7f73"
   },
   "README.md": {
-    "mtime": 1786188498.0,
-    "ast_hash": "0f5a410c97b66b97babbbec38b0b9af4",
+    "mtime": 1786191929.0,
+    "ast_hash": "7155746611fa1e2b82fee201d5788bbe",
     "semantic_hash": ""
   },
   "app.yaml": {
@@ -475,8 +475,8 @@
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1786188786.0,
-    "ast_hash": "1267d43a576783548739a11c56d4ad26",
+    "mtime": 1786202704.0,
+    "ast_hash": "3728a838a95f59cbc515c825477410d6",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -500,9 +500,9 @@
     "semantic_hash": "c51d4469ba4d7eb82d0bce0bfdb18eb4"
   },
   "python/static/index.html": {
-    "mtime": 1785833190.0,
-    "ast_hash": "0e7aaa1eafe5484645483e1bc6115836",
-    "semantic_hash": "0e7aaa1eafe5484645483e1bc6115836"
+    "mtime": 1786191810.0,
+    "ast_hash": "36914c70e1c068705dbd52e58625cf22",
+    "semantic_hash": ""
   },
   "python/wheelhouse/README.txt": {
     "mtime": 1785833274.0,
@@ -510,8 +510,8 @@
     "semantic_hash": "5928f90926905aaf97760b2f369448c1"
   },
   "sketch/README.md": {
-    "mtime": 1786188501.0,
-    "ast_hash": "da4081702abb5946f2eac68eecabf319",
+    "mtime": 1786190566.0,
+    "ast_hash": "905ca1ce73e0e39b7cd81bd5120741db",
     "semantic_hash": ""
   },
   "sketch/sketch.yaml": {
@@ -530,8 +530,8 @@
     "semantic_hash": "ed9715a57d70d0c7afa8e72bcfb65e3a"
   },
   "docs/BACKLOG.md": {
-    "mtime": 1786188781.0,
-    "ast_hash": "8c6d176331591479cefca0b05d31f690",
+    "mtime": 1786203616.0,
+    "ast_hash": "30feb0a2f4caae11ba5c4c6faa61bb86",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -575,8 +575,8 @@
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1786188498.0,
-    "ast_hash": "820b84c6880c6b6f00c0544e0f8c4202",
+    "mtime": 1786190790.0,
+    "ast_hash": "2d330846695c22c682c22feb3798c97d",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.eslintrc.js": {
@@ -2350,8 +2350,8 @@
     "semantic_hash": ""
   },
   "skills/uno-q-st3215/SKILL.md": {
-    "mtime": 1786139548.0,
-    "ast_hash": "91bde1495378d90c0e1d5b81dacb7609",
+    "mtime": 1786190885.0,
+    "ast_hash": "63c4b7cd6beb454a0683c4d83879ae01",
     "semantic_hash": ""
   },
   "skills/superpowers/assets/app-icon.png": {
@@ -2365,8 +2365,8 @@
     "semantic_hash": ""
   },
   "docs/adr/0008-a-failed-read-is-reported-as-unknown.md": {
-    "mtime": 1786142207.0,
-    "ast_hash": "931a9952dfae2a8dd2e506f3d1466878",
+    "mtime": 1786202704.0,
+    "ast_hash": "ca92af9c70500d722987b677671d159c",
     "semantic_hash": ""
   },
   "tools/soak_report.py": {
@@ -2380,23 +2380,33 @@
     "semantic_hash": ""
   },
   "skills/deliver/SKILL.md": {
-    "mtime": 1786188501.0,
-    "ast_hash": "5e68e1ceeb1ae76fd8ca79d51c5e7fde",
+    "mtime": 1786192024.0,
+    "ast_hash": "48df89a762d04db5dd3d71ff54936174",
     "semantic_hash": ""
   },
   "skills/operator-lens/SKILL.md": {
-    "mtime": 1786188501.0,
-    "ast_hash": "86353e176b99420d1118787a838bc5fb",
+    "mtime": 1786190566.0,
+    "ast_hash": "70a0bf9b5b8602131a9d233f210c3f56",
     "semantic_hash": ""
   },
   "skills/twin-review/SKILL.md": {
-    "mtime": 1786188501.0,
-    "ast_hash": "16077747201dfe1275513f4278b60bac",
+    "mtime": 1786190790.0,
+    "ast_hash": "63398a6bedc17f4f5f56e4ff07577ec0",
     "semantic_hash": ""
   },
   "docs/OPEN_QUESTIONS.md": {
-    "mtime": 1786188714.0,
-    "ast_hash": "b33ef4845ca44bb459b8b1b962c06223",
+    "mtime": 1786190854.0,
+    "ast_hash": "06b47121d99ef42d3547fab123c310ae",
+    "semantic_hash": ""
+  },
+  "tools/check_client_behaviour.js": {
+    "mtime": 1786191908.0,
+    "ast_hash": "5c168d1262a64bdc0a60806d4b8fb30e",
+    "semantic_hash": ""
+  },
+  "docs/CLOSED.md": {
+    "mtime": 1786202617.0,
+    "ast_hash": "29f6eb68b9a95b1d0a08f123c93f0b37",
     "semantic_hash": ""
   }
 }

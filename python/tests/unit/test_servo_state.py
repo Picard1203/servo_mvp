@@ -106,6 +106,33 @@ class TestFailedReadIsNeverAPosition:
         get_state_store().snapshot()
         assert "servo.read.failed" in backend.logger.events()
 
+    def test_invalid_reading_reports_no_telemetry(self, backend, sim):
+        """The rule that nulls the position governs the readings beside it.
+
+        The docstring on output_deg stated the rule correctly and it was
+        applied to one field of five: temperature, voltage, current and
+        torque stayed plain floats, so a dead bus delivered 0.0 for each
+        from _empty_snapshot(). An operator saw 0.00 V next to a position
+        that honestly said unknown, which reads as lost power (D16).
+        """
+        from app.deps import get_state_store
+        sim.read_snapshot = self._dead_bus
+        view = get_state_store().snapshot()
+        assert view.temperature_c is None
+        assert view.voltage_v is None
+        assert view.current_a is None
+        assert view.torque_kgcm is None
+
+    def test_valid_reading_still_reports_telemetry(self, backend, sim):
+        """Nulling on failure must not null on success."""
+        from app.deps import get_state_store
+        view = get_state_store().snapshot()
+        assert view.reading_valid is True
+        assert isinstance(view.temperature_c, float)
+        assert isinstance(view.voltage_v, float)
+        assert isinstance(view.current_a, float)
+        assert isinstance(view.torque_kgcm, float)
+
 
 class TestOneBaseline:
     """The display and the motion path must share one baseline.

@@ -92,10 +92,17 @@ class ServoStateResponse(BaseModel):
         position_verified: False after boot until calibration; a False
             here means the shown angle may be off by whole turns.
         active_zero: Name of the active baseline.
-        temperature_c: Servo temperature, Celsius.
-        voltage_v: Supply voltage, Volts.
-        current_a: Motor current, Amperes.
-        torque_kgcm: Estimated torque, kg*cm.
+        temperature_c: Servo temperature in Celsius, or null when the
+            servo did not answer. The rule stated above for output_deg
+            applies to these four identically - a failed read is not a
+            measurement, and 0.00 V shown as one reads to an operator
+            as a servo that has lost power.
+        voltage_v: Supply voltage in Volts, or null when the servo did
+            not answer.
+        current_a: Motor current in Amperes, or null when the servo did
+            not answer.
+        torque_kgcm: Estimated torque in kg*cm, or null when the servo
+            did not answer.
         overload: Servo overload protection tripped.
         overcurrent: Overcurrent fault flag.
         overheat: Overheat fault flag.
@@ -110,10 +117,10 @@ class ServoStateResponse(BaseModel):
     settling: bool
     position_verified: bool
     active_zero: str
-    temperature_c: float
-    voltage_v: float
-    current_a: float
-    torque_kgcm: float
+    temperature_c: Optional[float]
+    voltage_v: Optional[float]
+    current_a: Optional[float]
+    torque_kgcm: Optional[float]
     overload: bool
     overcurrent: bool
     overheat: bool

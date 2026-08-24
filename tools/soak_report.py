@@ -37,13 +37,30 @@ from typing import Any, Optional
 
 BOARD_APP_DIR: str = "/home/arduino/ArduinoApps/servo_mvp"
 
-# A gap wider than this is worth naming. The sampler runs at 1 s, so anything
-# past a couple of seconds means it did not get to run.
+# A gap wider than this is worth naming - past a couple of seconds means the
+# sampler did not get to run, regardless of its configured interval.
 GAP_THRESHOLD_SECONDS: float = 2.0
 
-# The stall signature: servo_read's 10 s timeout plus one sampler interval.
-STALL_BAND_LOW_SECONDS: float = 9.0
-STALL_BAND_HIGH_SECONDS: float = 13.0
+# The stall signature: servo_read's 10 s timeout, offset by one sampler
+# interval either side. Derived, not hardcoded, because the sampler interval
+# is a live config value (config.py's sampler_interval_seconds) - a soak run
+# at a different interval than the one this band assumes measures the wrong
+# window. Reproduces the original 9.0/13.0 exactly at interval=1.0.
+SERVO_READ_TIMEOUT_SECONDS: float = 10.0
+
+
+def stall_band(sampler_interval_seconds: float) -> tuple[float, float]:
+    """Returns the (low, high) stall-band bounds for a given sampler interval.
+
+    Args:
+        sampler_interval_seconds: The sampler's configured interval.
+
+    Returns:
+        A (low, high) tuple in seconds.
+    """
+    low = SERVO_READ_TIMEOUT_SECONDS - sampler_interval_seconds
+    high = SERVO_READ_TIMEOUT_SECONDS + sampler_interval_seconds + 2.0
+    return low, high
 
 
 def pull_from_board(name: str, destination: str) -> Optional[str]:
@@ -102,16 +119,20 @@ def _utc_cutoff(since: float) -> str:
             .replace(tzinfo=None).isoformat())
 
 
-def report_telemetry(db_path: str, since: float) -> dict[str, Any]:
+def report_telemetry(db_path: str, since: float,
+                     sampler_interval_seconds: float) -> dict[str, Any]:
     """Examines the telemetry table for gaps and impossible positions.
 
     Args:
         db_path (str): Path to the SQLite database.
         since (float): Only consider samples at or after this timestamp.
+        sampler_interval_seconds (float): The sampler interval the soak
+            actually ran at - determines the stall band.
 
     Returns:
         dict[str, Any]: Findings, ready to print.
     """
+    stall_low, stall_high = stall_band(sampler_interval_seconds)
     connection = sqlite3.connect(db_path)
     rows: list[tuple[int, float, int]] = []
     for row in connection.execute(
@@ -123,6 +144,8 @@ def report_telemetry(db_path: str, since: float) -> dict[str, Any]:
         "samples": len(rows),
         "gaps": [],
         "stall_band_gaps": 0,
+        "stall_band_low": stall_low,
+        "stall_band_high": stall_high,
         "impossible_positions": [],
         "hours": 0.0,
     }
@@ -138,8 +161,7 @@ def report_telemetry(db_path: str, since: float) -> dict[str, Any]:
             moment = datetime.datetime.fromtimestamp(
                 rows[index][1]).strftime("%H:%M:%S")
             findings["gaps"].append({"at": moment, "seconds": round(gap, 2)})
-            if (gap >= STALL_BAND_LOW_SECONDS) and \
-                    (gap <= STALL_BAND_HIGH_SECONDS):
+            if (gap >= stall_low) and (gap <= stall_high):
                 findings["stall_band_gaps"] += 1
         index += 1
 
@@ -326,8 +348,8 @@ def print_verdict(telemetry: dict[str, Any], log: dict[str, Any],
           f"{telemetry['samples']} telemetry samples")
     print(f"sampler gaps > {GAP_THRESHOLD_SECONDS:g}s  "
           f"{len(telemetry['gaps'])}")
-    print(f"  of those in the stall band ({STALL_BAND_LOW_SECONDS:g}-"
-          f"{STALL_BAND_HIGH_SECONDS:g}s)  "
+    print(f"  of those in the stall band ({telemetry['stall_band_low']:g}-"
+          f"{telemetry['stall_band_high']:g}s)  "
           f"{telemetry['stall_band_gaps']}")
     print(f"impossible positions {len(telemetry['impossible_positions'])}")
     print(f"failed reads logged  {log['read_failed']}")
@@ -411,6 +433,10 @@ def main() -> int:
     parser.add_argument("--mcu-log", default=None,
                         help="local MCU-side log path (backlog D3); "
                              "pulled over adb if omitted")
+    parser.add_argument("--sampler-interval", type=float, default=0.5,
+                        help="sampler_interval_seconds the soak ran at "
+                             "(config.py default; pass the value actually "
+                             "used if it was overridden)")
     arguments = parser.parse_args()
 
     workspace = tempfile.mkdtemp(prefix="soak-")
@@ -427,7 +453,7 @@ def main() -> int:
         return 2
 
     since = parse_since(arguments.since)
-    telemetry = report_telemetry(db_path, since)
+    telemetry = report_telemetry(db_path, since, arguments.sampler_interval)
     log = report_log(log_path, since)
     if mcu_log_path is None:
         mcu_log = _mcu_log_unavailable()

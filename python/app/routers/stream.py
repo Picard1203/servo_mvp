@@ -7,6 +7,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from app.core.config import Settings, get_settings
 from app.core.events import EventService
 from app.deps import get_event_service, get_state_store, get_zero_service
 from app.schemas.servo import ServoStateResponse
@@ -23,6 +24,7 @@ async def _stream_generator(
     state_store: ServoStateStore,
     zero_service: ZeroService,
     event_service: EventService,
+    settings: Settings,
 ) -> AsyncGenerator[str, None]:
     """Generates SSE events for state, zeros and events.
 
@@ -31,12 +33,17 @@ async def _stream_generator(
         state_store: The servo state store.
         zero_service: The zero service.
         event_service: The event service.
+        settings: Application settings.
 
     Yields:
         SSE formatted strings.
     """
     count = 0
     active = True
+    interval = settings.sampler_interval_seconds
+    # Zeros/events push roughly every 15s of wall clock, regardless of the
+    # state-push interval - the two are unrelated cadences that share a loop.
+    zeros_events_every = max(1, round(15.0 / interval))
     try:
         while active is True:
             disconnected = await request.is_disconnected()
@@ -65,7 +72,7 @@ async def _stream_generator(
                 )
                 yield f"event: state\ndata: {state.model_dump_json()}\n\n"
 
-                if ((count % 15) == 0):
+                if ((count % zeros_events_every) == 0):
                     zeros_list = await asyncio.to_thread(zero_service.list_all)
                     
                     zeros_resp = []
@@ -101,7 +108,7 @@ async def _stream_generator(
                     yield f"event: events\ndata: {events_resp.model_dump_json()}\n\n"
 
                 count += 1
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(interval)
     except (asyncio.CancelledError, Exception):
         pass
 
@@ -112,6 +119,7 @@ async def stream(
     state_store: ServoStateStore = Depends(get_state_store),
     zero_service: ZeroService = Depends(get_zero_service),
     event_service: EventService = Depends(get_event_service),
+    settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
     """Streams servo state, zeros and events.
 
@@ -120,12 +128,14 @@ async def stream(
         state_store: The servo state store.
         zero_service: The zero service.
         event_service: The event service.
+        settings: Application settings.
 
     Returns:
         The streaming response.
     """
     return StreamingResponse(
-        _stream_generator(request, state_store, zero_service, event_service),
+        _stream_generator(request, state_store, zero_service, event_service,
+                           settings),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

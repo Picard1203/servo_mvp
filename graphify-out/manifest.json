@@ -20,7 +20,7 @@
     "semantic_hash": ""
   },
   "python/app/core/events.py": {
-    "mtime": 1787583110.520725,
+    "mtime": 1787584711.9181135,
     "ast_hash": "4ff422eae97e83e89ea0ddfae20d5a2f",
     "semantic_hash": ""
   },
@@ -40,8 +40,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/db/database.py": {
-    "mtime": 1787573574.545273,
-    "ast_hash": "2152c87eeeba97ff5e884943fa8f4e64",
+    "mtime": 1787657040.750445,
+    "ast_hash": "b63fa9b2b02815a03fd496ea4faec13d",
     "semantic_hash": ""
   },
   "python/app/deps.py": {
@@ -170,22 +170,22 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/services/motion_service.py": {
-    "mtime": 1787583429.0892944,
+    "mtime": 1787584712.0427432,
     "ast_hash": "000aeb81c4cba28f2cacc9f9d058be5c",
     "semantic_hash": ""
   },
   "python/app/services/servo_state.py": {
-    "mtime": 1787573496.2597501,
+    "mtime": 1787644867.0529325,
     "ast_hash": "cc6d9cd485b40aab96ec72cc166b8204",
     "semantic_hash": ""
   },
   "python/app/services/telemetry_service.py": {
-    "mtime": 1787573496.9877658,
-    "ast_hash": "99e03e57323d1d6d233e3889614abeb9",
+    "mtime": 1787657040.8791468,
+    "ast_hash": "c411b6661f64f7620a4a7e4d541f68fc",
     "semantic_hash": ""
   },
   "python/app/services/zero_service.py": {
-    "mtime": 1786136823.5947826,
+    "mtime": 1787644861.6988537,
     "ast_hash": "be380f6075bf56a4bd007b3a2ab97ea0",
     "semantic_hash": ""
   },
@@ -200,7 +200,7 @@
     "semantic_hash": "12406d28aec8d097fed06de20b60cce7"
   },
   "python/static/app.js": {
-    "mtime": 1787583554.3674386,
+    "mtime": 1787584712.5215285,
     "ast_hash": "c0dd0320b1904c40591de7149bb04c72",
     "semantic_hash": ""
   },
@@ -210,8 +210,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/tests/conftest.py": {
-    "mtime": 1786140335.437049,
-    "ast_hash": "9bac3f5fc1233f9a2d71741cc137bccf",
+    "mtime": 1787657041.1713374,
+    "ast_hash": "711287fd50fa3b5f9a6ed0d0544f3a34",
     "semantic_hash": ""
   },
   "python/tests/e2e/__init__.py": {
@@ -220,9 +220,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/tests/e2e/conftest.py": {
-    "mtime": 1785832022.0,
-    "ast_hash": "f342a752931babb8f5d65dd085911d77",
-    "semantic_hash": "f342a752931babb8f5d65dd085911d77"
+    "mtime": 1787657041.275298,
+    "ast_hash": "022aab086a234996e29057af2a723939",
+    "semantic_hash": ""
   },
   "python/tests/e2e/test_operator_scenario.py": {
     "mtime": 1787573502.0598743,
@@ -290,7 +290,7 @@
     "semantic_hash": ""
   },
   "python/tests/unit/test_events.py": {
-    "mtime": 1787583063.6199262,
+    "mtime": 1787584712.6636517,
     "ast_hash": "42b29223526169022cd33872e4b4c830",
     "semantic_hash": ""
   },
@@ -300,13 +300,13 @@
     "semantic_hash": "5562a5ad3d0be287df6b8bb5d1f461bb"
   },
   "python/tests/unit/test_motion_service.py": {
-    "mtime": 1787583360.7788022,
+    "mtime": 1787584712.700434,
     "ast_hash": "150066540a067fe38e31fb67189c44e8",
     "semantic_hash": ""
   },
   "python/tests/unit/test_servo_state.py": {
-    "mtime": 1787573506.6799717,
-    "ast_hash": "11f9913cb08c8685c522b2cf742b901d",
+    "mtime": 1787657041.7488732,
+    "ast_hash": "36d90a751ed09b0eaab71cebfb701fe1",
     "semantic_hash": ""
   },
   "python/tests/unit/test_sign_magnitude.py": {
@@ -330,14 +330,14 @@
     "semantic_hash": "99c535ee75fad68ec695db4383bc99fd"
   },
   "python/tests/unit/test_telemetry_service.py": {
-    "mtime": 1787573506.7479732,
-    "ast_hash": "fa9e126edb309936926ec9495205e4ae",
+    "mtime": 1787657041.9049222,
+    "ast_hash": "901db2b8d9c488e39ad6df506ebe50a4",
     "semantic_hash": ""
   },
   "python/tests/unit/test_zero_service.py": {
-    "mtime": 1786048532.0,
-    "ast_hash": "bb0ecc7bd95fe470ee9a769d52fa1301",
-    "semantic_hash": "bb0ecc7bd95fe470ee9a769d52fa1301"
+    "mtime": 1787657041.9681282,
+    "ast_hash": "2afda1bffaa46f82fcce84e476d6dc7a",
+    "semantic_hash": ""
   },
   "sketch/src/AngleMath.h": {
     "mtime": 1786048824.0,
@@ -445,8 +445,8 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1787579978.5470161,
-    "ast_hash": "5ddc97ab6c834e7f2c4a6fd574a6bc7a",
+    "mtime": 1787657039.6650736,
+    "ast_hash": "96211bdf33dcf30e1273c8751124f516",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1787573081.152232,
-    "ast_hash": "51cf8de65c13b29bbfa87e2c14e9dcb3",
+    "mtime": 1787657039.7280195,
+    "ast_hash": "3d904cf05e41d89a78033e6f5d1049ef",
     "semantic_hash": ""
   },
   "app.yaml": {
@@ -475,8 +475,8 @@
     "semantic_hash": "1680558f28bf32352cabbce952f68274"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1787573574.4612718,
-    "ast_hash": "18447dfe602c583bccc290240b8ca53b",
+    "mtime": 1787657040.3685486,
+    "ast_hash": "58b75fc98620a698546c0da92f3d83a7",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -510,8 +510,8 @@
     "semantic_hash": "5928f90926905aaf97760b2f369448c1"
   },
   "sketch/README.md": {
-    "mtime": 1787572891.7626193,
-    "ast_hash": "905ca1ce73e0e39b7cd81bd5120741db",
+    "mtime": 1787657042.0951567,
+    "ast_hash": "521ff331b9b11f7e8d18e4810ce0e4d8",
     "semantic_hash": ""
   },
   "sketch/sketch.yaml": {
@@ -530,8 +530,8 @@
     "semantic_hash": ""
   },
   "docs/BACKLOG.md": {
-    "mtime": 1787584416.8444386,
-    "ast_hash": "e5a4e8c1dc63e2e103990e42a191091a",
+    "mtime": 1787657039.85624,
+    "ast_hash": "c9bc4469c293f0e378f6fa2b5b8cc7b0",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -575,8 +575,8 @@
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1787573081.7002637,
-    "ast_hash": "6c533bce9530cdf5c8f98c8040f7ec9e",
+    "mtime": 1787657040.569286,
+    "ast_hash": "67f81c68f9bb42f6e6092b0894e9dc4a",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.eslintrc.js": {
@@ -2385,28 +2385,28 @@
     "semantic_hash": ""
   },
   "skills/operator-lens/SKILL.md": {
-    "mtime": 1787572891.8906305,
-    "ast_hash": "70a0bf9b5b8602131a9d233f210c3f56",
+    "mtime": 1787657042.3516295,
+    "ast_hash": "05538b28fc0062dd68996d458b71aea9",
     "semantic_hash": ""
   },
   "skills/twin-review/SKILL.md": {
-    "mtime": 1787572891.942635,
-    "ast_hash": "63398a6bedc17f4f5f56e4ff07577ec0",
+    "mtime": 1787657042.4780548,
+    "ast_hash": "9606a2ae02315f03b0e6166e180f5289",
     "semantic_hash": ""
   },
   "docs/OPEN_QUESTIONS.md": {
-    "mtime": 1787579994.1985538,
+    "mtime": 1787584709.1857321,
     "ast_hash": "9afc9a6496cf4342c4c913d888e4b67e",
     "semantic_hash": ""
   },
   "tools/check_client_behaviour.js": {
-    "mtime": 1787583654.9829905,
+    "mtime": 1787584712.815111,
     "ast_hash": "a12129b029bdcfcba02653c2d297299a",
     "semantic_hash": ""
   },
   "docs/CLOSED.md": {
-    "mtime": 1787584397.605173,
-    "ast_hash": "fdac2b7e12240c29c64ea5ed9ad2ee82",
+    "mtime": 1787657039.9829438,
+    "ast_hash": "ec9fcb49399c9542b1e2513ca4f1ec6d",
     "semantic_hash": ""
   },
   "python/app/relay/mcu_log.py": {
@@ -2447,6 +2447,21 @@
   "python/tests/integration/test_stream.py": {
     "mtime": 1787573504.5999281,
     "ast_hash": "0698f7ea1c3fa9927e801aee8409dfec",
+    "semantic_hash": ""
+  },
+  "python/tests/unit/test_soak_report.py": {
+    "mtime": 1787657041.8801844,
+    "ast_hash": "1999f0ae820c78ebc95c8197f5ab31b7",
+    "semantic_hash": ""
+  },
+  "tools/verify.py": {
+    "mtime": 1787657042.542826,
+    "ast_hash": "82a1750ecf80df6d65b917829d231e7f",
+    "semantic_hash": ""
+  },
+  "tools/verify_baseline.json": {
+    "mtime": 1787657042.978642,
+    "ast_hash": "1ce7f686bb6945b6581f3fa565e3b949",
     "semantic_hash": ""
   }
 }

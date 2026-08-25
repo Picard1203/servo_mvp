@@ -1427,5 +1427,46 @@ regardless of setting, which no longer holds going forward.
 
 ---
 
+### D23 — `moving` and the fault flags were reported as measured on a failed read
+**Status:** CLOSED · 25 August 2026 · **Severity:** medium
+
+The sixth twin-path instance D16's own entry said to look for: after D16
+closed, six fields nulled on a failed read (`output_deg`, `raw_counts`, the
+four telemetry floats), but `moving` and the six fault booleans still came
+from `_empty_snapshot()`, all `False` - the API stated a servo that did not
+answer was "not moving and has no faults." Fixed the way the entry's own
+option 1 proposed: all seven now null on a failed read, gated in
+`ServoStateStore.snapshot()`, typed `Optional[bool]` in `ServoStateResponse`
+and `ServoStateView`. Cheaper than feared: a failed read writes no telemetry
+row at all (ADR-0008's own rule), so the CSV and database schema are
+untouched, and `app.js` already rendered these flags as tri-state before the
+API caught up - this was a contract fix for the *other* consumers (exports,
+direct API callers), not a client rewrite. Amends ADR-0008.
+
+**Related:** D16, D2, D9, ADR-0008, D25.
+
+---
+
+### D25 — An overload that stopped being readable disappeared from the screen
+**Status:** CLOSED · 25 August 2026 · **Severity:** medium
+
+The servo trips overload, the banner correctly reads `ALARM · Overload`;
+reads then start failing (what a strained servo on a busy bus does), and
+after three failures D16's rule blanked the readings and switched the
+banner to "Position unknown" - taking the still-active alarm with it.
+Fixed in `app.js`'s `renderState()`: a fault reported `true` is now sticky
+and survives the reading going unknown, marked "(last known — position
+unknown)"; a fault reported `false` is *not* carried forward past the
+known-window, deliberately asymmetric with (not a relaxation of) D16's
+own rule - claiming "still OK" from stale data is exactly what D16
+prevents. The paired question is answered: recover stays visible but
+`disabled` with the reason stated on the control (`title`), matching D15's
+existing pattern for a control that must refuse - hidden would have taught
+"the alarm is over," which is not true.
+
+**Related:** D16, D11, D12, D15, D23, R2.
+
+---
+
 ## Requirements captured but not yet designed
 

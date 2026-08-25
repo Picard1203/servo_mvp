@@ -30,11 +30,14 @@ Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
 (one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-229 Python tests, coverage of app/ gated at 99% (99.45% measured, D24)
+244 Python tests, coverage of app/ gated at 99% (99.45% measured, D24)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
-63 client-behaviour assertions (T12, promoted to a real check 25 Aug 2026)
+75 client-behaviour assertions (T12, promoted to a real check 25 Aug 2026)
 ```
+
+(as of Session 8, 25 August 2026 — `tools/verify.py` is the source of truth
+going forward, not this snapshot; run it rather than trust this number)
 
 **Session 3 landed 11 August 2026** — SSE migration complete. Collapsed 3 polling connections/operator to 1 persistent SSE stream (`GET /api/v1/stream`). Closed D4 (3-operator 10-min soak clean, 0 socket drops, 1,955 requests handled, 0 reconnects). Re-applied D29 async-def fix across 13 FastAPI handlers.
 

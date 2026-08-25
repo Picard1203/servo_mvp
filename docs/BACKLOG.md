@@ -428,6 +428,8 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **T12** | `tools/check_client_behaviour.js` promoted to a real verification command | 25 August 2026 · Session 8 |
 | **D8** | Deploy without `.env` must fail loud, not silently default to the simulator | 25 August 2026 · Session 8 |
 | **D29** | `LOG_LEVEL` was inert on the Logger461 stand-in | 25 August 2026 · Session 8 |
+| **D23** | `moving`/fault flags reported as measured on a failed read | 25 August 2026 · Session 8 |
+| **D25** | An overload alarm disappeared once the reading went unknown | 25 August 2026 · Session 8 |
 
 ---
 
@@ -696,36 +698,6 @@ cannot happen, and it should be an error rather than a silent 0.
 
 ---
 
-### D23 — `moving` and the fault flags are reported as measured on a failed read
-**Status:** open · **Severity:** medium · **Raised by:** Batch 1, 8 August 2026
-
-The sixth twin-path instance, where D16's entry said to look for it.
-
-After Batch 1 six fields null on a failed read: `output_deg`, `raw_counts` and
-the four telemetry floats. `moving` and the six fault booleans still come from
-`_empty_snapshot()`, all `False` — so the API states that a servo which did not
-answer is **not moving and has no faults**. The UI no longer renders it; every
-other consumer still reads it, which after R5 and D22 is the point of the API.
-
-Not fixed in Batch 1 because `bool | None` is a tri-state that ripples into the
-CSV, `TelemetrySample`, the database schema and every client — an API-shape
-decision, not a defect fix.
-
-Three options, not equivalent:
-
-1. **Null the booleans too.** Consistent with the six that already null; most work.
-2. **Lean on `reading_valid`** and document it. Cheapest; relies on every future
-   client reading a docstring — the assumption that failed in D16.
-3. **Nest a `reading` object** that is null as a whole. Cleanest; biggest change
-   to client and CSV.
-
-**Acceptance:** one is chosen and written down, and no field of `/servo/state`
-states a measurement that was not taken. If (2), say plainly it is a documented
-convention, not an enforced one. **Amends ADR-0008.**
-
-**Related:** D16, D2, D9, ADR-0008.
-
----
 
 ### D26 — The Python suite failed once in ten runs, unreproduced
 **Status:** cause found, fix shipped · **original flake never directly
@@ -780,32 +752,6 @@ moving to `CLOSED.md` until either it recurs and is caught directly, or
 enough clean runs accumulate across enough real sessions to call it settled.
 
 **Related:** D10 (a failure that destroyed its own evidence), T3.
-
----
-
-### D25 — An overload that stops being readable disappears from the screen
-**Status:** open · **Severity:** medium · **Found by:** twin-review, 8 August 2026
-
-The servo trips overload; the banner reads `■ ALARM · Overload` and the recover
-control appears. Reads then start failing — what a strained servo on a busy bus
-does. After three failures D16's rule blanks the lamps, the banner switches to
-"Position unknown", and the recover control is hidden. **The servo is still
-overloaded and the screen no longer says so.**
-
-Not a regression — before D16, `overload:false` hid the button from the *first*
-failed read. Filed because D16 rewrote these lines: blanking a fault that **was**
-reported differs from blanking a lamp that never was.
-
-**Hiding recover is arguably correct**, and that is the tension: `recover()`
-raises `InvalidReadingError` when the position is unknown, so the control could
-only refuse. The defect is that the alarm stops being *stated*.
-
-**Acceptance:** a fault reported and never reported cleared stays visible while
-the reading is unknown, marked last-known. Decide at the same time whether
-recover is reachable or explained as unavailable — hidden and refused teach the
-operator different things.
-
-**Related:** D16, D11, D12, R2.
 
 ---
 

@@ -177,6 +177,40 @@ class TestFailedReadIsNeverAPosition:
         assert isinstance(view.current_a, float)
         assert isinstance(view.torque_kgcm, float)
 
+    def test_invalid_reading_reports_no_movement_or_faults(self, backend,
+                                                            sim):
+        """D23, amends ADR-0008: the same rule governs moving and the
+
+        six fault flags. They stayed plain bool after Batch 1 nulled the
+        five readings beside them, so the API stated a servo that did
+        not answer was "not moving, no faults" - a claim about hardware
+        nothing was heard from.
+        """
+        from app.deps import get_state_store
+        sim.read_snapshot = self._dead_bus
+        view = get_state_store().snapshot()
+        assert view.moving is None
+        assert view.overload is None
+        assert view.overcurrent is None
+        assert view.overheat is None
+        assert view.voltage_fault is None
+        assert view.sensor_fault is None
+        assert view.angle_fault is None
+
+    def test_valid_reading_still_reports_movement_and_faults(self, backend,
+                                                              sim):
+        """Nulling on failure must not null on success (D23)."""
+        from app.deps import get_state_store
+        view = get_state_store().snapshot()
+        assert view.reading_valid is True
+        assert isinstance(view.moving, bool)
+        assert isinstance(view.overload, bool)
+        assert isinstance(view.overcurrent, bool)
+        assert isinstance(view.overheat, bool)
+        assert isinstance(view.voltage_fault, bool)
+        assert isinstance(view.sensor_fault, bool)
+        assert isinstance(view.angle_fault, bool)
+
     def test_invalid_reading_refuses_read_counts(self, backend, sim):
         """read_counts()'s own guard (D24): unexercised since it was
 

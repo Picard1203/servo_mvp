@@ -1,5 +1,7 @@
 """ServoStateStore: conversions, lock/settle, verified flag, snapshot."""
 
+import pytest
+
 from tests.conftest import wait_until
 
 
@@ -174,6 +176,18 @@ class TestFailedReadIsNeverAPosition:
         assert isinstance(view.voltage_v, float)
         assert isinstance(view.current_a, float)
         assert isinstance(view.torque_kgcm, float)
+
+    def test_invalid_reading_refuses_read_counts(self, backend, sim):
+        """read_counts()'s own guard (D24): unexercised since it was
+
+        written, same defect class as TestCaptureRobustness - a caller
+        that needs a real number raises rather than acting on count 0.
+        """
+        from app.core.exceptions import InvalidReadingError
+        from app.deps import get_state_store
+        sim.read_snapshot = self._dead_bus
+        with pytest.raises(InvalidReadingError):
+            get_state_store().read_counts()
 
 
 class TestOneBaseline:

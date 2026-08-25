@@ -1,0 +1,13 @@
+[run]
+source = app
+# Off the working copy on purpose. The working copy is often a network
+# mount of the board (CLAUDE.md sec.6 - currently CIFS/Samba), and
+# coverage's data file is SQLite - SQLite needs real POSIX file locking,
+# which this mount does not give it ("database is locked" on every run,
+# confirmed reproducible). Same family of problem as the venv needing
+# --copies for the same mount.
+data_file = /tmp/servo_mvp-coverage/.coverage
+
+[report]
+show_missing = true
+skip_covered = false

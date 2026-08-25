@@ -30,6 +30,46 @@ class TestCapture:
         assert zero.is_active is False
 
 
+class TestCaptureRobustness:
+    """capture() must not do what D2 already fixed for calibrate().
+
+    D2 gave calibrate() a guard against a dead bus (see
+    TestCalibrationRobustness) and stated capture() now had the same
+    guard. The guard was written; a test exercising it was not (D24) -
+    coverage stayed at 929/931 statements with these two lines silently
+    unreached the whole time.
+    """
+
+    def test_refuses_an_invalid_reading(self, backend, service, sim):
+        from app.core.exceptions import InvalidReadingError
+        from app.models.entities import TelemetrySnapshot
+
+        def dead_bus():
+            return TelemetrySnapshot(
+                raw_counts=0, moving=False, temperature_c=0.0,
+                voltage_v=0.0, current_a=0.0, torque_kgcm=0.0,
+                overload=False, overcurrent=False, overheat=False,
+                voltage_fault=False, sensor_fault=False, angle_fault=False,
+                valid=False)
+
+        sim.read_snapshot = dead_bus
+        with pytest.raises(InvalidReadingError):
+            service.capture("here")
+
+    def test_nothing_is_stored_when_the_read_failed(self, backend, service,
+                                                     sim):
+        from app.core.exceptions import InvalidReadingError
+        from app.models.entities import TelemetrySnapshot
+        sim.read_snapshot = lambda: TelemetrySnapshot(
+            raw_counts=0, moving=False, temperature_c=0.0, voltage_v=0.0,
+            current_a=0.0, torque_kgcm=0.0, overload=False,
+            overcurrent=False, overheat=False, voltage_fault=False,
+            sensor_fault=False, angle_fault=False, valid=False)
+        with pytest.raises(InvalidReadingError):
+            service.capture("here")
+        assert not service.list_all()
+
+
 class TestActivateDelete:
     """Activation and deletion rules."""
 

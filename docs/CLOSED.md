@@ -1390,5 +1390,42 @@ quoted in a doc that can go stale.
 
 ---
 
+### D8 — `.env` must be created before the first run of this version
+**Status:** CLOSED · 25 August 2026 · **Severity:** medium
+
+Without `.env`, `use_hardware_servo` defaulted to `False`, the backend ran
+the simulator, and the UI moved convincingly while the real servo never
+twitched — silent, and the worst failure available at a handover. Checking
+whether `.env` merely exists was not enough (a file present but missing or
+misspelling the key would pass that check and still run the simulator), so
+`main.py` now refuses to start when nothing *explicitly* chose a backend —
+gated on `Settings.model_fields_set`, which distinguishes an explicitly-set
+value (file or environment variable) from one that fell back to its
+default. A deliberate `USE_HARDWARE_SERVO=false` for laptop development
+still starts fine. Scoped to `main.py`; `run_dev.py` is a separate
+dev-PC entry point, unaffected.
+
+**Related:** `run_dev.py`, ADR-0004.
+
+---
+
+### D29 — `LOG_LEVEL` was inert: the Logger461 stand-in logged everything regardless
+**Status:** CLOSED · 25 August 2026 · **Severity:** medium
+
+The real Logger461 wheel is not installed off the air-gapped network, so
+`main.py`'s stand-in ran instead — and its `setup(level=...)` accepted the
+level and silently discarded it, so every message printed no matter what
+`LOG_LEVEL` was set to. Confirmed directly: setting `INFO` and restarting
+still produced DEBUG lines. Fixed: the stand-in stores the level it is
+given and gates on it (`_level_enabled()`, matching the real library's
+ordering). Revised two entries that had assumed this worked: D5's closing
+claim ("at INFO the lines are already silent") was false on this board and
+is true now; T9's storage table treated the DEBUG rate as operative
+regardless of setting, which no longer holds going forward.
+
+**Related:** D5, T9, T2.
+
+---
+
 ## Requirements captured but not yet designed
 

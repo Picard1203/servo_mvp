@@ -9,6 +9,32 @@ thread for the Bridge.
 import sys
 from threading import Thread
 
+# Used by _DevLogger._emit() below (D29): the stand-in's setup(level=...)
+# used to accept and silently discard the level, so LOG_LEVEL never did
+# anything on a board without the real wheel installed - confirmed directly,
+# changing it to INFO and restarting still produced DEBUG lines. A module-
+# level function rather than logic inlined in the nested class: _DevLogger
+# is defined inside _ensure_logger461() and never installed at all when a
+# test's own Logger461 stub is already in sys.modules (conftest.py installs
+# one before any app import), so the gating logic needs to be reachable and
+# testable independent of whichever object ends up as the live logger.
+_LOG_LEVEL_ORDER = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40,
+                    "CRITICAL": 50}
+
+
+def _level_enabled(level: str, minimum: str) -> bool:
+    """Decides whether a record at `level` should be emitted at `minimum`.
+
+    Args:
+        level: The level of the record being emitted.
+        minimum: The configured minimum level (Settings.log_level).
+
+    Returns:
+        True if the record should be written.
+    """
+    return _LOG_LEVEL_ORDER.get(level, 0) >= _LOG_LEVEL_ORDER.get(minimum, 20)
+
+
 def _ensure_logger461() -> None:
     """Provides Logger461 when the real wheel is not installed.
 
@@ -52,12 +78,13 @@ def _ensure_logger461() -> None:
         def __init__(self, path: str) -> None:
             self._path = path
             self._lock = threading.Lock()
+            self._level = "INFO"          # matches Settings.log_level default
 
         def setup(self, **kwargs) -> None:
-            """Accepts the real library's configuration and honours file.
+            """Accepts the real library's configuration: file and level.
 
             Args:
-                **kwargs: Configuration values; only `file` is used.
+                **kwargs: Configuration values; `file` and `level` are used.
 
             Returns:
                 None.
@@ -65,8 +92,13 @@ def _ensure_logger461() -> None:
             target = kwargs.get("file")
             if target:
                 self._path = str(target)
+            level = kwargs.get("level")
+            if level:
+                self._level = str(level).upper()
 
         def _emit(self, level, message, metadata, extra) -> None:
+            if not _level_enabled(level, self._level):
+                return
             now = datetime.datetime.now()
             record = {
                 "timestamp": now.isoformat(timespec="milliseconds"),
@@ -151,9 +183,46 @@ import uvicorn
 from Logger461 import logger
 
 from app.app import create_app
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.logging_setup import setup_logging
 from app.deps import get_mcu_log, get_relay, get_telemetry_service
+
+
+def _refuse_silent_simulator(settings: Settings) -> None:
+    """Refuses to start if nothing chose the simulator on purpose.
+
+    A missing .env and a .env that has the key misspelled both look
+    identical from here: use_hardware_servo falls back to its default
+    (False), the backend runs the simulator, and the UI moves
+    convincingly while the real servo never twitches (backlog D8) - the
+    worst failure available at a handover. Checking whether the .env
+    file merely exists is not enough: a file that exists but omits or
+    typos the key would pass that check and still run the simulator by
+    accident. `model_fields_set` distinguishes "explicitly set, from a
+    file or the environment" from "fell back to the default" - only the
+    silent default is refused. A deliberate `USE_HARDWARE_SERVO=false`
+    (laptop development) still starts fine.
+
+    Args:
+        settings: The loaded application settings.
+
+    Raises:
+        SystemExit: When the simulator would run and nobody chose it.
+
+    Returns:
+        None.
+    """
+    if settings.use_hardware_servo:
+        return
+    if "use_hardware_servo" in settings.model_fields_set:
+        return  # a deliberate choice, not an accident
+    logger.critical(
+        "refusing to start: no servo backend was chosen. Set "
+        "USE_HARDWARE_SERVO=true in .env (cp .env.board .env) to drive "
+        "hardware, or USE_HARDWARE_SERVO=false to run the simulator "
+        "deliberately.",
+        metadata={"event": "servo.backend.refused"})
+    raise SystemExit(1)
 
 
 def _serve(app) -> None:
@@ -213,14 +282,14 @@ def main() -> None:
     # State the servo backend explicitly. Defaulting to the simulator is
     # right for a laptop, but it is silent, and a silent simulator looks
     # exactly like working hardware on screen while the servo never moves.
+    _refuse_silent_simulator(settings)
     if settings.use_hardware_servo:
         logger.info("driving the REAL servo through the MCU bridge",
                     metadata={"event": "servo.backend"},
                     extra={"backend": "hardware"})
     else:
         logger.warning("SIMULATED servo - the real servo will NOT move. "
-                       "Set USE_HARDWARE_SERVO=true in .env "
-                       "(cp .env.board .env) to drive hardware.",
+                       "Chosen deliberately (USE_HARDWARE_SERVO=false).",
                        metadata={"event": "servo.backend"},
                        extra={"backend": "simulated"})
 

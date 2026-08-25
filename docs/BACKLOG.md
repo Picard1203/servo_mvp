@@ -426,6 +426,8 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D24** | Two `InvalidReadingError` guards unexercised; docs claimed 100% coverage | 25 August 2026 · Session 8 |
 | **D30** | `soak_report.py`'s UTC/local cutoff bug — regression test | 25 August 2026 · Session 8 |
 | **T12** | `tools/check_client_behaviour.js` promoted to a real verification command | 25 August 2026 · Session 8 |
+| **D8** | Deploy without `.env` must fail loud, not silently default to the simulator | 25 August 2026 · Session 8 |
+| **D29** | `LOG_LEVEL` was inert on the Logger461 stand-in | 25 August 2026 · Session 8 |
 
 ---
 
@@ -480,38 +482,6 @@ first.
 **Related:** D3, `docs/adr/0009-connection-ceiling.md`.
 
 ---
-
-### D29 — `LOG_LEVEL` is inert: the Logger461 stand-in logs everything regardless
-**Status:** open · **Severity:** medium · **Found prepping Session 2's soak,
-8 August 2026**
-
-The real `Logger461` wheel is not installed on this board — `main.py`'s
-fallback (`_ensure_logger461()`) is active, the same gap T9 already named for
-rotation. Its stand-in's `setup(**kwargs)` reads only `kwargs.get("file")`;
-`level` and `serialize` are accepted and silently discarded. Every level
-method (`debug()` through `critical()`) calls `_emit()` unconditionally —
-there is no level filter anywhere in the stand-in.
-
-**So `LOG_LEVEL` has never done anything on this board.** Confirmed directly:
-`.env` carried a leftover `DEBUG` from the W1 board run; changing it to
-`INFO` and restarting the app still produced `relay.conn.open`/
-`relay.conn.close` DEBUG lines immediately after boot.
-
-**Revises two existing entries:**
-- **D5's closing claim — "at INFO the lines are already silent" — is false
-  on this board.** True of the real Logger461/loguru; not true of the
-  stand-in actually running.
-- **T9's storage table should treat the DEBUG rate as the operative number,
-  not a worst case**, until the real wheel is installed (T2, air-gapped).
-
-**Acceptance:** the stand-in's `_emit` gates on a level ordering matching the
-real library, or the gap is stated plainly in D5/T9 rather than assumed.
-Cheap either way — found, not designed around.
-
-**Related:** D5, T9, T2.
-
----
-
 
 ### D35 — Commanded speed and actual speed disagree by roughly 1.5-2x
 **Status:** open, not yet investigated · **Severity:** medium · **Found:**
@@ -584,9 +554,12 @@ exactly that timeout working. 224 churn lines in one run; 168 in a later
 7-minute run — roughly 24 lines per minute per operator.
 
 So there is no fault to fix here. What remains is presentation: at INFO the
-lines are already silent, and the work is to make the default level read as a
-narrative of what the system *did* — moves, calibrations, faults — rather than
-what its sockets did. The phrasing complaint stands unchanged.
+lines are **now** silent — D29 (closed 25 August 2026) found the Logger461
+stand-in accepted a level and silently discarded it, so this claim was false
+on the board the whole time this entry has existed; it is true now that the
+stand-in actually filters. The work is still to make the default level read
+as a narrative of what the system *did* — moves, calibrations, faults —
+rather than what its sockets did. The phrasing complaint stands unchanged.
 
 **Original report follows.**
 
@@ -659,46 +632,6 @@ down here, then the UI verified and fixed at that size.
 
 ---
 
-### D8 — `.env` must be created before the first run of this version
-**Status:** open · **Severity:** medium · **Found by:** inspection of the live board
-
-There is no `python/.env` on the board, and no `servo_mvp.db` — this version has
-not been run yet, so this is a **pending deploy step, not a live
-misconfiguration**.
-
-It still matters, because omission is silent: without `.env`,
-`use_hardware_servo` defaults to `False` (`python/app/core/config.py:113`), the
-backend runs the simulator, and the UI moves convincingly while the servo never
-twitches.
-
-`config.py:75-81` already carries a comment about having been burnt by exactly
-this — a relative `env_file` that quietly fell back to defaults. The absolute
-path anchoring was the fix; the missing file is a separate instance of the same
-hazard.
-
-**Update, 7 August 2026 — the manual step is done, the acceptance is not.**
-`python/.env` now exists on the board and the backend logs
-`servo.backend backend=hardware` at boot, so it is driving the real servo. But
-nothing stops the next clean deployment repeating the omission, which is what
-this item is actually about.
-
-**Correction to this entry.** The claim that the database is unreachable from
-the sshfs mount was wrong, and it was repeated in `CLAUDE.md` §6. It is true of
-the *default* `db_path`, but `.env.board` deliberately overrides it with a
-**relative** `DB_PATH=servo_mvp.db`, with a comment explaining why: the Python
-side runs in a container where `HOME` is `/home/app`. The database therefore
-lands at `ArduinoApps/servo_mvp/servo_mvp.db` — **inside the mount**, readable
-directly. Both files have been corrected.
-
-The stored datum was read this session and is not 0: the operator calibrated at
-count 2049, mid-travel, and it behaves correctly. The `AUDIT.md` warning that it
-"is still 0" refers to a database that no longer exists.
-
-**Acceptance:** the deployed board cannot run against the simulator by accident.
-Either the manual step is removed, or startup refuses to proceed silently — a
-warning in a log nobody reads is what allowed this to persist.
-
----
 
 
 ### D12 — No way to return to the datum after activating a saved zero
@@ -991,10 +924,13 @@ and appends forever.
 
 **Provisional numbers from Session 2's soak, 8 August 2026 — treat with
 caution, both runs were abnormal (D4 reopened):** 3-operator run (~22 min,
-`LOG_LEVEL` inert per D29 so this is effectively the DEBUG rate regardless
-of setting): db 0.27 MB/hr → 196 MB/month, log 0.19 MB/hr → 137 MB/month,
-mcu log 0.10 MB/hr → 75 MB/month. Broadly in the range this table already
-expected, but a run dominated by connection-rejection churn is not a clean
+`LOG_LEVEL` was inert at the time (D29, since closed 25 August 2026 — the
+stand-in now actually filters), so this measured the DEBUG rate regardless
+of the configured setting; a board on INFO from here on should log less
+than this, not re-measured): db 0.27 MB/hr → 196 MB/month, log 0.19 MB/hr →
+137 MB/month, mcu log 0.10 MB/hr → 75 MB/month. Broadly in the range this
+table already expected, but a run dominated by connection-rejection churn
+is not a clean
 baseline — re-measure once D4 is actually closed.
 
 Still to do:

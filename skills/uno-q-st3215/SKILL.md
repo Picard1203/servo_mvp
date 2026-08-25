@@ -60,7 +60,7 @@ this servo.
 | `0x12` | phase | **BIT4 = 1 enables multi-turn** |
 | `0x22` | protect torque | |
 | `0x24` | overload torque | |
-| `0x28` | torque switch | **128 = set current position to 2048.** 0 disables drive torque while electronics stay powered — this is how you cut motor power but keep sensors alive. |
+| `0x28` | torque switch | **0 disables drive torque, 1 restores it, 128 sets current position to 2048.** Confirmed against Waveshare's own register map, not inferred. Torque off keeps the electronics powered (sensors keep answering) — this is how you cut motor power without losing telemetry. **These three values share ONE register with a mode-select semantic**: write it through an SDK helper (`EnableTorque(id, 0/1)`), never a raw `WriteByte` with a variable, or a stray 128 silently re-centres the servo and destroys calibration. |
 | `0x30` | torque limit | 2 bytes, 0..1000 |
 | `0x37` | **lock** | **EEPROM write lock** (0 unlocked, 1 locked). This is *not* an operator safety lock — never conflate them. EEPROM writes need the unlock ritual. |
 | `0x3C` | present load | **PWM duty, NOT torque.** Do not report it as torque. |
@@ -93,6 +93,18 @@ reads as ~32700**. Decode explicitly.
 - **Speed saturates near 1100 counts/s** (~66°/s output) whatever you command.
 - **Acceleration has no measurable effect above ~50.**
 - **Serial1 @ 1 Mbps is reliable** — 200/200 reads, 220 µs each.
+- **Restoring torque after cutting it: re-command the present position
+  BEFORE re-enabling, not after.** Torque can be written to while the
+  goal register is written too, so writing the current position as the
+  goal while still off leaves nothing for the servo to correct the
+  instant it re-engages — otherwise it may snap toward a stale goal set
+  before torque was cut, or toward wherever the shaft was hand-turned to
+  while free. **Designed, not yet bench-verified** — the dev rig this
+  was built against doesn't have the belt mounted; confirm on real
+  hardware, with the arm deliberately displaced while torque is off,
+  before trusting it. Also unconfirmed for this configuration: whether
+  multi-turn absolute position tracking survives the shaft being turned
+  by hand while torque is off.
 
 ---
 
@@ -212,8 +224,12 @@ fails at runtime as **silence**, not an error.
 
 ```
 Linux -> MCU   servo_read, servo_move, servo_stop, servo_set_deadband,
-               servo_configure_range, servo_centre_here, get_status,
+               servo_configure_range, servo_set_torque, get_status,
                net_tx(slot,data), net_shutdown(slot)
+               (CentreHere() is deliberately NOT exposed here - see
+               BridgeApi.h's own comment: calibration is a software
+               relabel recorded in SQLite, and a servo-held position
+               offset would be a second, competing source of truth)
 MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
 ```
 

@@ -76,6 +76,45 @@ class TestFaults:
                         snapshot.voltage_fault, snapshot.sensor_fault))
 
 
+class TestTorque:
+    """Motor isolation: cutting torque must stop the shaft actually moving,
+    not just report False - a twin that only lied about moving while still
+    driving would be worse than the thing it is meant to fix."""
+
+    def test_set_torque_returns_true(self, sim):
+        assert sim.set_torque(False) is True
+        assert sim.set_torque(True) is True
+
+    def test_isolated_servo_does_not_reach_its_target(self, sim):
+        sim.set_deadband(1)
+        sim.set_torque(False)
+        sim.command_move(4000, 20000, 50)
+        import time
+        time.sleep(0.2)
+        assert abs(sim.read_raw_counts() - 4000) > 100
+
+    def test_moving_is_false_while_isolated_even_with_a_live_target(self, sim):
+        sim.set_deadband(1)
+        sim.command_move(4000, 20000, 50)
+        assert wait_until(lambda: sim.read_snapshot().moving)
+        sim.set_torque(False)
+        assert sim.read_snapshot().moving is False
+
+    def test_restoring_torque_does_not_resume_a_stale_target(self, sim):
+        """Mirrors the real controller's un-isolate ordering: the target
+        snaps to wherever the shaft actually is before torque returns, so
+        it does not lurch toward a goal set before isolation."""
+        sim.set_deadband(1)
+        sim.command_move(4000, 20000, 50)
+        assert wait_until(lambda: sim.read_snapshot().moving)
+        sim.set_torque(False)
+        held = sim.read_raw_counts()
+        sim.set_torque(True)
+        import time
+        time.sleep(0.2)
+        assert abs(sim.read_raw_counts() - held) <= 2
+
+
 class TestRangeConfiguration:
     """configure_range records the travel-range mode."""
 

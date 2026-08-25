@@ -20,12 +20,13 @@ def repo(tmp_path):
     return SqliteTelemetryRepository(Database(str(tmp_path / "t.db")))
 
 
-def _sample(timestamp, overload=False):
+def _sample(timestamp, overload=False, isolated=False):
     """Builds a sample.
 
     Args:
         timestamp: Unix timestamp.
         overload: Overload flag value.
+        isolated: Motor isolation state value.
 
     Returns:
         The sample.
@@ -35,7 +36,8 @@ def _sample(timestamp, overload=False):
                            voltage_v=12.1, current_a=0.2, torque_kgcm=2.2,
                            overload=overload, overcurrent=False,
                            overheat=False, voltage_fault=False,
-                           sensor_fault=False, angle_fault=False)
+                           sensor_fault=False, angle_fault=False,
+                           isolated=isolated)
 
 
 class TestAddQuery:
@@ -49,6 +51,18 @@ class TestAddQuery:
         assert rows[0].overload is True
         assert rows[0].locked is True
         assert rows[0].output_deg == 1.5
+
+    def test_roundtrip_isolated_flag(self, repo):
+        now = time.time()
+        repo.add(_sample(now, isolated=True))
+        rows = list(repo.query(now - 1, now + 1, limit=10))
+        assert rows[0].isolated is True
+
+    def test_isolated_defaults_false(self, repo):
+        now = time.time()
+        repo.add(_sample(now))
+        rows = list(repo.query(now - 1, now + 1, limit=10))
+        assert rows[0].isolated is False
 
     def test_range_filtering_and_order(self, repo):
         repo.add(_sample(100.0))

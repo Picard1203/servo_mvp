@@ -85,10 +85,16 @@ class Database:
                     voltage_fault INTEGER NOT NULL DEFAULT 0,
                     sensor_fault INTEGER NOT NULL DEFAULT 0,
                     angle_fault INTEGER NOT NULL DEFAULT 0,
-                    target_deg REAL
+                    target_deg REAL,
+                    isolated INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS idx_telemetry_ts
                     ON telemetry (timestamp);
+                CREATE TABLE IF NOT EXISTS app_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             self._connection.commit()
@@ -124,6 +130,13 @@ class Database:
             # was never actually requested (same rule as output_deg's
             # own null-on-failed-read handling).
             "ALTER TABLE telemetry ADD COLUMN target_deg REAL",
+            # R2, motor isolation: whether the operator's stored intent was
+            # in effect for this sample. NOT NULL DEFAULT 0 (not nullable
+            # like target_deg above) because this is app-held state, not a
+            # servo measurement - there is always a value, the same
+            # reasoning ServoStateResponse.locked already rests on.
+            "ALTER TABLE telemetry ADD COLUMN isolated INTEGER NOT NULL"
+            " DEFAULT 0",
         )
         for statement in migrations:
             try:

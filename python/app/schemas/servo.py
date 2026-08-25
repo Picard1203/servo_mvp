@@ -69,6 +69,29 @@ class LockResponse(BaseModel):
     locked: bool
 
 
+class IsolateRequest(BaseModel):
+    """Command to engage or release motor isolation.
+
+    Attributes:
+        isolated: Desired isolation state.
+    """
+
+    isolated: bool
+
+
+class IsolateResponse(BaseModel):
+    """Acknowledgement of an isolation-state change request.
+
+    Attributes:
+        isolated: The intent that was set - not necessarily yet the
+            acknowledged hardware state. Poll /servo/state (or the SSE
+            stream)'s own isolated field for confirmation, since a write
+            can be accepted here and still fail against the servo.
+    """
+
+    isolated: bool
+
+
 class RecoverResponse(BaseModel):
     """Acknowledgement of an overload recovery action.
 
@@ -128,6 +151,13 @@ class ServoStateResponse(BaseModel):
             baseline.
         output_max_deg: Upper reachable output angle from the active
             baseline.
+        isolated: True once drive torque is confirmed cut. Never null on
+            a failed read, unlike moving and the fault flags above - this
+            is state the system holds, not a servo measurement, and only
+            ever True once the servo has acknowledged the write.
+        isolation_idle_timeout_s: The configured idle-auto-isolate
+            timeout, so the client can state the rule accurately instead
+            of holding a second, hardcoded copy of the number.
     """
 
     output_deg: Optional[float]
@@ -152,6 +182,8 @@ class ServoStateResponse(BaseModel):
     target_stale: bool = False
     output_min_deg: float = 0.0
     output_max_deg: float = 0.0
+    isolated: bool = False
+    isolation_idle_timeout_s: float = 0.0
 
     @classmethod
     def from_view(cls, view: ServoStateView) -> "ServoStateResponse":
@@ -181,4 +213,6 @@ class ServoStateResponse(BaseModel):
             servo_deg=view.servo_deg, target_deg=view.target_deg,
             target_stale=view.target_stale,
             output_min_deg=view.output_min_deg,
-            output_max_deg=view.output_max_deg)
+            output_max_deg=view.output_max_deg,
+            isolated=view.isolated,
+            isolation_idle_timeout_s=view.isolation_idle_timeout_s)

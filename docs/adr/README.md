@@ -18,10 +18,12 @@ against it.
 | [0006](0006-csv-bridge-payloads.md) | Bridge payloads are CSV strings | either side of the MCU boundary |
 | [0007](0007-moves-are-permitted-while-position-is-unverified.md) | Moves are permitted while position is unverified | motion, calibration, safety behaviour |
 | [0008](0008-a-failed-read-is-reported-as-unknown.md) | A failed read is reported as unknown, never as a number | the servo read path, the API contract, the UI |
+| [0009](0009-connection-ceiling.md) | Connection ceiling stays at 6; `timeout_keep_alive` is the real lever | the relay, connection limits |
+| [0010](0010-motor-isolation-state-survives-a-reboot.md) | Motor isolation state survives a reboot | R2, motor isolation, reboot/startup behaviour |
 
 ## Numbering
 
-Scan this directory for the highest number and increment. `0008` is next.
+Scan this directory for the highest number and increment. `0011` is next.
 
 ## Candidates not yet written
 

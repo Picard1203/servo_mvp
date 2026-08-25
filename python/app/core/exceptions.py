@@ -13,6 +13,16 @@ class MovingError(DomainError):
     """Raised when a lock change is requested while a move is in progress."""
 
 
+class IsolatedError(DomainError):
+    """Raised when movement is requested while the motor is isolated (R2).
+
+    Deliberately not guarded by the same moving-in-progress check that
+    protects lock changes (MovingError) - a manual isolate command must
+    take effect immediately, even mid-move, since it is meant to double
+    as R8's future emergency-stop mechanism.
+    """
+
+
 class NotFoundError(DomainError):
     """Raised when a referenced entity does not exist."""
 

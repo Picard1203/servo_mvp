@@ -86,6 +86,16 @@ String HandleConfigureRange(String payload) {
                                                     amplification)));
 }
 
+// Backlog R2 (motor isolation). Field is a plain 0/1, never passed through
+// to the servo unclamped - ServoController::SetTorque() is what keeps a
+// stray value from ever reaching register 0x28 as anything but 0 or 1.
+String HandleSetTorque(String payload) {
+  BridgeApi* api = BridgeApi::instance();
+  if (api == nullptr) return String(Ack(false));
+  const bool enabled = FieldAt(payload, 0, 0) != 0;
+  return String(Ack(api->controller().SetTorque(enabled)));
+}
+
 // Python calls this with no payload at all (system.py health check), so it
 // must take no parameter - a String parameter here fails to bind.
 String HandleGetStatus() {
@@ -199,6 +209,7 @@ void BridgeApi::Register() {
   Bridge.provide("servo_stop", HandleServoStop);
   Bridge.provide("servo_set_deadband", HandleSetDeadband);
   Bridge.provide("servo_configure_range", HandleConfigureRange);
+  Bridge.provide("servo_set_torque", HandleSetTorque);
   Bridge.provide("get_status", HandleGetStatus);
 
   if (relay_ != nullptr) {

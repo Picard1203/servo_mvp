@@ -60,6 +60,8 @@ const state = {
   readFailures: 0,       /* consecutive invalid servo readings */
   lastKnownDeg: null,    /* last position actually measured */
   lastMeasured: null,    /* last state the servo actually answered */
+  wasLocked: false,      /* edge-detects the lock RELEASE, for the
+                            isolated-but-just-unlocked nudge */
 };
 
 /* ---------------- HTTP helpers ---------------- */
@@ -278,6 +280,10 @@ function askText(title, body, okLabel) {
 const REFUSALS = {
   locked: "refused — servo is locked",
   moving: "refused — servo is moving",
+  // Deliberately not a strict mirror of "locked"'s wording: naming the
+  // state without the remedy leaves the operator in it with no way out
+  // in view (D12's lesson - a state they can enter and not leave).
+  isolated: "refused — motor is isolated; un-isolate to move",
   active_zero: "refused — position is in use as the baseline",
   datum_zero: "refused — the reference cannot be removed",
   invalid_reading: "refused — the servo did not answer, so its position "
@@ -517,8 +523,14 @@ function renderState(s) {
 
   const anyFault = FAULT_FIELDS.some((field) => stickyFaults[field.key] === true);
   const chip = $("movechip");
+  // FAULT outranks everything (D25: an alarm must never vanish).
+  // ISOLATED outranks MOVING/SETTLING/HOLDING: with drive torque cut,
+  // "HOLDING" would assert the servo is actively holding position, when
+  // friction (and, once fitted, the physical lock) is what's actually
+  // doing that - the same shape of screen/reality gap D9 was about.
   if (!shown && !anyFault) { chip.className = "chip"; chip.textContent = "—"; }
   else if (anyFault) { chip.className = "chip alarm"; chip.textContent = "FAULT"; }
+  else if (s.isolated) { chip.className = "chip isolated"; chip.textContent = "ISOLATED"; }
   else if (shown.moving) { chip.className = "chip moving"; chip.textContent = "MOVING"; }
   else if (s.settling) { chip.className = "chip"; chip.textContent = "SETTLING"; }
   else { chip.className = "chip holding"; chip.textContent = "HOLDING"; }
@@ -546,17 +558,38 @@ function renderState(s) {
   const recoverWrap = $("recoverwrap");
   const recoverBtn = $("recoverBtn");
   recoverWrap.hidden = stickyFaults.overload !== true;
-  recoverBtn.disabled = !known;
-  recoverBtn.title = known ? ""
+  // Recover re-commands the present position, which needs drive torque -
+  // meaningless while isolated. Same D15/D25 pattern as the position-
+  // unknown case: visible, disabled, reason stated on the control itself.
+  recoverBtn.disabled = !known || s.isolated;
+  recoverBtn.title = s.isolated
+    ? "Motor is isolated - un-isolate to recover"
+    : known ? ""
     : "Position unknown - recover needs a known position to re-command";
 
   const lock = $("lockCube");
   lock.classList.toggle("locked", s.locked);
   lock.textContent = s.locked ? "Locked" : "Lock";
+  if (!s.locked && s.isolated) {
+    // The moment un-locking meets its actual limit: the operator just
+    // freed movement, but the motor still won't move. Fires only on the
+    // RELEASE edge, not every render, or it would repeat on every ~1s
+    // poll for as long as both states hold.
+    if (state.wasLocked) {
+      say("Lock released — motor is still isolated; un-isolate to move.");
+    }
+  }
+  state.wasLocked = s.locked;
 
   const cal = $("calCube");
   cal.classList.toggle("needcal", !s.position_verified);
   cal.textContent = "Calibrate";
+
+  const iso = $("isoCube");
+  iso.classList.toggle("isolated", s.isolated);
+  iso.textContent = s.isolated ? "Isolated" : "Isolate";
+  $("isoHint").textContent = "auto-isolates after " +
+    Math.round(s.isolation_idle_timeout_s / 60) + " min locked";
 
   const slot = $("alarmslot");
   if (anyFault) {
@@ -732,6 +765,21 @@ async function toggleLock() {
     /* success: no notice */
   } catch (err) { sayError(err); }
 }
+async function toggleIsolate() {
+  clearNotice();
+  const current = state.lastState ? state.lastState.isolated : false;
+  const next = !current;
+  try {
+    await apiPost("/servo/isolate", { isolated: next });
+    // Deliberately NOT the usual "success: no notice" pattern: the
+    // physical lock is manual and unsensed, so the software never knows
+    // whether it's actually engaged either way - every isolate action
+    // needs this reminder, not just the auto-triggered one.
+    say(next
+      ? "Motor isolated — physical lock is manual, confirm it's engaged."
+      : "Motor isolation released.");
+  } catch (err) { sayError(err); }
+}
 async function doCalibrate() {
   clearNotice();
   const verified = state.lastState && state.lastState.position_verified;
@@ -818,7 +866,10 @@ function setExportPreset(rangeKey) {
    (f32, signed by direction) - the one authoritative gear-ratio
    constant, received as data rather than restated as a second,
    hardcoded copy (ANGLE_STEP below is the OTHER angle constant this
-   project already keeps in one place only). Sample is 20 bytes. */
+   project already keeps in one place only). Sample is 20 bytes; byte 17
+   is target_valid_flags, not a plain bool - bit0 is target_valid, bit1
+   is motor isolation, sharing the byte rather than widening the sample
+   (the flags byte at offset 12 has none left). */
 const SERVO_RATIO_OFFSET = 12;
 const HEADER_BYTES = 16;
 const SAMPLE_BYTES = 20;
@@ -841,7 +892,9 @@ function parseBinaryTelemetry(buffer) {
     const torque = view.getInt16(offset + 10, true) / 100.0;
     const flags = view.getUint8(offset + 12);
     const dtMs = view.getUint32(offset + 13, true);
-    const targetValid = view.getUint8(offset + 17) !== 0;
+    const targetValidFlags = view.getUint8(offset + 17);
+    const targetValid = (targetValidFlags & 1) !== 0;
+    const isolated = (targetValidFlags & 2) !== 0;
     /* null, not 0.0, when no target was in effect - same rule as every
        other "did not answer" field in this contract (D16's shape). */
     const targetDeg = targetValid ? view.getInt16(offset + 18, true) / 100.0 : null;
@@ -864,6 +917,7 @@ function parseBinaryTelemetry(buffer) {
       sensor_fault: (flags & 64) !== 0,
       angle_fault: (flags & 128) !== 0,
       target_deg: targetDeg,
+      isolated: isolated,
       /* Servo (pre-ratio) angle is a pure function of output_deg and the
          one ratio carried in the header - computed here, not stored a
          second time on the wire or in the export (see BACKLOG.md R5). */
@@ -1109,6 +1163,7 @@ function computeDailyStats(days) {
     const samples = day.samples;
     let peakTorque = 0, peakCurrent = 0, minTemp = 999, maxTemp = -999,
         minVoltage = 999, maxVoltage = 0, stallCount = 0, movingCount = 0,
+        isolatedCount = 0,
         angleTravelled = 0, prevAngle = null, prevTs = null;
     samples.forEach((s) => {
       peakTorque = Math.max(peakTorque, s.torque_kgcm);
@@ -1118,6 +1173,7 @@ function computeDailyStats(days) {
       minVoltage = Math.min(minVoltage, s.voltage_v);
       maxVoltage = Math.max(maxVoltage, s.voltage_v);
       if (s.moving) movingCount += 1;
+      if (s.isolated) isolatedCount += 1;
       if (prevTs !== null && (s.timestamp - prevTs) >= 9.0) stallCount += 1;
       if (prevAngle !== null) angleTravelled += Math.abs(s.output_deg - prevAngle);
       prevAngle = s.output_deg;
@@ -1127,6 +1183,7 @@ function computeDailyStats(days) {
     return {
       dateStr: day.dateStr, count: samples.length,
       movingPct: samples.length ? (movingCount / samples.length) * 100 : 0,
+      isolatedPct: samples.length ? (isolatedCount / samples.length) * 100 : 0,
       angleTravelled, peakTorque, peakCurrent, minTemp, maxTemp,
       minVoltage, maxVoltage, stallCount,
     };
@@ -1226,9 +1283,13 @@ function excelSerialDate(unixSeconds) {
 const RAW_HEADERS = [
   "Timestamp", "Raw Counts", "Output Angle (deg)", "Servo Angle (deg)",
   "Target Angle (deg)", "Temperature (C)", "Voltage (V)", "Current (A)",
-  "Torque (kg.cm)", "Moving", "Locked", "Faults", "Interval (s)"
+  "Torque (kg.cm)", "Moving", "Locked", "Faults", "Interval (s)", "Isolated"
 ];
-const RAW_COLS = ["A","B","C","D","E","F","G","H","I","J","K","L","M"];
+// Isolated is APPENDED as column N, never inserted earlier: DAY_SHEET_COLS
+// below hardcodes "M" for interval, which feeds every chart formula via
+// dayCellRef() - a mid-table insert would silently shift it and break
+// every chart built from this sheet.
+const RAW_COLS = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N"];
 const TIMESTAMP_COL = "A";
 
 /* Explicit widths for every column - the previous version had none at
@@ -1250,7 +1311,7 @@ const DAY_SHEET_COL_WIDTHS_XML =
   `<col min="9" max="9" width="15" customWidth="1"/>` +   // Torque (kg.cm)
   `<col min="10" max="11" width="9" customWidth="1"/>` +  // Moving/Locked
   `<col min="12" max="12" width="26" customWidth="1"/>` + // Faults (can list several)
-  `<col min="13" max="13" width="13" customWidth="1"/>` + // Interval (s)
+  `<col min="13" max="14" width="13" customWidth="1"/>` + // Interval (s)/Isolated
   `</cols>`;
 
 /* One worksheet per day, full resolution - this is the raw form; nothing
@@ -1290,6 +1351,7 @@ function makeDaySheetXml(day) {
       (s.locked ? `<c r="K${r}" t="inlineStr"><is><t>Yes</t></is></c>` : "") +
       (faults ? `<c r="L${r}" t="inlineStr"><is><t>${faults}</t></is></c>` : "") +
       `<c r="M${r}"><v>${Math.round(s.interval * 1000) / 1000}</v></c>` +
+      (s.isolated ? `<c r="N${r}" t="inlineStr"><is><t>Yes</t></is></c>` : "") +
       `</row>`;
   });
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
@@ -1614,8 +1676,13 @@ function makeOverviewSheetXml(days, samples, stats, fromTs, toTs, chartCount) {
   const dailyStats = computeDailyStats(days);
   const dailyHeaders = ["Day", "Samples", "Moving %", "Angle Travelled (deg)",
                         "Peak Torque (kg.cm)", "Peak Current (A)",
-                        "Temp Range (C)", "Voltage Range (V)", "Stalls (>=9s)"];
-  const dailyCols = ["A","B","C","D","E","F","G","H","I"];
+                        "Temp Range (C)", "Voltage Range (V)", "Stalls (>=9s)",
+                        "Isolated %"];
+  // Appended at the end, not inserted after "Moving %" - every column
+  // letter above is hardcoded into the row-population code below, so a
+  // mid-table insert would silently shift them (the same trap the day
+  // sheets' own column letters already warn about).
+  const dailyCols = ["A","B","C","D","E","F","G","H","I","J"];
   const tableTop = chartGridBottomRow(chartCount) + 4;
   body += `<row r="${tableTop - 1}"><c r="A${tableTop - 1}" t="inlineStr" s="6"><is><t>Per-day summary</t></is></c></row>`;
   body += `<row r="${tableTop}" ht="20" customHeight="1">` +
@@ -1634,6 +1701,7 @@ function makeOverviewSheetXml(days, samples, stats, fromTs, toTs, chartCount) {
       `<c r="G${r}" t="inlineStr"><is><t>${d.minTemp.toFixed(1)} - ${d.maxTemp.toFixed(1)}</t></is></c>` +
       `<c r="H${r}" t="inlineStr"><is><t>${d.minVoltage.toFixed(2)} - ${d.maxVoltage.toFixed(2)}</t></is></c>` +
       `<c r="I${r}"><v>${d.stallCount}</v></c>` +
+      `<c r="J${r}"><v>${Math.round(d.isolatedPct * 10) / 10}</v></c>` +
       `</row>`;
   });
 
@@ -1652,7 +1720,7 @@ function makeOverviewSheetXml(days, samples, stats, fromTs, toTs, chartCount) {
     `<col min="3" max="3" width="20" customWidth="1"/>` +
     `<col min="4" max="4" width="20" customWidth="1"/>` +
     `<col min="5" max="8" width="16" customWidth="1"/>` +
-    `<col min="9" max="9" width="14" customWidth="1"/>` +
+    `<col min="9" max="10" width="14" customWidth="1"/>` +
     `</cols>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n` +
@@ -2026,6 +2094,7 @@ function initUi() {
   bind("stopBtn", doStop);
   bind("lockCube", toggleLock);
   bind("calCube", doCalibrate);
+  bind("isoCube", toggleIsolate);
   bind("recoverBtn", doRecover);
   bind("saveBtn", doSave);
   bind("useBtn", doUse);

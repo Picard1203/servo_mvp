@@ -84,6 +84,7 @@ button{font-family:inherit}
 .chip.holding{color:var(--ok)}
 .chip.moving{background:var(--bluebell);color:#fff}
 .chip.alarm{background:var(--alarm);color:#fff}
+.chip.isolated{background:var(--lilac);color:#fff}
 /* Target: TANGERINE is a measurement; BLUEBELL is a commanded intent
    (same colour the MOVING chip already uses) - carried through the
    marker, the value and every Excel chart series so one colour means
@@ -198,7 +199,16 @@ button{font-family:inherit}
 .cube:active:not(:disabled){transform:translateY(1px)}
 .cube.locked,.cube.needcal{background:var(--warn-bg);border-color:var(--warn);
   color:var(--warn)}
+/* Isolation gets its own colour, not the warn-amber locked/needcal share:
+   it is the healthy, protective state (motor resting on purpose), not a
+   thing needing attention - and locked, uncalibrated and isolated can all
+   be true on screen at once, which three identical amber cubes would
+   flatten into one undifferentiated "something's up" signal. */
+.cube.isolated{background:var(--lilac);border-color:var(--lilac);color:#fff}
 .cube.flash{animation:flash .4s ease}
+
+.hint{font-family:"Segoe UI",sans-serif;font-size:12.5px;color:var(--faint);
+  text-align:center;margin:10px 0 0}
 
 /* ---------- a control that is waiting for an answer ---------- */
 /* Busy is not the same as unavailable. .btn:disabled dims to .45, which

@@ -90,3 +90,19 @@ class ServoRepository(ABC):
         Returns:
             None.
         """
+
+    @abstractmethod
+    def set_torque(self, enabled: bool) -> bool:
+        """Cuts or restores drive torque while sensors stay powered (R2).
+
+        The return value is load-bearing, unlike every other command here:
+        callers must never report isolation engaged or cleared on a write
+        the servo did not actually acknowledge, since that would claim the
+        motor is safe (or free to move) when it may not be.
+
+        Args:
+            enabled: True to restore drive torque, false to cut it.
+
+        Returns:
+            True when the servo acknowledged the command.
+        """

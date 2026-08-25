@@ -72,6 +72,22 @@ class ServoController {
   /// @return True on success.
   bool CentreHere();
 
+  /// Cuts or restores drive torque while the servo's electronics and
+  /// telemetry stay powered (backlog R2, motor isolation).
+  ///
+  /// Restoring torque re-commands the present position as the goal BEFORE
+  /// re-enabling the drive: writing the goal while torque is still off
+  /// leaves nothing for the servo to correct the instant it re-engages,
+  /// which avoids a snap toward a stale goal left over from before
+  /// isolation (or from the shaft having been turned by hand while torque
+  /// was off). Uses the SDK's EnableTorque helper on register 0x28 - the
+  /// same call Begin() already makes - never a raw WriteByte, because 0x28
+  /// also accepts 128 as "set current position as centre" and a
+  /// passed-through value must never collide with that.
+  /// @param enabled True to restore drive torque, false to cut it.
+  /// @return True when every step the servo answered to succeeded.
+  bool SetTorque(bool enabled);
+
  private:
   ServoBus& bus_;
 };

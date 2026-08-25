@@ -157,4 +157,22 @@ bool ServoController::CentreHere() {
   return bus_.WriteByte(reg::kTorqueSwitch, units::kCentrePositionCommand);
 }
 
+bool ServoController::SetTorque(bool enabled) {
+  bool ok = true;
+  if (enabled) {
+    // Re-command the present position BEFORE re-enabling the drive. Torque
+    // is still off here, so this only updates the goal register - nothing
+    // moves - and the drive has nothing left to correct once it re-engages.
+    const int32_t here = ReadRawCounts();
+    MoveCommand hold;
+    hold.target_counts = here;
+    hold.speed_counts_per_second = 1;
+    hold.acceleration = 0;
+    ok = Move(hold) && ok;
+  }
+  ok = bus_.driver().EnableTorque(bus_.servo_id(), enabled ? 1 : 0) != -1 &&
+       ok;
+  return ok;
+}
+
 }  // namespace servo

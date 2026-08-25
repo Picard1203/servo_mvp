@@ -87,36 +87,13 @@ diagnostic surface, which the remote operators do not have.
 
 **Raises Q9**, below.
 
-### Q4 — Should motor isolation survive a reboot? `answered — engineering decision`
+### Q4 — Should motor isolation survive a reboot? `answered — promoted to ADR-0010`
 **Decided 8 August 2026**, at the operator's instruction to make the call on
-tradeoffs. **Wants an ADR before R2 is built.**
+tradeoffs. **Full reasoning: `docs/adr/0010-motor-isolation-state-survives-a-reboot.md`**
+(promoted from this entry 25 August 2026, ahead of R2's build).
 
-**Decision: isolation latches. It survives a reboot, and is re-applied at
-startup before the servo is commanded to do anything.**
-
-The reasoning, and the tradeoff it turns on:
-
-- **Isolation is a protective act, so its safe state is the one that persists.**
-  A watchdog restart, a power blip or an App Lab redeploy silently re-energising
-  a mechanism somebody chose to make safe is the failure that hurts people. The
-  competing risk — a reboot leaving the system dead — hurts a schedule.
-- **The ADR-0007 argument does not transfer, and that is the crux.** ADR-0007
-  refuses to gate movement on calibration because clearing that state needs
-  somebody *physically present*, three hours away. **Clearing isolation does
-  not.** It is one click in the same UI the remote operator already has open. A
-  latched state that can be cleared remotely costs a click; an unlatched one
-  costs a surprise.
-- **It must be visible, not merely stored.** On boot the UI has to say the drive
-  is isolated and that it was isolated *before the restart* — an operator who
-  does not know why the machine is dead will power-cycle it, which under this
-  decision changes nothing and wastes the trip.
-- **The register is not the record.** `kTorqueSwitch = 0x28` re-enables on servo
-  power-up regardless, so the latch lives in the database as operator intent and
-  is re-applied at startup. That ordering matters: re-apply **before** any move
-  can be accepted, or a queued command wins the race.
-
-**Reopen this if** R8 (emergency stop) or R4 (unified Lock) changes the model —
-an e-stop almost certainly latches too, and the two should agree.
+Short answer: isolation latches, survives a reboot, and is re-applied at
+startup before the servo can be commanded to do anything.
 
 ---
 

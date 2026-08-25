@@ -267,9 +267,11 @@ class TestDirection:
 
     def test_reversed_direction_inverts_counts(self, backend):
         from app.services.servo_state import ServoStateStore
-        from app.deps import get_servo_repository, get_zero_repository
+        from app.deps import (get_app_state_repository, get_servo_repository,
+                              get_zero_repository)
         reversed_store = ServoStateStore(
             servo=get_servo_repository(), zeros=get_zero_repository(),
+            app_state=get_app_state_repository(),
             settling_seconds=backend.settings.settling_seconds,
             counts_per_turn=backend.settings.counts_per_turn,
             servo_deg_per_output_deg=backend.settings.servo_deg_per_output_deg,
@@ -298,9 +300,11 @@ class TestReachableRange:
 
     def test_reversed_direction_range_is_mirrored(self, backend):
         from app.services.servo_state import ServoStateStore
-        from app.deps import get_servo_repository, get_zero_repository
+        from app.deps import (get_app_state_repository, get_servo_repository,
+                              get_zero_repository)
         store = ServoStateStore(
             servo=get_servo_repository(), zeros=get_zero_repository(),
+            app_state=get_app_state_repository(),
             settling_seconds=backend.settings.settling_seconds,
             counts_per_turn=backend.settings.counts_per_turn,
             servo_deg_per_output_deg=backend.settings.servo_deg_per_output_deg,

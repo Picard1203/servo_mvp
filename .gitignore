@@ -13,6 +13,9 @@ venv/
 # python/.env is the live board config and must not be.
 python/.env
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite3
 
 # Logs

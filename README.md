@@ -56,8 +56,7 @@ servo_mvp/
 │   ├── PROJECT_STATE.md     where the project is
 │   ├── BACKLOG.md           open defects and tasks
 │   ├── adr/                 why it is built this way
-│   ├── AUDIT.md             historical: the bug chain of the first round
-│   └── FILE_REGISTRY.md     catalogue of superseded deliverables
+│   └── AUDIT.md             historical: the bug chain of the first round
 ├── python/
 │   ├── app/                 backend
 │   ├── static/              index.html, style.css, app.js

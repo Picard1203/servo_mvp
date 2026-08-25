@@ -2,9 +2,9 @@
 
 import io
 import struct
-from threading import Thread
-from time import monotonic, sleep, time
-from typing import Iterator
+from threading import Event, Thread
+from time import monotonic, time
+from typing import Iterator, Optional
 
 from Logger461 import logger
 
@@ -55,6 +55,8 @@ class TelemetryService:
         self._state = state
         self._settings = settings
         self._last_purge = 0.0
+        self._stop_event = Event()
+        self._thread: Optional[Thread] = None
 
     def start_sampler(self) -> None:
         """Starts the background sampling thread.
@@ -62,11 +64,32 @@ class TelemetryService:
         Returns:
             None.
         """
-        Thread(target=self._run, daemon=True).start()
+        self._thread = Thread(target=self._run, daemon=True)
+        self._thread.start()
         logger.info("telemetry sampler started",
                     metadata={"event": "telemetry.started"},
                     extra={"interval_s":
                            self._settings.sampler_interval_seconds})
+
+    def stop_sampler(self) -> None:
+        """Stops the background sampling thread, if one was started.
+
+        Production never needs this - the process just exits. Tests
+        build a fresh TelemetryService per case; without this, a thread
+        started by one test kept running against that test's own (now
+        stale) objects for the rest of the whole suite, silently reading
+        state and logging into the shared test logger stub at any later
+        moment - the exact shape of an unreproducible, timing-dependent
+        failure (backlog D26). conftest.py's _clear_all_caches() calls
+        this before dropping the cached instance.
+
+        Returns:
+            None.
+        """
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+            self._thread = None
 
     def export_binary_stream(self, ts_from: float, ts_to: float) -> Iterator[bytes]:
         """Packs telemetry samples in range into a compact binary byte stream.
@@ -128,12 +151,12 @@ class TelemetryService:
                     extra={"rows": count, "ts_from": ts_from, "ts_to": ts_to})
 
     def _run(self) -> None:
-        """Samples until the process ends, at the configured interval.
+        """Samples until stopped, at the configured interval.
 
         Returns:
             None.
         """
-        while True:
+        while not self._stop_event.is_set():
             started = monotonic()
             try:
                 self._sample_once()
@@ -142,8 +165,8 @@ class TelemetryService:
                 logger.exception("telemetry sampling failed",
                                  metadata={"event": "telemetry.error"})
             elapsed = monotonic() - started
-            sleep(max(0.05,
-                      self._settings.sampler_interval_seconds - elapsed))
+            self._stop_event.wait(
+                max(0.05, self._settings.sampler_interval_seconds - elapsed))
 
     def _sample_once(self) -> None:
         """Reads one coherent snapshot and persists it.

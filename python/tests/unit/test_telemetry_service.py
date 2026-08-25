@@ -199,9 +199,18 @@ class TestSamplerResilience:
 
         monkeypatch.setattr(service, "_sample_once", flaky)
         service.start_sampler()
-        from tests.conftest import wait_until
-        assert wait_until(lambda: calls["n"] >= 3, timeout=3)   # survived
-        assert "telemetry.error" in backend.logger.events()
+        try:
+            from tests.conftest import wait_until
+            assert wait_until(lambda: calls["n"] >= 3, timeout=3)  # survived
+            assert "telemetry.error" in backend.logger.events()
+        finally:
+            # This service is built directly, not through the cached
+            # deps.get_telemetry_service() singleton, so conftest's
+            # teardown never sees it - without this the thread's own
+            # closure keeps it (and this test's monkeypatched failure)
+            # alive and logging into the shared stub for the rest of the
+            # suite (backlog D26).
+            service.stop_sampler()
 
     def test_a_sampler_failure_records_what_went_wrong(self, backend,
                                                        monkeypatch):
@@ -224,12 +233,80 @@ class TestSamplerResilience:
 
         monkeypatch.setattr(service, "_sample_once", always_fails)
         service.start_sampler()
-        assert wait_until(lambda: "telemetry.error"
-                          in backend.logger.events(), timeout=3)
-        failure = next(entry for entry in backend.logger.records
-                       if len(entry) == 4
-                       and entry[2].get("event") == "telemetry.error")
-        extra = failure[3]
-        assert extra.get("exception_type") == "RuntimeError"
-        assert "the bus fell over" in extra.get("exception", "")
-        assert "Traceback" in extra.get("traceback", "")
+        try:
+            assert wait_until(lambda: "telemetry.error"
+                              in backend.logger.events(), timeout=3)
+            failure = next(entry for entry in backend.logger.records
+                           if len(entry) == 4
+                           and entry[2].get("event") == "telemetry.error")
+            extra = failure[3]
+            assert extra.get("exception_type") == "RuntimeError"
+            assert "the bus fell over" in extra.get("exception", "")
+            assert "Traceback" in extra.get("traceback", "")
+        finally:
+            service.stop_sampler()  # see the sibling test's comment (D26)
+
+
+class TestSamplerLifecycleIsolation:
+    """D26: a sampler thread that outlived its test used to log into a
+
+    later test's own results, unreproducibly. The Python suite failed
+    once in ten runs (8 August 2026) with the failing test never
+    identified. Root cause, found 25 August 2026 while chasing an
+    unrelated ResourceWarning: start_sampler() had no stop mechanism at
+    all, so a thread started by one test kept running against that
+    test's own (soon closed) Database for the rest of the whole suite -
+    reading state and logging errors into the shared test logger stub
+    at whatever moment the scheduler happened to run it. That is exactly
+    the shape of an intermittent, unreproducible failure: which test it
+    corrupts, and when, depends on thread timing, not on anything either
+    test does wrong on its own.
+
+    These tests induce the mechanism directly and deterministically,
+    rather than relooping the whole suite and hoping to get unlucky
+    again: the first proves stop_sampler() actually stops the thread;
+    the second proves what used to happen when nothing did.
+    """
+
+    def test_stop_sampler_actually_stops_the_thread(self, backend, sim):
+        from app.deps import get_state_store, get_telemetry_repository
+        from app.services.telemetry_service import TelemetryService
+        from tests.conftest import wait_until
+        service = TelemetryService(get_telemetry_repository(),
+                                   get_state_store(), backend.settings)
+        service.start_sampler()
+        assert wait_until(lambda: service._thread is not None
+                          and service._thread.is_alive(), timeout=1.0)
+        service.stop_sampler()
+        assert service._thread is None
+
+    def test_teardown_stops_the_sampler_before_closing_the_database(self):
+        """The ordering itself is the fix - proven directly, not risked.
+
+        An earlier version of this test induced the actual race (started
+        a sampler, closed its database out from under the live thread,
+        asserted a clean ProgrammingError got logged). That reliably
+        reproduced the mechanism - and, once, segfaulted the whole
+        interpreter instead: sqlite3's C extension is not safe against a
+        connection being closed while another thread is mid-statement on
+        it, `check_same_thread=False` notwithstanding. A test that can
+        crash the process it runs in is worse than the bug it documents,
+        so this asserts the invariant that prevents the race - stop
+        happens before close - rather than ever triggering it for real.
+        """
+        import unittest.mock as mock
+        from tests.conftest import _clear_all_caches
+        calls = []
+        with mock.patch("app.deps.get_telemetry_service") as get_svc, \
+             mock.patch("app.deps.get_database") as get_db, \
+             mock.patch("app.core.config.get_settings"):
+            get_svc.cache_info.return_value = mock.Mock(currsize=1)
+            get_svc.return_value.stop_sampler.side_effect = \
+                lambda: calls.append("stop_sampler")
+            get_db.cache_info.return_value = mock.Mock(currsize=1)
+            get_db.return_value.close.side_effect = \
+                lambda: calls.append("close")
+            _clear_all_caches()
+        assert calls == ["stop_sampler", "close"], (
+            "closing before the sampler is confirmed stopped is exactly "
+            "the segfault this test used to risk")

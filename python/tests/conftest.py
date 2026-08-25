@@ -189,6 +189,14 @@ def _clear_all_caches() -> None:
     """
     from app import deps
     from app.core.config import get_settings
+    # Sampler first, then the database it reads through - stopping the
+    # thread before closing the connection it may still be mid-read on
+    # is what makes closing the connection safe at all (see
+    # TelemetryService.stop_sampler and Database.close).
+    if deps.get_telemetry_service.cache_info().currsize > 0:
+        deps.get_telemetry_service().stop_sampler()
+    if deps.get_database.cache_info().currsize > 0:
+        deps.get_database().close()
     get_settings.cache_clear()
     for name in dir(deps):
         provider = getattr(deps, name)

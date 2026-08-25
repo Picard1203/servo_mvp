@@ -139,6 +139,8 @@ library — re-apply it from `libraries/`.
 
 ## 6. Development shortcut
 
-The working copy is often an **sshfs mount of the board**
-(`arduino@192.168.1.192:/home/arduino/ArduinoApps/`), so edits land on the board
-with no push step. Convenient for development; **not** the deployment path above.
+The working copy is often a **network mount of the board** (currently CIFS/Samba,
+not sshfs — see `CLAUDE.md` §6, which is the source of truth for the current
+protocol and address; both have already changed once), so edits land on the
+board with no push step. Convenient for development; **not** the deployment path
+above.

@@ -14,17 +14,22 @@ import pytest
 import uvicorn
 
 
-def _free_port() -> int:
-    """Finds a free localhost TCP port.
+def _bound_socket() -> socket.socket:
+    """Binds an ephemeral localhost TCP socket and leaves it open.
+
+    Finding a free port, closing the probe socket, and binding a new one
+    later leaves a window where a second process can be handed the same
+    port number before this one rebinds it - harmless run serially, a
+    real collision under parallel test execution (D26). Handing uvicorn
+    the still-open socket removes the window instead of narrowing it.
 
     Returns:
-        An ephemeral port number currently free.
+        The open, bound (but not yet listening) socket.
     """
-    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    probe.bind(("127.0.0.1", 0))
-    port = probe.getsockname()[1]
-    probe.close()
-    return port
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("127.0.0.1", 0))
+    return sock
 
 
 @pytest.fixture()
@@ -34,7 +39,8 @@ def live_backend(backend, monkeypatch):
     Yields:
         Namespace with base_url, port, and the relay instance.
     """
-    port = _free_port()
+    sock = _bound_socket()
+    port = sock.getsockname()[1]
     monkeypatch.setattr(backend.settings, "api_port", port)
 
     from app.app import create_app
@@ -48,7 +54,8 @@ def live_backend(backend, monkeypatch):
     config = uvicorn.Config(app, host="127.0.0.1", port=port,
                             log_level="warning")
     server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
+    thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]},
+                              daemon=True)
     thread.start()
     deadline = time.monotonic() + 5.0
     while not server.started:

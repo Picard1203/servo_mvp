@@ -34,6 +34,23 @@ class Database:
         """
         return self._connection
 
+    def close(self) -> None:
+        """Closes the connection.
+
+        The process-wide singleton never needs this in production - the
+        OS reclaims it at process exit. Tests build a fresh Database per
+        case and drop the old one from an lru_cache without ever calling
+        this, which left every run's teardown to an unpredictable GC pass
+        instead (surfaced as ResourceWarning: unclosed database once
+        coverage instrumentation was added and perturbed collection
+        timing). conftest.py's _clear_all_caches() calls this before
+        clearing the cache.
+
+        Returns:
+            None.
+        """
+        self._connection.close()
+
     def _init_schema(self) -> None:
         """Creates tables and indexes when missing.
 

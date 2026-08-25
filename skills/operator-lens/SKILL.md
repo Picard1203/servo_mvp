@@ -10,7 +10,7 @@ to procure this.** Both judge the system by what it does on screen, not by what
 its API returns.
 
 This skill exists because of a measurable pattern: **the defects that matter most
-here were found by an operator on hardware, not by 198 tests.** D9, D10, D11, D12
+here were found by an operator on hardware, not by the automated suite.** D9, D10, D11, D12
 and D13 all came out of one board session. None were on any list beforehand.
 
 ---

@@ -423,10 +423,33 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D33** | Recent Activity timestamps display in UTC, not local time | 24 August 2026 · Session 7 (T14) |
 | **D34** | Angle displays truncate to 1 decimal, losing the 0.06° step | 24 August 2026 · Session 7 (T14) · widened from the move log to every angle readout |
 | **T14** | Triage the unslotted items; audit backlog and doc hygiene deliberately | 24 August 2026 · Session 7 |
+| **D24** | Two `InvalidReadingError` guards unexercised; docs claimed 100% coverage | 25 August 2026 · Session 8 |
+| **D30** | `soak_report.py`'s UTC/local cutoff bug — regression test | 25 August 2026 · Session 8 |
+| **T12** | `tools/check_client_behaviour.js` promoted to a real verification command | 25 August 2026 · Session 8 |
 
 ---
 
 ## Defects
+
+### D36 — Several tests construct their own `Database` and never close it
+**Status:** open · **Severity:** low · **Found:** 25 August 2026, chasing D26
+
+Nine call sites in `test_database.py`, `test_sqlite_zero_repository.py` and
+`test_sqlite_telemetry_repository.py` build a `Database(tmp_path / ...)`
+directly rather than through the cached `deps.get_database()` singleton, so
+none of them are closed by `_clear_all_caches()`'s new teardown ordering
+(D26). Each leaves a `ResourceWarning: unclosed database` at some later,
+unpredictable point in the suite. Does not fail the suite and is not the
+D26 mechanism (these are per-test SQLite files, not the shared connection a
+zombie thread can race) — found opportunistically, not chased down, because
+nine call sites is a real piece of work, not a one-line fix alongside D26.
+
+**Acceptance:** each either uses a fixture that closes it (`yield db;
+db.close()`) or the pattern is judged fine as-is and this entry says why.
+
+**Related:** D26.
+
+---
 
 ### D28 — MCU boot-time `mcu_log` notify lost to a startup race
 **Status:** open · **Severity:** low · **Found on real hardware, 8 August 2026**
@@ -489,42 +512,6 @@ Cheap either way — found, not designed around.
 
 ---
 
-### D30 — `soak_report.py` compared a local cutoff string against UTC logs,
-### and reported a catastrophic run as clean
-**Status:** code fixed 8 August 2026 · **regression test still needed**
-· **Severity:** high · **Found running Session 2's soak**
-
-Both JSONL logs are written in **UTC** (`mcu_log.py` uses `time.gmtime()`
-explicitly; the Linux-side stand-in's `datetime.now()` is also UTC because
-the container's system clock is UTC — confirmed against `date -u`).
-`parse_since()` correctly converts a **local**-time `--since` string to an
-absolute unix timestamp. The bug was one step later: `report_log()` and
-`report_mcu_log()` each rebuilt a cutoff *string* from that timestamp with
-`datetime.fromtimestamp(since).isoformat()` — local again — then compared
-it directly against the logs' UTC-stamped strings. A 3-hour local/UTC gap
-(IDT) meant every real record from the run sorted as "before the cutoff."
-
-First report after the 3-operator soak (1462 MCU rejections, 11+ minutes of
-continuous `servo_read` timeouts) printed:
-```
-VERDICT: clean - no stall signature, no fabricated positions, no errors.
-```
-**The D24 species again — a number nobody checked, reporting the opposite
-of what happened** — on the one tool whose entire job is catching this.
-
-**Fixed:** both call sites now use a new `_utc_cutoff()` helper
-(`datetime.fromtimestamp(since, tz=UTC).replace(tzinfo=None).isoformat()`)
-instead of the local reformat. `--since` itself is still typed in the
-operator's own local time, matching what `synthetic_operator.py` itself
-prints — that half was never the bug. Re-running both of tonight's soaks
-with the fix produced the real numbers now in D4 and R1.
-
-**Not yet done:** a regression test — a record just outside a
-local-timezone cutoff but inside the UTC one, asserting it's still counted.
-
-**Related:** D24, D3 (introduced the MCU log this bug hides).
-
----
 
 ### D35 — Commanded speed and actual speed disagree by roughly 1.5-2x
 **Status:** open, not yet investigated · **Severity:** medium · **Found:**
@@ -808,25 +795,56 @@ convention, not an enforced one. **Amends ADR-0008.**
 ---
 
 ### D26 — The Python suite failed once in ten runs, unreproduced
-**Status:** open · **needs investigation** · **Severity:** medium
-· **Observed:** 8 August 2026
+**Status:** cause found, fix shipped · **original flake never directly
+reproduced** · **Severity:** medium · **Observed:** 8 August 2026 ·
+**Investigated:** 25 August 2026
 
-One run reported `1 failed, 197 passed`. Nine runs either side were clean and it
-did not recur, so **which test failed is not known** — the run was chained into
-one command and its traceback was consumed before it could be read. That was an
-error in how it was run.
+**Root cause found while chasing an unrelated `ResourceWarning`, not by
+reproducing the original report.** `TelemetryService.start_sampler()` had
+no stop mechanism at all — a background thread it started kept running
+forever, reading state and logging into the shared test `_logger_stub`
+whenever the scheduler next ran it, regardless of which test's teardown
+had already run. Two tests in `TestSamplerResilience` build their own
+`TelemetryService` directly (not through the cached singleton), so their
+threads outlived every run of the suite from that point on.
 
-- It happened on the loaded run (pytest + `make` + two `node` invocations
-  chained, on a machine also serving an sshfs mount).
-- Batch 1's Python change is four conditional expressions and some type
-  annotations — nothing concurrent, timed or ordered.
-- The suite has timing-sensitive areas: the settle window, the sampler interval,
-  `wait_until` in `conftest.py`. A deadline under load is the natural suspect.
+**Worse than a confusing assertion.** Closing the shared `Database`
+connection (as `_clear_all_caches()` now correctly does between tests)
+while one of these zombie threads was mid-statement on it didn't just
+raise a catchable error — it **segfaulted the interpreter outright** once,
+confirmed reproducible: `sqlite3`'s C extension is not safe against a
+connection closing mid-use, `check_same_thread=False` notwithstanding.
 
-**Acceptance:** run the suite in a loop with `--tb=long` captured to a file
-until it recurs; then fix it or document the timing sensitivity that triggers
-it. **Until then a single green run is not evidence** — any report of "198
-passed" should say how many runs it took.
+**Fixed:** `TelemetryService` gains `stop_sampler()`; the two tests that
+build their own instance now stop it in a `finally` block; `Database`
+gains `close()`; `_clear_all_caches()` stops any cached sampler before
+closing the database it reads through, in that order.
+
+**Evidence, stated plainly rather than implied:**
+- A ~20-run background loop against the code **before** this fix segfaulted
+  at roughly 1-in-10 to 1-in-20 runs — close enough to the original "1
+  failed in 10" that this is very likely the same mechanism, but the
+  original failure mode (a clean assertion failure, not a segfault) was
+  never itself reproduced, so this is strong circumstantial evidence, not
+  proof of identity.
+- Two new deterministic tests (`TestSamplerLifecycleIsolation` in
+  `test_telemetry_service.py`) induce the mechanism directly instead of
+  relooping and hoping: one proves `stop_sampler()` actually stops the
+  thread, the other proves the fixed teardown order without ever
+  triggering the crash for real (an earlier version of that test induced
+  the actual race and segfaulted once itself — rewritten for exactly that
+  reason).
+- A ~30-run loop against the **fixed** code, on local disk (no CIFS
+  contention — a different environment from the one the original flake
+  happened in), ran clean before being interrupted partway through
+  (session/terminal closed by accident) with no failures or segfaults.
+
+**Left open, deliberately:** the original report's exact failing test was
+never identified, and a clean loop is evidence, not proof, especially since
+it ran in a different environment (local disk, solo) than the original
+(loaded machine, concurrent tools). Stays in `BACKLOG.md` rather than
+moving to `CLOSED.md` until either it recurs and is caught directly, or
+enough clean runs accumulate across enough real sessions to call it settled.
 
 **Related:** D10 (a failure that destroyed its own evidence), T3.
 
@@ -858,59 +876,7 @@ operator different things.
 
 ---
 
-### D24 — Two `InvalidReadingError` guards are unexercised; the docs claimed 100%
-**Status:** open · **Severity:** medium · **Found by:** Batch 1, 8 August 2026
-
-Coverage of `app/` is **99%, not 100%**. Two statements never execute:
-
-| | |
-|---|---|
-| `zero_service.py:49` | the guard in **`ZeroService.capture()`** |
-| `servo_state.py:225` | the guard in **`ServoStateStore.read_counts()`** |
-
-**`capture()`'s guard is the line D2 exists about.** D2 states it "now raises
-`InvalidReadingError` exactly as `calibrate()` always did" and that six tests
-were added. The guard is correct; the test that runs it does not exist.
-`calibrate()`'s twin **is** covered — the twin-path shape, this time in the
-tests.
-
-Measured identically before and after Batch 1 (929 statements, 2 missed), so it
-pre-dates it. It survived because **nothing measures it**: the verification
-commands do not run coverage and `pytest.ini` sets no threshold.
-
-**Acceptance:** both guards exercised by a test that fails without them, and the
-quoted figure is one the suite enforces (`--cov-fail-under`) or is not quoted.
-
-**Related:** D2, ADR-0008, `AUDIT.md`.
-
----
-
 ## Tasks
-
-### T12 — Decide the status of `tools/check_client_behaviour.js`
-**Status:** open · **Severity:** medium · **Raised by:** Batch 1, 8 August 2026
-
-Written during Batch 1 because four of its five items were client-side and the
-repository could check none of them. Loads `python/static/app.js` into a stubbed
-DOM under `node` and runs 44 assertions across D14, D15, D16, D20, D21. Passes.
-Deliberately **not** a fourth verification command yet.
-
-**For:** every UI defect here — D14, D15, D16, D17, D18, D19, D21 — lives in one
-600-line file with no automated coverage, and it needs nothing beyond `node`, in
-the spirit of `tools/check_bridge_contract.py`.
-
-**Against:** it makes `node` a development prerequisite, which touches ADR-0005
-(air-gapped by default) — it must never become something fetched from a network.
-And a stubbed DOM proves logic, not rendering: nothing about layout, CSS, or
-whether `disabled` really blocks a click.
-
-**Acceptance:** either it becomes a fourth command and `CLAUDE.md` §3 says so
-with its count, or it is recorded as a one-off with a reason. **Do not leave it
-undecided** — a checker nobody runs is D20's species.
-
-**Related:** ADR-0005, D7, R6.
-
----
 
 ### T13 — Distil the remaining documents
 **Status:** open · **Severity:** medium · **Raised by:** the operator, 8 August 2026

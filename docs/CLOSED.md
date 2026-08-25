@@ -1343,5 +1343,52 @@ stated reason it doesn't; every index table matches what it indexes.
 
 ---
 
+### D24 — Two `InvalidReadingError` guards were unexercised; the docs claimed 100%
+**Status:** CLOSED · 25 August 2026 · **Severity:** medium
+
+Coverage of `app/` was 99%, not the 100% seven documents quoted — nothing
+measured it. The two unexercised statements were the guards in
+`ZeroService.capture()` (the exact line D2 was filed about) and
+`ServoStateStore.read_counts()`. Both now have a test that fails without
+them, verified RED then GREEN. Coverage is measured and gated at 99% in
+`pytest.ini`; `tools/verify.py` (T12) reports it every run.
+
+**Related:** D2, ADR-0008, T12.
+
+---
+
+### D30 — `soak_report.py` compared a local cutoff string against UTC logs, and reported a catastrophic run as clean
+**Status:** CLOSED · 25 August 2026 (code fixed 8 August 2026; regression
+test was the missing half) · **Severity:** high
+
+Both JSONL logs are UTC; `report_log()`/`report_mcu_log()` rebuilt the
+`--since` cutoff back into local time before comparing, so on this
+project's 3-hour offset every real record sorted as "before the cutoff" —
+the first report after a genuinely catastrophic soak (1,462 rejections, 11+
+minutes of timeouts) printed `VERDICT: clean`. Fixed the same day with a
+`_utc_cutoff()` helper both call sites share. The regression test
+(`test_soak_report.py`) forces `TZ=Asia/Jerusalem` and `time.tzset()` so it
+actually exercises the gap — this machine's own clock is UTC, so a naive
+test would pass even with the bug reinstated. Verified RED against the
+original buggy expression before being accepted.
+
+**Related:** D24 (the same species — a number nobody checked).
+
+---
+
+### T12 — Decided: `tools/check_client_behaviour.js` is a real verification command
+**Status:** CLOSED · 25 August 2026 · **Severity:** medium
+
+Promoted to a fourth verification check, folded into `tools/verify.py`.
+Node is present on the development machine and the checker fetches nothing
+over a network, so ADR-0005 (air-gapped by default) is not touched — the
+concern that kept this undecided. Assertion count is 63 now (grown from 44
+since Batch 1, covering D32 too), read live by `verify.py` rather than
+quoted in a doc that can go stale.
+
+**Related:** ADR-0005, D7, R6.
+
+---
+
 ## Requirements captured but not yet designed
 

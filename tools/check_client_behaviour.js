@@ -179,11 +179,15 @@ console.log("\nD14 - a refused connection reads as something to act on");
     output_min_deg: -90.0, output_max_deg: 90.0,
   };
   const dead = {
-    output_deg: null, reading_valid: false, moving: false, locked: false,
+    // D23: a failed read nulls moving and the six fault flags too, not
+    // just the five readings - this fixture used to say `false` for all
+    // six, which stopped being what the real API sends the moment D23
+    // shipped.
+    output_deg: null, reading_valid: false, moving: null, locked: false,
     settling: false, position_verified: true, active_zero: "datum",
     temperature_c: null, voltage_v: null, current_a: null,
-    torque_kgcm: null, overload: false, overcurrent: false, overheat: false,
-    voltage_fault: false, sensor_fault: false, angle_fault: false,
+    torque_kgcm: null, overload: null, overcurrent: null, overheat: null,
+    voltage_fault: null, sensor_fault: null, angle_fault: null,
     servo_deg: null, target_deg: 20.0, target_stale: false,
     output_min_deg: -90.0, output_max_deg: 90.0,
   };
@@ -251,6 +255,53 @@ console.log("\nD14 - a refused connection reads as something to act on");
         $("vVolt").textContent === "12.10", $("vVolt").textContent);
   check("recovery clears the unknown lamps",
         !$("fOverload").classList.contains("unknown"));
+
+  /* ---------- D25: a reported alarm survives the reading going unknown --- */
+  console.log("\nD25 - an overload alarm stays visible through an unknown read");
+  const tripped = Object.assign({}, good, { overload: true });
+
+  ctx.renderState(tripped);
+  check("a fresh trip shows the alarm",
+        /ALARM/.test($("alarmslot").textContent), $("alarmslot").textContent);
+  check("...naming the fault",
+        /Overload/.test($("alarmslot").textContent));
+  check("recover is visible while overload is active",
+        $("recoverwrap").hidden === false);
+  check("recover is enabled while the position is known",
+        $("recoverBtn").disabled === false);
+
+  ctx.renderState(dead);
+  ctx.renderState(dead);
+  ctx.renderState(dead);   // three failures: position is now genuinely unknown
+  check("the alarm survives the reading going unknown, not blanked to"
+        + " 'Position unknown' the way D16's rule alone would have",
+        /ALARM/.test($("alarmslot").textContent), $("alarmslot").textContent);
+  check("...marked as last-known, not presented as a live reading",
+        /last known/.test($("alarmslot").textContent),
+        $("alarmslot").textContent);
+  check("recover stays visible - hidden would teach the operator the"
+        + " alarm is over, which it is not",
+        $("recoverwrap").hidden === false);
+  check("recover is disabled once the position is unknown - it cannot"
+        + " re-command a position it does not have",
+        $("recoverBtn").disabled === true);
+  check("...with the reason stated on the control itself",
+        $("recoverBtn").title.length > 0, $("recoverBtn").title);
+  check("D16's own rule is untouched: a fault lamp still stops claiming"
+        + " OK once unknown (this is about not ERASING a true report,"
+        + " not about trusting stale data)",
+        $("fOverload")._sub.textContent === "TRIP",
+        $("fOverload")._sub.textContent);
+
+  ctx.renderState(Object.assign({}, good, { overload: false }));
+  check("a fresh clean read clears the alarm",
+        // The clean branch sets innerHTML (it needs the ok-dot span), not
+        // textContent - a real DOM's textContent reflects either; this
+        // stub's does not, so both are checked here.
+        /No active alarms/.test($("alarmslot").innerHTML),
+        $("alarmslot").innerHTML);
+  check("...and hides recover again",
+        $("recoverwrap").hidden === true);
 
   /* ---------- target: no target yet, and a stale (post-Stop) target -- */
   console.log("\nTarget angle - never fabricated, stale after Stop");

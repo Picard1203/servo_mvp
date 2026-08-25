@@ -494,11 +494,30 @@ function renderState(s) {
   const servoText = num(shown && shown.servo_deg, 1);
   $("servoVal").textContent = servoText === "—" ? "—" : servoText + "°";
 
-  const anyFault = !!shown && (shown.overload || shown.overcurrent ||
-                   shown.overheat || shown.voltage_fault ||
-                   shown.sensor_fault || shown.angle_fault);
+  // D25: a fault that WAS reported must not vanish just because the
+  // reading has since gone unknown - before this, three failed reads
+  // blanked `shown` to null, `anyFault` collapsed to false with it, and
+  // the alarm banner + recover control both disappeared while the servo
+  // was, as far as anyone knew, still overloaded. Deliberately
+  // asymmetric with D16's rule, not a relaxation of it: a reported TRUE
+  // (a real trip) is sticky and survives the reading going unknown; a
+  // reported FALSE (healthy) is not carried forward past the known-
+  // window - claiming "still OK" from stale data is exactly what D16
+  // exists to prevent. Cleared only by a later fresh read that itself
+  // reports the fault gone.
+  const stickyFlag = (name) => {
+    if (measured) return s[name];
+    if (state.lastMeasured && state.lastMeasured[name] === true) return true;
+    return known ? (shown ? shown[name] : null) : null;
+  };
+  const stickyFaults = {};
+  for (const field of FAULT_FIELDS) stickyFaults[field.key] = stickyFlag(field.key);
+  const faultIsStale = !measured &&
+    FAULT_FIELDS.some((field) => stickyFaults[field.key] === true);
+
+  const anyFault = FAULT_FIELDS.some((field) => stickyFaults[field.key] === true);
   const chip = $("movechip");
-  if (!shown) { chip.className = "chip"; chip.textContent = "—"; }
+  if (!shown && !anyFault) { chip.className = "chip"; chip.textContent = "—"; }
   else if (anyFault) { chip.className = "chip alarm"; chip.textContent = "FAULT"; }
   else if (shown.moving) { chip.className = "chip moving"; chip.textContent = "MOVING"; }
   else if (s.settling) { chip.className = "chip"; chip.textContent = "SETTLING"; }
@@ -506,19 +525,30 @@ function renderState(s) {
 
   /* null, not false: "no fault reported" and "nothing was reported" are
      different things, and a green OK lamp is a claim either way. */
-  const flag = (name) => shown ? shown[name] : null;
-  setFault("fOverload", flag("overload"));
-  setFault("fOvercurrent", flag("overcurrent"));
-  setFault("fOverheat", flag("overheat"));
-  setFault("fVoltage", flag("voltage_fault"));
-  setFault("fSensor", flag("sensor_fault"));
-  setFault("fAngle", flag("angle_fault"));
-  $("mTemp").classList.toggle("alarm", flag("overheat") === true);
-  $("mVolt").classList.toggle("alarm", flag("voltage_fault") === true);
+  setFault("fOverload", stickyFaults.overload);
+  setFault("fOvercurrent", stickyFaults.overcurrent);
+  setFault("fOverheat", stickyFaults.overheat);
+  setFault("fVoltage", stickyFaults.voltage_fault);
+  setFault("fSensor", stickyFaults.sensor_fault);
+  setFault("fAngle", stickyFaults.angle_fault);
+  $("mTemp").classList.toggle("alarm", stickyFaults.overheat === true);
+  $("mVolt").classList.toggle("alarm", stickyFaults.voltage_fault === true);
   $("mCur").classList.toggle("alarm",
-                             flag("overcurrent") === true ||
-                             flag("overload") === true);
-  $("recoverwrap").hidden = flag("overload") !== true;
+                             stickyFaults.overcurrent === true ||
+                             stickyFaults.overload === true);
+
+  // Recover is genuinely unable to work without a known position -
+  // MotionService.recover() re-commands the current position, and there
+  // isn't one. Visible-but-disabled with the reason stated (D15's own
+  // pattern for a control that must refuse) teaches the operator "still
+  // wrong, can't act yet" - hidden would teach "the alarm is over",
+  // which is exactly the false signal D25 is about.
+  const recoverWrap = $("recoverwrap");
+  const recoverBtn = $("recoverBtn");
+  recoverWrap.hidden = stickyFaults.overload !== true;
+  recoverBtn.disabled = !known;
+  recoverBtn.title = known ? ""
+    : "Position unknown - recover needs a known position to re-command";
 
   const lock = $("lockCube");
   lock.classList.toggle("locked", s.locked);
@@ -531,8 +561,9 @@ function renderState(s) {
   const slot = $("alarmslot");
   if (anyFault) {
     slot.className = "alarmslot alarm";
-    slot.textContent = "\u25a0 ALARM \u00b7 " + faultName(shown) +
-      (shown.overload ? " \u2014 torque cut back" : "");
+    slot.textContent = "\u25a0 ALARM \u00b7 " + faultName(stickyFaults) +
+      (stickyFaults.overload ? " \u2014 torque cut back" : "") +
+      (faultIsStale ? " (last known \u2014 position unknown)" : "");
   } else if (!known) {
     // Ranks above the unverified warning: an unset reference means the
     // shown angle may be wrong, a lost reading means there is no angle.

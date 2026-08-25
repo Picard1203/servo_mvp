@@ -70,7 +70,7 @@ on the system path — use it:
 cd python && ../.venv/bin/python -m pytest
 ```
 
-If it is ever missing, rebuild with **`--copies`**: the working copy is an sshfs
+If it is ever missing, rebuild with **`--copies`**: the working copy is a network
 mount of the board (§6) and the mount refuses the symlinks a normal venv wants.
 
 ```bash
@@ -93,15 +93,40 @@ is a defect — fix it rather than updating one copy.
 
 ## 3. Before you change anything
 
-Run all three. Note the numbers.
+**One command, not three.** `tools/verify.py` runs the Python suite, the
+native sketch checks, the Bridge contract check and the client-behaviour
+check (T12, promoted 25 Aug 2026) and prints one summary block:
 
 ```bash
-cd python && ../.venv/bin/python -m pytest    # 226 tests
-cd sketch/tests/native && make           # 194 checks
-python3 tools/check_bridge_contract.py   # "both sides agree"
+python3 tools/verify.py                   # everything, compared to the last baseline
+python3 tools/verify.py --update-baseline # after a deliberate count change, accept it
 ```
 
-Run them again after. **If the numbers do not match, stop and say so.**
+The counts live in `tools/verify_baseline.json`, not in this file — a number
+quoted in prose is exactly what let "226 tests" sit here stale after the
+suite grew to 229 (D24's own lesson). Run it before changing anything and
+again after; a mismatch from the baseline is not automatically wrong (D24
+itself changed the count on purpose) but **an unexplained mismatch means
+stop and say so.**
+
+**The Python suite runs against a local mirror, not the working tree
+directly** (`~/.cache/servo_mvp/verify-mirror`) — the working copy's mount
+(§6) costs ~40s of pure import latency per run otherwise, confirmed not
+fixed by Python's own bytecode cache. `python/` is re-mirrored fresh on
+every call, so edits are never stale. `.venv` is mirrored only when
+`python/requirements.txt` or `requirements-dev.txt` changes — **a bare
+`pip install` into the real `.venv` without touching a requirements file
+will not be picked up**; touch one of those files (or delete
+`~/.cache/servo_mvp/verify-mirror/venv`) to force a remirror.
+
+Individual commands, if you need just one:
+
+```bash
+cd python && ../.venv/bin/python -m pytest
+cd sketch/tests/native && make
+python3 tools/check_bridge_contract.py
+node tools/check_client_behaviour.js
+```
 
 The venv recipe is in §2. The board's own runtime environment is provisioned
 by App Lab and is a different thing.
@@ -142,11 +167,33 @@ by App Lab and is a different thing.
 
 ## 6. Environment note
 
-The working copy is usually an **sshfs mount of the board itself**
-(`arduino@192.168.1.192:/home/arduino/ArduinoApps/`), so edits land on the board
-directly and there is no push step during development. That is a convenience for
-development only — it is not the deployment path. See `README.md` for real
-deployment.
+The working copy is usually a **network mount of the board itself**, so edits
+land on the board directly and there is no push step during development. That
+is a convenience for development only — it is not the deployment path. See
+`README.md` for real deployment.
+
+**Changed 25 August 2026: the mount is now CIFS/Samba, not sshfs.** Current
+mount: `//172.20.10.12/arduinoapps` (Samba share, user `arduino`) mounted at
+`uno_q_workspace/`, with `servo_mvp/` inside it matching
+`/home/arduino/ArduinoApps/servo_mvp` on the board. The IP also changed, from
+the old `192.168.1.192`. **Confirm the current mount with `mount | grep cifs`
+before trusting either number** — both the protocol and the address have
+already changed once.
+
+The mount still refuses symlinks under CIFS, same as it did under sshfs —
+confirmed empirically 25 August 2026 (`ln -s` fails with "Operation not
+supported"). The `--copies` venv workaround below still applies, and this is
+also why `skills/superpowers/AGENTS.md` (a symlink in git) keeps showing as a
+`typechange` in `git status` on this machine: the mount cannot materialize it
+as a real symlink. That diff is a property of the mount, not a change to
+revert.
+
+**SQLite on this mount cannot take its own lock.** `coverage.py`'s data file is
+SQLite and fails with "database is locked" when written inside the mount;
+confirmed reproducible, fixed by pointing `data_file` at `/tmp` (see
+`python/.coveragerc`). Anything else that opens a SQLite file for writing
+*inside* the mount should be treated as suspect on this filesystem, and
+pointed outside it if it breaks.
 
 The database is at `servo_mvp.db` in the app root — **inside** the mount, so it
 can be read directly. `.env.board` sets a relative `DB_PATH` deliberately: the
@@ -158,6 +205,6 @@ Python side runs in a container where `HOME` is `/home/app`, so an absolute
 
 ```bash
 adb shell arduino-app-cli app start user:servo_mvp     # ~16s warm, ~7min cold
-adb shell arduino-app-cli app restart user:servo_mvp   # required after modifying python code via sshfs
+adb shell arduino-app-cli app restart user:servo_mvp   # required after modifying python code via the mount
 adb shell arduino-app-cli app logs  user:servo_mvp
 ```

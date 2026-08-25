@@ -26,15 +26,14 @@ Post-MVP, additional servos will be added as mechanical restraint (backlog R4).
 
 ## Status
 
-Everything exists — backend, UI, sketch, tests — and all three verification
-commands pass:
+Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
+(one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-226 Python tests (confirmed after Session 7's D32/D33/D34 fixes; line
-coverage not remeasured this session — see backlog D24 on why a stale
-coverage figure is worse than none)
+229 Python tests, coverage of app/ gated at 99% (99.45% measured, D24)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
+63 client-behaviour assertions (T12, promoted to a real check 25 Aug 2026)
 ```
 
 **Session 3 landed 11 August 2026** — SSE migration complete. Collapsed 3 polling connections/operator to 1 persistent SSE stream (`GET /api/v1/stream`). Closed D4 (3-operator 10-min soak clean, 0 socket drops, 1,955 requests handled, 0 reconnects). Re-applied D29 async-def fix across 13 FastAPI handlers.
@@ -173,8 +172,9 @@ is answered, this table is a priority ordering rather than a schedule.
   `backend=hardware` at boot, and the database is populated. The app is started
   headlessly with `arduino-app-cli app start user:servo_mvp`, which is also how
   App Lab starts it — App Lab opens its Python and serial monitors when it does.
-- **The database is `ArduinoApps/servo_mvp/servo_mvp.db`, inside the sshfs
-  mount.** `.env.board` sets a relative `DB_PATH` on purpose, because the Python
+- **The database is `ArduinoApps/servo_mvp/servo_mvp.db`, inside the network
+  mount** (CIFS/Samba — see `CLAUDE.md` §6). `.env.board` sets a relative
+  `DB_PATH` on purpose, because the Python
   side runs in a container where `HOME` is `/home/app`. Earlier docs claimed it
   sat outside the mount and needed `adb`; that is true only of the default.
 - The active datum is count 2049, captured mid-travel by the operator, and ±90

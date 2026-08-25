@@ -1468,5 +1468,36 @@ existing pattern for a control that must refuse - hidden would have taught
 
 ---
 
+### D26 — The Python suite failed once in ten runs, unreproduced
+**Status:** CLOSED · 25 August 2026 (closed on evidence, not proof — see
+below) · **Severity:** medium · **Observed:** 8 August 2026
+
+Root cause found while chasing an unrelated `ResourceWarning`, not by
+reproducing the original report: `TelemetryService.start_sampler()` had no
+stop mechanism at all, so a background thread it started kept running
+forever, reading state and logging into the shared test `_logger_stub`
+whenever the scheduler next ran it. Worse than a confusing assertion:
+closing the shared `Database` connection while one of these zombie threads
+was mid-statement on it segfaulted the interpreter outright, confirmed
+reproducible — `sqlite3`'s C extension is not safe against a connection
+closing mid-use. Fixed: `TelemetryService` gains `stop_sampler()`; `Database`
+gains `close()`; `_clear_all_caches()` stops any cached sampler before
+closing the database it reads through.
+
+**Closed on:** a ~20-run loop against the pre-fix code segfaulted at
+roughly 1-in-10 to 1-in-20 — close enough to the original "1 in 10" to
+call it the same mechanism; two deterministic tests
+(`TestSamplerLifecycleIsolation`) induce it directly rather than relying on
+luck; a ~30-run loop against the fixed code ran clean. The original
+report's exact failing test was never identified, and the clean loop ran
+on local disk rather than the original's loaded machine — genuinely not
+proof of identity, closed as a judgment call rather than left open
+indefinitely. **If this recurs, it is a new defect, not a reopening** — file
+it fresh with whatever evidence the recurrence provides.
+
+**Related:** D10 (a failure that destroyed its own evidence), T3.
+
+---
+
 ## Requirements captured but not yet designed
 

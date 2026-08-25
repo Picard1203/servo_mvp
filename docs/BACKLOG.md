@@ -22,8 +22,8 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
 | **6 — D10 half DONE, 24 Aug 2026** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** Nothing from Session 6's D10 work is a prerequisite for it, but **Session 8 now runs first** (inserted 24 Aug 2026 by T14's triage, see row 8) so R2 designs against a settled `ServoStateResponse` shape — R2 itself is Session 9, not a direct continuation of this row. | R2: yes, for the operator-visible part |
 | **7 — DONE, 24 Aug 2026** | **T14 closed** — all fourteen unslotted items given a real session (rows above and below) or an explicit reason they don't get one (T13, T15 — see their entries); Closed index gained D3/D27/D13 (moved to `CLOSED.md` but never indexed). **D32, D33, D34 closed the same session** — board-tested, verified (suite 223→226), app restarted and checked live. **D35 opened** (speed-step enforcement postponed, see Session 10) — a board measurement during D32's work found commanded and actual servo speed disagree by ~1.5-2x, so the planned fix was not shipped on an unverified unit-conversion assumption. | yes — used to verify D32/D33/D34 live and to bench-test D35's measurement |
-| **8 — next** | One batch, many small fixes, no reason to split across sessions: **D24** (2 uncovered `InvalidReadingError` guards + `--cov-fail-under`), **D26** (loop the suite to reproduce its 1-in-10 flake, time-boxed — fix or document the timing sensitivity), **D30** (the one missing regression test for the already-fixed UTC/local cutoff bug), **T12** (decide `check_client_behaviour.js`'s status, 15 min), **D8** (deploy without `.env` must fail loud, not default to the simulator — the one must-ship item in this triage), **D29** (`LOG_LEVEL` is inert on the Logger461 stand-in — add the level filter), **D23** (decide + implement the `moving`/fault-boolean shape on a failed read — amends ADR-0008), **D25** (keep a reported alarm visible through the D16 blanking rule). **D23+D25 deliberately go last in this session, immediately before R2** — both touch the exact `ServoStateResponse` surface R2 is about to extend with an isolated-state field, so R2 designs against a settled shape instead of one about to move under it. | no (board confirmation of D8/D23/D25 is a nice-to-have, not required) |
-| **9 — after Session 8** | **R2** — motor isolation, per Session 6's entry. The `/grilling` pass on its open design questions runs at the start of this session. | yes, for the operator-visible part |
+| **8 — DONE, 25 Aug 2026** | All eight closed: **D24** (coverage gated at 99%, two unexercised guards covered), **D26** (sampler-thread leak found and fixed — segfault reproduced pre-fix at ~1-in-10 to 1-in-20, gone after; closed on evidence, see `CLOSED.md`), **D30** (UTC/local cutoff regression test), **T12** (`check_client_behaviour.js` promoted to a real check, folded into new `tools/verify.py`), **D8** (deploy without `.env` now fails loud), **D29** (`LOG_LEVEL` now real on the Logger461 stand-in), **D23** (`moving`/fault flags null on a failed read, amends ADR-0008), **D25** (a reported alarm survives the reading going unknown; recover disabled-with-reason, not hidden). `ServoStateResponse` shape is now settled for R2. Repo hygiene pass same session: stale soak artifacts and `FILE_REGISTRY.md` removed, `.gitignore` gaps closed. | no — board confirmation of D8/D23/D25 still outstanding, first thing to do when the board is next up |
+| **9 — next** | **R2** — motor isolation, per Session 6's entry. The `/grilling` pass on its open design questions runs at the start of this session. | yes, for the operator-visible part |
 | **10 — opportunistic, any time after 7** | **D28** (MCU boot-time `mcu_log` notify race — needs a flash to fix or confirm) + **D35** (commanded vs. actual speed disagree by ~1.5-2x, found bench-testing D32 this session — needs `PRESENT_SPEED` register-level readback, not just wall-clock timing). D32 itself closed this session (24 Aug) — its speed-step-enforcement piece split into D35 rather than shipped on an unverified assumption. Low severity, no dependency on anything above; ride along with any session that already has the board up (R2's Session 9 is the natural host). | yes |
 
 **T14 (`CLOSED.md`) has the full reasoning behind this slotting** if it is
@@ -430,6 +430,7 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D29** | `LOG_LEVEL` was inert on the Logger461 stand-in | 25 August 2026 · Session 8 |
 | **D23** | `moving`/fault flags reported as measured on a failed read | 25 August 2026 · Session 8 |
 | **D25** | An overload alarm disappeared once the reading went unknown | 25 August 2026 · Session 8 |
+| **D26** | Suite failed once in ten runs — cause found (sampler thread leak), closed on evidence not proof; reopen fresh if it recurs | 25 August 2026 · Session 8 |
 
 ---
 
@@ -698,62 +699,6 @@ cannot happen, and it should be an error rather than a silent 0.
 
 ---
 
-
-### D26 — The Python suite failed once in ten runs, unreproduced
-**Status:** cause found, fix shipped · **original flake never directly
-reproduced** · **Severity:** medium · **Observed:** 8 August 2026 ·
-**Investigated:** 25 August 2026
-
-**Root cause found while chasing an unrelated `ResourceWarning`, not by
-reproducing the original report.** `TelemetryService.start_sampler()` had
-no stop mechanism at all — a background thread it started kept running
-forever, reading state and logging into the shared test `_logger_stub`
-whenever the scheduler next ran it, regardless of which test's teardown
-had already run. Two tests in `TestSamplerResilience` build their own
-`TelemetryService` directly (not through the cached singleton), so their
-threads outlived every run of the suite from that point on.
-
-**Worse than a confusing assertion.** Closing the shared `Database`
-connection (as `_clear_all_caches()` now correctly does between tests)
-while one of these zombie threads was mid-statement on it didn't just
-raise a catchable error — it **segfaulted the interpreter outright** once,
-confirmed reproducible: `sqlite3`'s C extension is not safe against a
-connection closing mid-use, `check_same_thread=False` notwithstanding.
-
-**Fixed:** `TelemetryService` gains `stop_sampler()`; the two tests that
-build their own instance now stop it in a `finally` block; `Database`
-gains `close()`; `_clear_all_caches()` stops any cached sampler before
-closing the database it reads through, in that order.
-
-**Evidence, stated plainly rather than implied:**
-- A ~20-run background loop against the code **before** this fix segfaulted
-  at roughly 1-in-10 to 1-in-20 runs — close enough to the original "1
-  failed in 10" that this is very likely the same mechanism, but the
-  original failure mode (a clean assertion failure, not a segfault) was
-  never itself reproduced, so this is strong circumstantial evidence, not
-  proof of identity.
-- Two new deterministic tests (`TestSamplerLifecycleIsolation` in
-  `test_telemetry_service.py`) induce the mechanism directly instead of
-  relooping and hoping: one proves `stop_sampler()` actually stops the
-  thread, the other proves the fixed teardown order without ever
-  triggering the crash for real (an earlier version of that test induced
-  the actual race and segfaulted once itself — rewritten for exactly that
-  reason).
-- A ~30-run loop against the **fixed** code, on local disk (no CIFS
-  contention — a different environment from the one the original flake
-  happened in), ran clean before being interrupted partway through
-  (session/terminal closed by accident) with no failures or segfaults.
-
-**Left open, deliberately:** the original report's exact failing test was
-never identified, and a clean loop is evidence, not proof, especially since
-it ran in a different environment (local disk, solo) than the original
-(loaded machine, concurrent tools). Stays in `BACKLOG.md` rather than
-moving to `CLOSED.md` until either it recurs and is caught directly, or
-enough clean runs accumulate across enough real sessions to call it settled.
-
-**Related:** D10 (a failure that destroyed its own evidence), T3.
-
----
 
 ## Tasks
 

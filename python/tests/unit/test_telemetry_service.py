@@ -149,6 +149,36 @@ class TestExport:
         second = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
         assert not (second[6] & 0b00000100)  # cleared by the second sample
 
+    def test_isolated_rides_bit1_of_the_target_valid_byte(
+            self, backend, service, sim):
+        """isolated shares a byte with target_valid rather than widening
+        the 20-byte sample - the two bits must be independently
+        recoverable, not just both happen to be set together."""
+        from app.deps import get_isolation_service, get_motion_service
+        from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
+        get_motion_service().move_to(30.0, 100.0)  # target_valid -> 1
+        get_isolation_service().set_isolated(True)  # isolated -> 1
+        service._sample_once()
+        stream = b"".join(service.export_binary_stream(0, time.time() + 1))
+        offset = HEADER_STRUCT.size
+        sample = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
+        target_valid_flags = sample[8]
+        assert target_valid_flags & 0b01  # bit0: target_valid
+        assert target_valid_flags & 0b10  # bit1: isolated
+
+    def test_isolated_bit_is_independent_of_target_valid(
+            self, backend, service, sim):
+        from app.deps import get_isolation_service
+        from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
+        get_isolation_service().set_isolated(True)  # isolated, no target yet
+        service._sample_once()
+        stream = b"".join(service.export_binary_stream(0, time.time() + 1))
+        offset = HEADER_STRUCT.size
+        sample = SAMPLE_STRUCT.unpack(stream[offset:offset + SAMPLE_STRUCT.size])
+        target_valid_flags = sample[8]
+        assert not (target_valid_flags & 0b01)  # no move commanded
+        assert target_valid_flags & 0b10        # but isolated is set
+
     def test_range_limits_rows(self, backend, service):
         from app.services.telemetry_service import HEADER_STRUCT
         service._sample_once()

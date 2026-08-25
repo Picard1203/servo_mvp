@@ -177,6 +177,7 @@ console.log("\nD14 - a refused connection reads as something to act on");
     voltage_fault: false, sensor_fault: false, angle_fault: false,
     servo_deg: 18.3, target_deg: 20.0, target_stale: false,
     output_min_deg: -90.0, output_max_deg: 90.0,
+    isolated: false, isolation_idle_timeout_s: 900,
   };
   const dead = {
     // D23: a failed read nulls moving and the six fault flags too, not
@@ -190,6 +191,7 @@ console.log("\nD14 - a refused connection reads as something to act on");
     voltage_fault: null, sensor_fault: null, angle_fault: null,
     servo_deg: null, target_deg: 20.0, target_stale: false,
     output_min_deg: -90.0, output_max_deg: 90.0,
+    isolated: false, isolation_idle_timeout_s: 900,
   };
 
   ctx.renderState(good);
@@ -302,6 +304,86 @@ console.log("\nD14 - a refused connection reads as something to act on");
         $("alarmslot").innerHTML);
   check("...and hides recover again",
         $("recoverwrap").hidden === true);
+
+  /* ---------- R2: motor isolation - cube, movechip rank, recover guard */
+  console.log("\nR2 - motor isolation: cube, movechip rank, recover guard");
+  ctx.renderState(Object.assign({}, good, { isolated: true }));
+  check("the cube shows Isolated",
+        $("isoCube").textContent === "Isolated", $("isoCube").textContent);
+  check("the cube carries the isolated class",
+        $("isoCube").classList.contains("isolated"));
+  check("the movechip shows ISOLATED, not HOLDING - torque is cut, so"
+        + " HOLDING would claim the servo is actively holding position"
+        + " when friction is (D9's species: the screen asserting"
+        + " something untrue about the mechanism)",
+        $("movechip").textContent === "ISOLATED", $("movechip").textContent);
+  check("recover is disabled while isolated - it needs torque to"
+        + " re-command a position",
+        $("recoverBtn").disabled === true);
+  check("...with the reason stated on the control itself (D25's pattern)",
+        /isolated/i.test($("recoverBtn").title), $("recoverBtn").title);
+  check("the hint states the CONFIGURED timeout, not a hardcoded copy"
+        + " that would go stale the moment the setting is retuned (D21)",
+        $("isoHint").textContent === "auto-isolates after 15 min locked",
+        $("isoHint").textContent);
+
+  ctx.renderState(Object.assign({}, good, { isolated: false }));
+  check("the cube reverts to Isolate",
+        $("isoCube").textContent === "Isolate", $("isoCube").textContent);
+  check("...and drops the isolated class",
+        !$("isoCube").classList.contains("isolated"));
+
+  ctx.renderState(Object.assign({}, good, { isolated: true, overload: true }));
+  check("FAULT still outranks ISOLATED on the movechip - D25's rule that"
+        + " an alarm must never be displaced applies here too",
+        $("movechip").textContent === "FAULT", $("movechip").textContent);
+  ctx.renderState(good);   // clear the fault for the checks that follow
+
+  /* ---------- R2: the refusal names the remedy, not just the state --- */
+  console.log("\nR2 - a move refused while isolated says how to fix it");
+  toasts.length = 0;
+  const isolatedErr = new Error("motor is isolated");
+  isolatedErr.status = 409;
+  isolatedErr.reason = "isolated";
+  ctx.sayError(isolatedErr);
+  check("the refusal names the state AND the remedy - D12's lesson:"
+        + " naming a state with no way out leaves the operator stuck",
+        lastToast() && /isolated/.test(lastToast().message) &&
+        /un-isolate/.test(lastToast().message), lastToast());
+
+  /* ---------- R2: isolating reminds about the physical lock ---------- */
+  console.log("\nR2 - isolating reminds the operator the physical lock is manual");
+  toasts.length = 0;
+  let isolatePost = null;
+  const realApiPost = ctx.apiPost;
+  ctx.apiPost = async (url, body) => { isolatePost = { url, body }; return {}; };
+  await ctx.toggleIsolate();
+  check("it posts to /servo/isolate",
+        isolatePost && isolatePost.url === "/servo/isolate", isolatePost);
+  check("...isolated:true, since this harness never observes a prior"
+        + " server-confirmed state (state.lastState stays unset - the"
+        + " same reason toggleLock() has no equivalent test)",
+        isolatePost && isolatePost.body.isolated === true, isolatePost);
+  check("the reminder names the physical lock, since the software"
+        + " cannot sense whether it is actually engaged either way",
+        lastToast() && /physical lock is manual/.test(lastToast().message),
+        lastToast());
+  ctx.apiPost = realApiPost;
+
+  /* ---------- R2: releasing Lock while isolated nudges once, not on ---
+     ---------- every subsequent poll ------------------------------- */
+  console.log("\nR2 - unlocking while isolated nudges once, not every poll");
+  toasts.length = 0;
+  ctx.renderState(Object.assign({}, good, { locked: true, isolated: true }));
+  check("locking alone does not nudge",
+        toasts.length === 0, toasts.length);
+  ctx.renderState(Object.assign({}, good, { locked: false, isolated: true }));
+  check("releasing lock while still isolated nudges once",
+        toasts.length === 1, toasts.length);
+  ctx.renderState(Object.assign({}, good, { locked: false, isolated: true }));
+  check("...and does not repeat on the next poll while nothing changed",
+        toasts.length === 1, toasts.length);
+  ctx.renderState(good);   // restore baseline (unlocked, un-isolated)
 
   /* ---------- target: no target yet, and a stale (post-Stop) target -- */
   console.log("\nTarget angle - never fabricated, stale after Stop");

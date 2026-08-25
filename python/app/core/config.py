@@ -84,6 +84,13 @@ class Settings(BaseSettings):
             Set well above what 30-day retention can ever hold
             (5.18M rows at 0.5s sampling), only to stop a truly
             pathological request (e.g. an accidental from=0).
+        isolation_idle_timeout_s: Seconds the digital lock must stay
+            continuously engaged before motor isolation auto-engages as a
+            backup (backlog R2). Manual isolate is the primary path and
+            is not gated by this at all; this timer only catches "locked
+            but forgot to isolate." Placeholder value, untuned until
+            bench testing with the mechanical team - the dev rig does
+            not have the belt mounted yet.
     """
 
     # ABSOLUTE path, anchored to this module. A relative "env_file" is
@@ -141,6 +148,7 @@ class Settings(BaseSettings):
     telemetry_retention_days: int = 30
     telemetry_purge_interval_seconds: float = 3600.0
     export_max_rows: int = 10_000_000
+    isolation_idle_timeout_s: float = 900.0  # 15 min, placeholder - R2
 
 
 @lru_cache

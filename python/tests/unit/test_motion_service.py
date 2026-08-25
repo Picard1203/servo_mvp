@@ -4,7 +4,8 @@ import time
 
 import pytest
 
-from app.core.exceptions import LockedError, MovingError, StepError
+from app.core.exceptions import (IsolatedError, LockedError, MovingError,
+                                 StepError)
 from tests.conftest import wait_until
 
 
@@ -73,6 +74,49 @@ class TestLockGate:
         started = time.monotonic()
         motion.move_to(12.0, 60.0)
         assert time.monotonic() - started < 0.1
+
+
+class TestIsolationGate:
+    """Motor isolation gates a move the same way the digital lock does."""
+
+    def test_isolated_rejects_move(self, motion):
+        from app.deps import get_isolation_service
+        get_isolation_service().set_isolated(True)
+        with pytest.raises(IsolatedError):
+            motion.move_to(12.0, 60.0)
+
+    def test_un_isolate_then_move_succeeds(self, motion):
+        from app.deps import get_isolation_service
+        isolation = get_isolation_service()
+        isolation.set_isolated(True)
+        isolation.set_isolated(False)
+        motion.move_to(12.0, 60.0)   # must not raise
+
+    def test_isolated_not_guarded_by_motion_state(self, motion, sim):
+        """Unlike a lock change, isolating must take effect immediately
+        even mid-move - it is meant to double as a future emergency-stop
+        mechanism, and refusing it while the servo is misbehaving badly
+        enough to need isolating would be exactly backwards."""
+        from app.deps import get_isolation_service
+        sim.set_deadband(1)
+        motion.move_to(60.0, 20.0)
+        assert wait_until(lambda: sim.read_snapshot().moving)
+        get_isolation_service().set_isolated(True)   # must not raise
+        with pytest.raises(IsolatedError):
+            motion.move_to(12.0, 60.0)
+
+    def test_isolated_and_locked_are_distinct_reasons(self, motion):
+        """The two gates must not collapse into one reason code - an
+        operator refused for the wrong reason cannot fix the right
+        thing."""
+        from app.deps import get_isolation_service
+        motion.set_lock(True)
+        with pytest.raises(LockedError):
+            motion.move_to(12.0, 60.0)
+        motion.set_lock(False)
+        get_isolation_service().set_isolated(True)
+        with pytest.raises(IsolatedError):
+            motion.move_to(12.0, 60.0)
 
 
 def _settling(backend) -> bool:

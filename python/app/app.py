@@ -15,8 +15,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.core.exceptions import (ActiveZeroError, DatumZeroError,
-                                 InvalidReadingError, LockedError,
-                                 MovingError, NotFoundError,
+                                 InvalidReadingError, IsolatedError,
+                                 LockedError, MovingError, NotFoundError,
                                  OutOfTravelError, StepError)
 from app.routers import servo, stream, system, telemetry, zeros
 
@@ -76,6 +76,11 @@ def _register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(MovingError)
     async def _moving(request: Request, exc: MovingError) -> JSONResponse:
         return error(409, str(exc), reason="moving")
+
+    @app.exception_handler(IsolatedError)
+    async def _isolated(request: Request,
+                        exc: IsolatedError) -> JSONResponse:
+        return error(409, str(exc), reason="isolated")
 
     @app.exception_handler(NotFoundError)
     async def _missing(request: Request, exc: NotFoundError) -> JSONResponse:

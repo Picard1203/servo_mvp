@@ -122,6 +122,17 @@ class ServoStateView:
             baseline. Sent so the client can scale a travel display
             against the real range instead of a second, hardcoded copy
             of it - the config already lives in exactly one place.
+        isolated: Motor isolation state (backlog R2) - True once the
+            servo has ACKNOWLEDGED that drive torque is cut, never on
+            unacknowledged intent alone. A plain bool, never None on a
+            failed read, following locked's shape rather than moving's:
+            this is state the system already holds, not a servo
+            measurement, so a failed read has no bearing on whether it
+            is known.
+        isolation_idle_timeout_s: The configured idle-auto-isolate
+            timeout, sent as data rather than declared a second time in
+            the client - the same reasoning output_min_deg/max_deg and
+            the telemetry export's gear-ratio field already rest on.
     """
 
     output_deg: Optional[float]
@@ -147,6 +158,8 @@ class ServoStateView:
     target_stale: bool = False
     output_min_deg: float = 0.0
     output_max_deg: float = 0.0
+    isolated: bool = False
+    isolation_idle_timeout_s: float = 0.0
 
 
 @dataclass(slots=True, frozen=True)
@@ -173,6 +186,7 @@ class TelemetrySample:
             (pre-ratio) is NOT stored - it is a pure function of
             output_deg and the (fixed) gear ratio, so storing it would
             duplicate data across a 30-day export for nothing.
+        isolated: Motor isolation state in effect at sample time (R2).
     """
 
     timestamp: float
@@ -191,3 +205,4 @@ class TelemetrySample:
     sensor_fault: bool
     angle_fault: bool
     target_deg: Optional[float] = None
+    isolated: bool = False

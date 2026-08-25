@@ -31,6 +31,7 @@ class SimulatedServoRepository:
         self._overload = False
         self._multi_turn = False
         self._angle_resolution = 1
+        self._torque_enabled = True
         Thread(target=self._run, daemon=True).start()
 
     def read_raw_counts(self) -> int:
@@ -53,7 +54,9 @@ class SimulatedServoRepository:
             The instantaneous readout.
         """
         with self._lock:
-            moving = abs(self._target - self._counts) > self._deadband_counts
+            moving = (self._torque_enabled
+                     and abs(self._target - self._counts)
+                     > self._deadband_counts)
             counts = round(self._counts)
             overload = self._overload
         base_current = 0.9 if moving else 0.18
@@ -136,6 +139,26 @@ class SimulatedServoRepository:
         with self._lock:
             self._deadband_counts = max(1, counts)
 
+    def set_torque(self, enabled: bool) -> bool:
+        """Cuts or restores simulated drive torque (R2).
+
+        Mirrors the real controller's un-isolate ordering: restoring
+        torque snaps the target to the present position first, so the
+        simulator does not resume driving toward a stale goal, matching
+        what ServoController/BridgeServoRepository do on real hardware.
+
+        Args:
+            enabled: True to restore drive torque, false to cut it.
+
+        Returns:
+            Always True - the simulator cannot fail an acknowledgement.
+        """
+        with self._lock:
+            if enabled and not self._torque_enabled:
+                self._target = self._counts
+            self._torque_enabled = enabled
+        return True
+
     def simulate_overload(self) -> None:
         """Trips the simulated overload fault (testing/commissioning aid).
 
@@ -153,13 +176,16 @@ class SimulatedServoRepository:
         """
         while True:
             with self._lock:
-                delta = self._target - self._counts
-                if abs(delta) <= self._deadband_counts:
-                    pass  # inside the dead zone: servo stops driving
+                if not self._torque_enabled:
+                    pass  # isolated: nothing drives the shaft (R2)
                 else:
-                    step = self._speed_counts_s * _TICK_SECONDS
-                    if abs(delta) <= step:
-                        self._counts = self._target
+                    delta = self._target - self._counts
+                    if abs(delta) <= self._deadband_counts:
+                        pass  # inside the dead zone: servo stops driving
                     else:
-                        self._counts += copysign(step, delta)
+                        step = self._speed_counts_s * _TICK_SECONDS
+                        if abs(delta) <= step:
+                            self._counts = self._target
+                        else:
+                            self._counts += copysign(step, delta)
             sleep(_TICK_SECONDS)

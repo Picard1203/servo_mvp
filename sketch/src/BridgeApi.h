@@ -11,6 +11,7 @@
 //   servo_stop              ""                       -> "ok" | "err"
 //   servo_set_deadband      "counts"                 -> "ok" | "err"
 //   servo_configure_range   "multiturn,amplification"-> "ok" | "err"
+//   servo_set_torque        "enabled"                -> "ok" | "err"  (R2)
 //   get_status              (no payload)             -> "ready" | "no-servo"
 //
 // Notifies (sketch -> Linux):

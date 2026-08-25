@@ -143,6 +143,30 @@ class TestCommands:
         repo.configure_range(True, 2)
         assert bridge.calls[-1] == ("servo_configure_range", "1,2")
 
+    def test_set_torque_off_payload(self, bridge, repo):
+        bridge.reply = "ok"
+        repo.set_torque(False)
+        assert bridge.calls[-1] == ("servo_set_torque", "0")
+
+    def test_set_torque_on_payload(self, bridge, repo):
+        bridge.reply = "ok"
+        repo.set_torque(True)
+        assert bridge.calls[-1] == ("servo_set_torque", "1")
+
+    def test_set_torque_returns_true_on_ack(self, bridge, repo):
+        bridge.reply = "ok"
+        assert repo.set_torque(False) is True
+
+    def test_set_torque_returns_false_when_not_acknowledged(self, bridge, repo):
+        """The ack is load-bearing for this one command: callers must
+        never believe isolation took effect on an unconfirmed write."""
+        bridge.reply = "err"
+        assert repo.set_torque(False) is False
+
+    def test_set_torque_returns_false_on_bridge_exception(self, bridge, repo):
+        bridge.raise_on_call = RuntimeError("bridge down")
+        assert repo.set_torque(True) is False
+
 
 class TestResilience:
     """A misbehaving bus must not take the backend down."""

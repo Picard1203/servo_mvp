@@ -24,8 +24,12 @@ class TestSchema:
                           db.connection.execute("PRAGMA table_info(telemetry)")]
         assert "is_datum" in zero_cols
         for col in ("overload", "overcurrent", "overheat", "voltage_fault",
-                    "sensor_fault", "target_deg"):
+                    "sensor_fault", "target_deg", "isolated"):
             assert col in telemetry_cols
+        app_state_cols = [r[1] for r in
+                          db.connection.execute(
+                              "PRAGMA table_info(app_state)")]
+        assert set(app_state_cols) == {"key", "value", "updated_at"}
 
     def test_init_idempotent(self, tmp_path):
         path = str(tmp_path / "twice.db")
@@ -62,6 +66,13 @@ class TestMigration:
                           db.connection.execute("PRAGMA table_info(telemetry)")]
         assert "sensor_fault" in telemetry_cols
         assert "target_deg" in telemetry_cols
+        assert "isolated" in telemetry_cols
+        # A database old enough to predate target_deg predates app_state
+        # too - it must be created fresh, not merely migrated onto.
+        app_state_cols = [r[1] for r in
+                          db.connection.execute(
+                              "PRAGMA table_info(app_state)")]
+        assert set(app_state_cols) == {"key", "value", "updated_at"}
 
     def test_migration_idempotent_on_a_populated_database(self, tmp_path):
         """The ALTER-and-ignore pattern must not raise or lose rows on a
@@ -80,6 +91,9 @@ class TestMigration:
         row = db2.connection.execute(
             "SELECT * FROM telemetry WHERE timestamp = 1.0").fetchone()
         assert row["target_deg"] == 45.0
+        # isolated is NOT NULL DEFAULT 0 - a row written before the
+        # column existed must read back as 0, not NULL or an error.
+        assert row["isolated"] == 0
 
 
 class TestConcurrentAccess:

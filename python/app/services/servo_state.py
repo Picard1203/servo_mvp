@@ -15,20 +15,26 @@ from Logger461 import logger
 from app.core.exceptions import InvalidReadingError
 from app.models.entities import (ServoStateView, TelemetrySnapshot,
                                  ZeroReference)
+from app.repositories.abstract.app_state_repository import AppStateRepository
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.repositories.abstract.zero_repository import ZeroRepository
 
+_ISOLATED_INTENT_KEY = "isolated"
+
 
 class ServoStateStore:
-    """Coordinates lock state, baseline and settle timing atomically."""
+    """Coordinates lock state, baseline, isolation and settle timing
+    atomically."""
 
     def __init__(self, servo: ServoRepository, zeros: ZeroRepository,
-                 settling_seconds: float, counts_per_turn: int,
-                 servo_deg_per_output_deg: float,
-                 servo_direction: int = 1) -> None:
+                 app_state: AppStateRepository, settling_seconds: float,
+                 counts_per_turn: int, servo_deg_per_output_deg: float,
+                 servo_direction: int = 1,
+                 isolation_idle_timeout_s: float = 0.0) -> None:
         self._servo = servo
         self._zeros = zeros
         self._settling_seconds = settling_seconds
+        self._isolation_idle_timeout_s = isolation_idle_timeout_s
         self._counts_per_turn = counts_per_turn
         self._counts_per_servo_deg = counts_per_turn / 360.0
         self._servo_deg_per_output_deg = servo_deg_per_output_deg
@@ -42,6 +48,20 @@ class ServoStateStore:
         self._target_stale = False  # True after stop(); cleared by the
         # next accepted move, never inferred from `moving` (a second
         # definition of the same fact is exactly what D9/D10 cost).
+
+        # Loaded synchronously, here, so the very first move request this
+        # process ever serves already refuses correctly (ADR-0010) - no
+        # ordering dependency on IsolationService having run yet. Never
+        # trust the servo's own torque state across a reboot instead: the
+        # MCU's own Begin() unconditionally re-enables torque at every
+        # boot, so only the database (operator intent) is authoritative.
+        self._isolated_intent = app_state.get(_ISOLATED_INTENT_KEY) == "1"
+        # Acknowledged hardware state. Always starts False, regardless of
+        # intent: reporting isolated=True before the servo has actually
+        # confirmed the write would be a false safety claim - the worst
+        # failure this feature can produce. IsolationService's reconciler
+        # is what advances this once the servo acks.
+        self._isolated_known = False
 
     # ----------------------------------------------------------- locking
 
@@ -69,6 +89,65 @@ class ServoStateStore:
         """
         with self._lock:
             return self._locked
+
+    # --------------------------------------------------------- isolation
+
+    def set_isolated_intent(self, isolated: bool) -> None:
+        """Sets the operator's intent for motor isolation (R2).
+
+        Called only by IsolationService, which is the sole owner of
+        persisting this to the database - this method only updates the
+        in-memory value used by the move-refusal gate.
+
+        Args:
+            isolated: Desired isolation state.
+
+        Returns:
+            None.
+        """
+        with self._lock:
+            self._isolated_intent = isolated
+
+    def is_isolated_intent(self) -> bool:
+        """Returns the operator's current isolation intent.
+
+        This is what MotionService.move_to() gates on - intent, not
+        acknowledged hardware state - so a move is refused from the very
+        first request this process serves, before any reconciler tick has
+        had a chance to run.
+
+        Returns:
+            True when the operator intends the motor to be isolated.
+        """
+        with self._lock:
+            return self._isolated_intent
+
+    def set_isolated_known(self, isolated: bool) -> bool:
+        """Records that the servo has ACKNOWLEDGED an isolation write.
+
+        Called only by IsolationService's reconciler, only after a
+        successful command_torque acknowledgement. Never call this on
+        intent alone - see the class docstring on _isolated_known.
+
+        Args:
+            isolated: The acknowledged isolation state.
+
+        Returns:
+            True when the state actually changed.
+        """
+        with self._lock:
+            changed = isolated != self._isolated_known
+            self._isolated_known = isolated
+            return changed
+
+    def is_isolated_known(self) -> bool:
+        """Returns the acknowledged isolation state shown to the operator.
+
+        Returns:
+            True only once the servo has confirmed drive torque is cut.
+        """
+        with self._lock:
+            return self._isolated_known
 
     def mark_position_verified(self) -> None:
         """Marks the position reference as verified (after calibration).
@@ -225,6 +304,7 @@ class ServoStateStore:
             verified = self._position_verified
             target_deg = self._target_deg
             target_stale = self._target_stale
+            isolated = self._isolated_known
         if not reading.valid:
             logger.warning("servo read failed; position is not known",
                            metadata={"event": "servo.read.failed"},
@@ -257,7 +337,9 @@ class ServoStateStore:
             target_deg=target_deg,
             target_stale=target_stale,
             output_min_deg=round(output_min_deg, 2),
-            output_max_deg=round(output_max_deg, 2))
+            output_max_deg=round(output_max_deg, 2),
+            isolated=isolated,
+            isolation_idle_timeout_s=self._isolation_idle_timeout_s)
 
     def current_output_deg(self) -> Optional[float]:
         """Returns the current output angle relative to the active zero.

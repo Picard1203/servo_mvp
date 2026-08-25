@@ -10,7 +10,7 @@ from Logger461 import logger
 
 from app.core.config import Settings
 from app.core.events import EventService
-from app.core.exceptions import (LockedError, MovingError,
+from app.core.exceptions import (IsolatedError, LockedError, MovingError,
                                  OutOfTravelError, StepError)
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.services.servo_state import ServoStateStore
@@ -47,6 +47,7 @@ class MotionService:
         Raises:
             StepError: If the angle violates the configured step size.
             LockedError: If the digital lock is engaged.
+            IsolatedError: If the motor is isolated (R2).
         """
         self._validate_step(target_deg)
         self._validate_reachable(target_deg)
@@ -61,6 +62,19 @@ class MotionService:
                                      "reason": "locked"},
                            extra={"target_deg": target_deg})
             raise LockedError("servo is locked")
+        # Gated on INTENT, not the acknowledged hardware state - this must
+        # refuse from the very first request the process ever serves,
+        # before IsolationService's reconciler has had any chance to run
+        # (ADR-0010). See ServoStateStore.is_isolated_intent()'s docstring.
+        if self._state.is_isolated_intent():
+            self._events.record("servo.move.rejected",
+                                "move rejected: isolated",
+                                {"target_deg": target_deg})
+            logger.warning("move rejected: isolated",
+                           metadata={"event": "servo.move.rejected",
+                                     "reason": "isolated"},
+                           extra={"target_deg": target_deg})
+            raise IsolatedError("motor is isolated")
 
         self._await_settle()
 

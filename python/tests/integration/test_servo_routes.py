@@ -15,7 +15,8 @@ class TestState:
                      "overcurrent", "overheat", "voltage_fault",
                      "sensor_fault", "angle_fault", "servo_deg",
                      "target_deg", "target_stale", "output_min_deg",
-                     "output_max_deg"}
+                     "output_max_deg", "isolated",
+                     "isolation_idle_timeout_s"}
 
     def test_full_shape_and_boot_defaults(self, client):
         body = client.get("/api/v1/servo/state").json()
@@ -25,6 +26,7 @@ class TestState:
         assert body["locked"] is False
         assert body["target_deg"] is None
         assert body["target_stale"] is False
+        assert body["isolated"] is False
 
 
 class TestMove:
@@ -87,6 +89,46 @@ class TestStopLock:
         assert client.post("/api/v1/servo/lock",
                            json={"locked": True}).json() == {"locked": True}
         assert client.get("/api/v1/servo/state").json()["locked"] is True
+
+
+class TestIsolate:
+    """POST /api/v1/servo/isolate, and its refusal of a move."""
+
+    def test_isolate_roundtrip_reflected_in_state(self, client):
+        response = client.post("/api/v1/servo/isolate",
+                               json={"isolated": True})
+        assert response.status_code == 200
+        assert response.json() == {"isolated": True}
+        assert wait_until(
+            lambda: client.get("/api/v1/servo/state").json()["isolated"],
+            timeout=1.0)
+
+    def test_un_isolate_reflected_in_state(self, client):
+        client.post("/api/v1/servo/isolate", json={"isolated": True})
+        client.post("/api/v1/servo/isolate", json={"isolated": False})
+        assert client.get("/api/v1/servo/state").json()["isolated"] is False
+
+    def test_move_while_isolated_409_isolated(self, client):
+        client.post("/api/v1/servo/isolate", json={"isolated": True})
+        response = client.post("/api/v1/servo/move",
+                               json={"target_deg": 12.0, "speed_dps": 30})
+        assert response.status_code == 409
+        assert response.json()["reason"] == "isolated"
+
+    def test_isolated_reason_is_distinct_from_locked(self, client):
+        """Two different gates must surface as two different reasons -
+        an operator refused for the wrong one cannot fix the right
+        thing."""
+        client.post("/api/v1/servo/lock", json={"locked": True})
+        locked_response = client.post(
+            "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
+        assert locked_response.json()["reason"] == "locked"
+
+        client.post("/api/v1/servo/lock", json={"locked": False})
+        client.post("/api/v1/servo/isolate", json={"isolated": True})
+        isolated_response = client.post(
+            "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
+        assert isolated_response.json()["reason"] == "isolated"
 
 
 class TestCalibrate:

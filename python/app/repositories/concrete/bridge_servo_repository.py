@@ -205,6 +205,28 @@ class BridgeServoRepository(ServoRepository):
         payload = f"{1 if multi_turn else 0},{angle_resolution}"
         self._command("servo_configure_range", payload)
 
+    def set_torque(self, enabled: bool) -> bool:
+        """Cuts or restores drive torque while sensors stay powered (R2).
+
+        Uses _call directly, not _command: the ack is load-bearing here,
+        unlike every other command in this class (see the abstract
+        contract's docstring).
+
+        Args:
+            enabled: True to restore drive torque, false to cut it.
+
+        Returns:
+            True when the servo acknowledged the command.
+        """
+        with self._lock:
+            reply = self._call("servo_set_torque", "1" if enabled else "0")
+            self._cached = None          # state may have changed
+        if reply != "ok":
+            logger.warning("servo torque command not acknowledged",
+                           metadata={"event": "servo.torque.rejected"},
+                           extra={"enabled": enabled, "reply": reply})
+        return reply == "ok"
+
     # ------------------------------------------------------------ internals
 
     def _call(self, name: str, payload: str) -> str:

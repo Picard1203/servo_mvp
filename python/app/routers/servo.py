@@ -4,11 +4,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.deps import get_motion_service, get_state_store, get_zero_service
-from app.schemas.servo import (LockRequest, LockResponse, MoveAcceptedResponse,
+from app.deps import (get_isolation_service, get_motion_service,
+                      get_state_store, get_zero_service)
+from app.schemas.servo import (IsolateRequest, IsolateResponse, LockRequest,
+                               LockResponse, MoveAcceptedResponse,
                                MoveRequest, RecoverResponse,
                                ServoStateResponse, StopResponse)
 from app.schemas.zeros import ZeroResponse
+from app.services.isolation_service import IsolationService
 from app.services.motion_service import MotionService
 from app.services.servo_state import ServoStateStore
 from app.services.zero_service import ZeroService
@@ -18,6 +21,7 @@ router = APIRouter(prefix="/api/v1/servo", tags=["servo"])
 MotionDep = Annotated[MotionService, Depends(get_motion_service)]
 StateDep = Annotated[ServoStateStore, Depends(get_state_store)]
 ZeroDep = Annotated[ZeroService, Depends(get_zero_service)]
+IsolationDep = Annotated[IsolationService, Depends(get_isolation_service)]
 
 
 @router.get("/state", response_model=ServoStateResponse)
@@ -79,6 +83,26 @@ def post_lock(request: LockRequest,
     """
     motion.set_lock(request.locked)
     return LockResponse(locked=request.locked)
+
+
+@router.post("/isolate", response_model=IsolateResponse)
+def post_isolate(request: IsolateRequest,
+                       isolation: IsolationDep) -> IsolateResponse:
+    """Sets motor isolation intent and reconciles it immediately.
+
+    The response reflects intent, accepted synchronously - it does not
+    guarantee the servo has acknowledged the write. Poll /servo/state
+    (or the SSE stream) for the confirmed isolated field.
+
+    Args:
+        request: Desired isolation state.
+        isolation: Injected isolation service.
+
+    Returns:
+        The intent that was set.
+    """
+    isolation.set_isolated(request.isolated)
+    return IsolateResponse(isolated=request.isolated)
 
 
 @router.post("/calibrate", status_code=201, response_model=ZeroResponse)

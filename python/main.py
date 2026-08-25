@@ -185,7 +185,8 @@ from Logger461 import logger
 from app.app import create_app
 from app.core.config import Settings, get_settings
 from app.core.logging_setup import setup_logging
-from app.deps import get_mcu_log, get_relay, get_telemetry_service
+from app.deps import (get_isolation_service, get_mcu_log, get_relay,
+                      get_telemetry_service)
 
 
 def _refuse_silent_simulator(settings: Settings) -> None:
@@ -242,11 +243,17 @@ def _serve(app) -> None:
 
 
 def _start_background() -> None:
-    """Starts the telemetry sampler and registers the Bridge relay.
+    """Starts the telemetry sampler, isolation reconciler and Bridge relay.
 
     Returns:
         None.
     """
+    # Constructing this reconciles the servo's torque state toward
+    # whatever was persisted before a restart - built here, eagerly,
+    # rather than left to whichever request happens to touch it first, so
+    # an isolated motor stops drawing power again as soon as the process
+    # is up rather than whenever it is next asked about.
+    get_isolation_service()
     get_telemetry_service().start_sampler()
     try:
         get_relay().register()

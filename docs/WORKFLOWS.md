@@ -222,6 +222,14 @@ Antigravity).
 | `operator-lens` | Walks the control surface as the operator or the receiving team, not the developer. Five questions per control; files findings into `BACKLOG.md` in house format. |
 | `twin-review` | Four parallel reviewers on one diff — twin path, operator impact, relay safety, doc truth. **On demand only.** Iteration cap 2, then escalate. |
 
+**`grilling`** is not one of these three — it is a generic, non-project-specific
+skill (stress-tests a plan or decision by questioning it relentlessly), used
+once so far: **R2's session opens with it**, on R2's own open design questions
+(operator-visible state when isolated, refuse-vs-queue a move, the new
+`ServoStateResponse` field — see `BACKLOG.md`'s R2 entry), per the operator's
+explicit request that R2 be grounded in the docs rather than a prior session's
+paraphrase.
+
 `deliver` borrows superpowers' `writing-plans` and `executing-plans` for the
 plan-and-checkpoint mechanics; both are now installed. Nothing else from the
 frameworks surveyed was adopted.

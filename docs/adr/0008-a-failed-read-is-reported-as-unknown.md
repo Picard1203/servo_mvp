@@ -79,12 +79,8 @@ worse false statement than any position. That was backlog D16.
 `ServoStateResponse` and `ServoStateView` now report `null` for all four when
 the read failed, as they already did for `output_deg` and `raw_counts`.
 
-Two deliberate limits:
+One deliberate limit remains:
 
-- **The boolean flags are not covered.** `moving` and the six fault flags are
-  still `false` on a failed read, stating "not moving, no faults" about a servo
-  that said nothing. `bool | None` ripples into the CSV and every consumer, so
-  it is a separate decision — **backlog D23**, which amends this ADR again.
 - **Display pacing is still not the API's business.** The client holds the last
   measured readings through a blip and blanks them once the read is genuinely
   unknown, on the position's debounce. The contract stays honest every second.
@@ -95,4 +91,9 @@ Accepted, 7 August 2026. Decided by the operator when the alternatives were put
 side by side. Implemented in commit `c903182`; six tests cover it.
 
 **Extended 8 August 2026** (backlog D16) to the four telemetry readings; four
-further tests. **Still open: the boolean flags — backlog D23.**
+further tests. **Extended again 25 August 2026** (backlog D23) to `moving`
+and the six fault flags — they null on a failed read the same way, chosen
+over `bool | None` rippling into a client rewrite because it turned out not
+to: a failed read writes no telemetry row at all (this ADR's own rule), so
+the CSV/export path never sees the case, and the web UI already rendered
+these flags as tri-state before the API caught up.

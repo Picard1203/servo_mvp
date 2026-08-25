@@ -87,7 +87,12 @@ class ServoStateResponse(BaseModel):
             when the servo did not answer. Clients must render null as
             "unknown" and never as 0 - a failed read is not a position.
         reading_valid: False when this snapshot has no position in it.
-        moving: True while a move is in progress.
+        moving: True while a move is in progress, or null when the servo
+            did not answer (D23, amends ADR-0008). The rule stated above
+            for output_deg governs this and the six fault flags below
+            identically: a failed read states nothing measured, not
+            "not moving, no faults" - clients must render null as
+            unknown, not as false.
         locked: Digital lock state.
         settling: True while inside the post-lock settle window.
         position_verified: False after boot until calibration; a False
@@ -104,11 +109,14 @@ class ServoStateResponse(BaseModel):
             not answer.
         torque_kgcm: Estimated torque in kg*cm, or null when the servo
             did not answer.
-        overload: Servo overload protection tripped.
-        overcurrent: Overcurrent fault flag.
-        overheat: Overheat fault flag.
-        voltage_fault: Supply-voltage fault flag.
-        sensor_fault: Angle-sensor fault flag.
+        overload: Servo overload protection tripped, or null on a failed
+            read (D23) - see moving's docstring above.
+        overcurrent: Overcurrent fault flag, or null on a failed read.
+        overheat: Overheat fault flag, or null on a failed read.
+        voltage_fault: Supply-voltage fault flag, or null on a failed read.
+        sensor_fault: Angle-sensor fault flag, or null on a failed read.
+        angle_fault: Angle-sensor range fault flag, or null on a failed
+            read.
         servo_deg: The servo's own shaft angle before the gear ratio,
             same baseline as output_deg. Follows output_deg's own
             validity.
@@ -124,7 +132,7 @@ class ServoStateResponse(BaseModel):
 
     output_deg: Optional[float]
     reading_valid: bool
-    moving: bool
+    moving: Optional[bool]
     locked: bool
     settling: bool
     position_verified: bool
@@ -133,12 +141,12 @@ class ServoStateResponse(BaseModel):
     voltage_v: Optional[float]
     current_a: Optional[float]
     torque_kgcm: Optional[float]
-    overload: bool
-    overcurrent: bool
-    overheat: bool
-    voltage_fault: bool
-    sensor_fault: bool
-    angle_fault: bool
+    overload: Optional[bool]
+    overcurrent: Optional[bool]
+    overheat: Optional[bool]
+    voltage_fault: Optional[bool]
+    sensor_fault: Optional[bool]
+    angle_fault: Optional[bool]
     servo_deg: Optional[float] = None
     target_deg: Optional[float] = None
     target_stale: bool = False

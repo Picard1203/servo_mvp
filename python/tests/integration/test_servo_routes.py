@@ -231,6 +231,23 @@ class TestNothingIsReportedAsMeasuredOnAFailedRead:
         body = client.get("/api/v1/servo/state").json()
         assert set(body) == TestState.EXPECTED_KEYS
 
+    def test_movement_and_faults_are_null_not_false(self, backend, client):
+        """D23, amends ADR-0008: the same rule as the five readings above.
+
+        moving and the six fault flags stayed plain bool after D16, so
+        the API stated "not moving, no faults" about a servo that did
+        not answer - a claim about hardware nothing was heard from.
+        """
+        self._kill_the_bus()
+        body = client.get("/api/v1/servo/state").json()
+        assert body["moving"] is None
+        assert body["overload"] is None
+        assert body["overcurrent"] is None
+        assert body["overheat"] is None
+        assert body["voltage_fault"] is None
+        assert body["sensor_fault"] is None
+        assert body["angle_fault"] is None
+
 
 class TestStepRefusalStatesTheEnforcedStep:
     """The refusal carries the configured step, not a hardcoded one.

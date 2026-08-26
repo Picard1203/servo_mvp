@@ -2062,3 +2062,78 @@ comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
 
 **Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
 and the suite (207 tests as of Batch 2) still passes.
+
+---
+
+### T15 — Code-level documentation reads as unprofessional and costs tokens
+**Status:** done · 26 August 2026 · **Decided:** `OPEN_QUESTIONS.md` Q10
+
+Split into T15a (`python/app/`) and T15b (`sketch/src/`), each an Antigravity
+run against its own exact prompt (`docs/handoff/`), with T1 folded into T15a
+since both touch the same docstrings.
+
+**T15a needed real correction, not just review.** Antigravity's own report
+claimed every file's relocations were complete; a full manual diff read
+found genuine load-bearing content silently deleted with no relocation at
+all in several files — most seriously `isolation_service.py` (this
+session's own torque-inversion fix comment) and `servo_state.py`'s
+`_baseline_counts()` (the flagship D9 example this entry already cited by
+name). Restored to `docs/DESIGN_NOTES.md`, with the two safety-critical
+cases kept as one-line inline pointers (the operator's call, not a blanket
+exception). `python/static/app.js` was reverted whole — its entire diff was
+comment removal with zero other contribution, and `CONVENTIONS.md` has no
+JavaScript section to strip against; that was a scoping mistake, not a
+judgment failure, and waits for **T18**.
+
+**T15b held up far better.** Nearly everything it removed was already
+documented in `skills/uno-q-st3215/SKILL.md` and `RELAY_NOTES.md` — built in
+an earlier session, and evidently working as the "check first" reference it
+was meant to be. Real gaps: five Doxygen summaries deleted outright rather
+than kept (process violation of the prompt's own rule, not a judgment
+call), the servo command payload-format table (had no other home), and a
+handful of minor provenance/tuning facts — all fixed, in `SKILL.md` and
+`docs/DESIGN_NOTES.md`.
+
+**Standing lesson from both runs, now written into the prompts themselves:
+verify against the actual diff, never take a self-reported "complete" at
+face value.** A derived constant also lost a term during relocation on the
+Python side (a wrong number, not just a missing one) — the firmware prompt
+now warns about this specifically.
+
+`tools/verify.py`: 293/194/96, unchanged, both runs. Native suite: 194
+checks, 0 failures.
+
+**Related:** T1 (folded in, closed alongside), T18 (front-end conventions,
+`app.js`'s own future pass).
+
+**Original report follows.**
+
+**Status:** blocked on an operator decision — see `OPEN_QUESTIONS.md` Q10 ·
+**Raised by:** the operator, 24 August 2026
+
+The operator's read on the current docstrings/comments: too long, contains
+inline comments (disapproved of), and carries "insider information" — project
+history, rationale, incident narrative — that belongs in `docs/` markdown, not
+in the source. Beyond style, this has a real cost: every session re-reads this
+code, so verbose in-code narrative is paid for out of the same token budget as
+the actual work, every time.
+
+**This contradicts current, deliberate policy, and that must be resolved
+first, not silently overridden either way:** `CONVENTIONS.md` (Docstrings,
+~L30) currently says the opposite — "if a docstring needs three sentences of
+prose to explain the mechanism, the explanation belongs in a comment at the
+relevant line, not in the docstring" — and the repo's own defect history
+(`AUDIT.md`, D2, D9) is full of cases where exactly this kind of in-line
+"why" comment (e.g. `_baseline_counts`'s note about the 212.7°-on-90°
+incident) is what stopped the same mistake recurring nearby. A wholesale
+"move it to docs/" pass needs an explicit decision on which of those two
+failure modes the project would rather risk, not just a style pass.
+
+**Scope, once decided:** a full-repo pass — `CONVENTIONS.md`'s own Docstrings
+section rewritten first if the decision changes it, then every docstring and
+inline comment in `python/app/` and `sketch/src/` brought into line, with any
+genuinely load-bearing rationale relocated to the matching `docs/adr/` entry,
+`AUDIT.md`, or `CLOSED.md` record rather than deleted.
+
+**Related:** T1 (mechanical `CONVENTIONS.md` gaps, different axis), CLAUDE.md
+§4's "write every document distilled" rule (same cost, different location).

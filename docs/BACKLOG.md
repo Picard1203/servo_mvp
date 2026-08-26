@@ -26,8 +26,8 @@ session** (context-reset unit), not a calendar day.
 | # | Session | Board? |
 |---|---|---|
 | **11** | **DONE, 26 Aug 2026.** T15a: prose strip on `python/app/`, plus T1 in full. Run by Antigravity; corrected by hand the same session after a full diff review found real content silently dropped — see T15's entry. `python/static/*.js` was descoped and reverted whole (no JS conventions exist yet — T18). | no |
-| **12** | **Antigravity.** T15b: same rule on `sketch/src/`, separate prompt. `docs/handoff/antigravity-firmware-prose-strip.md`. | no |
-| **13** | **Claude.** T16: enhance `twin-review` (fifth lens, selectable lenses). Fix R1's stale blocked-on-D4 note. Spot-check sessions 11–12. | no |
+| **12** | **DONE, 26 Aug 2026.** T15b: same rule on `sketch/src/`. Held up far better than session 11 — most of what it removed was already in `skills/uno-q-st3215/SKILL.md`/`RELAY_NOTES.md`; five deleted doc-comment summaries and a few minor facts (payload-format table, register provenance) restored. T15 fully closed — see `CLOSED.md`. | no |
+| **13** | **Claude.** T16: enhance `twin-review` (fifth lens, selectable lenses). Fix R1's stale blocked-on-D4 note. **Sessions 11–12 already fully diff-reviewed by hand this session** — no spot-check needed, go straight to T16 and R1. | no |
 | **14** | **Claude.** Run enhanced `/twin-review`, whole-app, first time. **Findings only** → `docs/REVIEW_FINDINGS.md` (file:line, plain-language issue, why it matters, severity, proposed fix — session 15 has no memory of this run). | no |
 | **15** | **Claude.** Triage those findings; fix what matters before the demo; backlog the rest with a reason. | maybe |
 | **16** | **Claude, board.** R1 re-measured (synthetic, one SSE stream/operator — no real multi-machine test exists yet). Soak sharpened for auto-isolate. Feature pass via `/operator-lens`. Fix live: **D17**, **D12**, **D19**. | yes |
@@ -91,7 +91,6 @@ or ask — it is not re-derived here to keep this table short.
 | T10 | Write the recovery runbook, in two halves | open · high |
 | T11 | Write the operations manual | open · high |
 | T13 | Distil the remaining documents | open · opportunistic |
-| T15 | Code-level documentation strip (T15a Python, T15b firmware) | T15a done + corrected · T15b open |
 | T16 | Enhance `twin-review`: fifth lens, selectable lenses | open |
 | T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · independent track |
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
@@ -147,3 +146,4 @@ or ask — it is not re-derived here to keep this table short.
 | **D26** | Suite failed once in ten runs — cause found (sampler thread leak), closed on evidence not proof; reopen fresh if it recurs | 25 August 2026 · Session 8 |
 | **R2** | Motor isolation — board verification found the isolate/un-isolate write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level; UI/refusal gaps closed alongside | 26 August 2026 · hand-turn scenario left open, see T17 |
 | **T1** | `CONVENTIONS.md` gap in `python/app/` (types, control-flow style) closed via T15a | 26 August 2026 · Antigravity, hand-verified against the diff |
+| **T15** | Code-level documentation strip, both halves (T15a Python, T15b firmware) — Antigravity, hand-verified against the diff both times | 26 August 2026 · T15a needed real correction, T15b held up well |

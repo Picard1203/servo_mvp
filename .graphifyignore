@@ -1,0 +1,13 @@
+# Vendored/generic skill collections, not this project's own code.
+# 26 August 2026: these accounted for 355 of 360 skills/ files (72% of the
+# whole graph's file corpus) — reference material for other projects, not
+# servo_mvp's architecture. Excluded so the graph stays scoped to what this
+# project actually is. skills/deliver, skills/operator-lens,
+# skills/twin-review and skills/uno-q-st3215 (this project's own custom
+# skills) stay in scope.
+skills/superpowers/
+skills/iot-skillsbench/
+skills/Arduino-Agent/
+skills/_global-claude-skills/
+skills/arduino-cli-claude-plugin/
+skills/agentic-awesome-skills/

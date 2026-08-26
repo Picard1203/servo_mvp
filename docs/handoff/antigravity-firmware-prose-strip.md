@@ -92,6 +92,14 @@ codebase have previously stopped real recurring defects (see
 `skills/uno-q-st3215/SKILL.md`'s existing table) — losing one is a worse
 outcome here than an extra line in a doc.
 
+**Relocating a derived number means re-deriving it, not paraphrasing it.**
+The Python sibling run relocated a comment containing `(360/4096) * (30/44)`
+and the destination ended up stating `360/4096` alone — the belt-ratio term
+silently dropped, producing a wrong number in the docs where the comment had
+the right one. If a comment you are relocating contains a calculation, copy
+the calculation itself, or verify your restatement reproduces the same
+number, before writing it into the destination file.
+
 Do not create any other new file. List every relocation in your report.
 
 ## D — two comment classes that need special handling, found the hard way

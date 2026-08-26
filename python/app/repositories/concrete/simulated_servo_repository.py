@@ -1,11 +1,4 @@
-"""Simulated servo: sprint-1 stand-in for the real serial bus.
-
-Models raw encoder counts as an unbounded SIGNED integer, exactly like
-the STS multi-turn position after correct sign-magnitude decoding, so
-the sprint-2 hardware swap changes nothing above this layer. Honors the
-configured dead zone (stops driving within it) and simulates the
-overload fault semantics (cleared by the next position command).
-"""
+"""Simulated servo: sprint-1 stand-in for the real serial bus."""
 
 import random
 from math import copysign
@@ -19,44 +12,56 @@ _KT_KGCM_PER_A = 11.0
 
 
 class SimulatedServoRepository:
-    """Thread-driven simulation of one ST3215-class servo."""
+    """Thread-driven simulation of one ST3215-class servo.
+
+    Attributes:
+        _lock (Lock): Mutex protecting simulated servo state.
+        _counts (float): Current simulated shaft position in encoder counts.
+        _target (float): Commanded target position in encoder counts.
+        _speed_counts_s (float): Commanded motion speed in counts per second.
+        _deadband_counts (int): Dead-zone threshold in encoder counts.
+        _acceleration (int): Commanded acceleration parameter.
+        _overload (bool): Simulated overload protection fault state.
+        _multi_turn (bool): Multi-turn positioning mode flag.
+        _angle_resolution (int): Multi-turn resolution amplification factor.
+        _torque_enabled (bool): Simulated drive torque engagement state.
+        _running (bool): Background simulation loop execution flag.
+    """
 
     def __init__(self) -> None:
-        self._lock = Lock()
-        self._counts = 0.0
-        self._target = 0.0
-        self._speed_counts_s = 0.0
-        self._deadband_counts = 10
-        self._acceleration = 50
-        self._overload = False
-        self._multi_turn = False
-        self._angle_resolution = 1
-        self._torque_enabled = True
+        self._lock: Lock = Lock()
+        self._counts: float = 0.0
+        self._target: float = 0.0
+        self._speed_counts_s: float = 0.0
+        self._deadband_counts: int = 10
+        self._acceleration: int = 50
+        self._overload: bool = False
+        self._multi_turn: bool = False
+        self._angle_resolution: int = 1
+        self._torque_enabled: bool = True
+        self._running: bool = True
         Thread(target=self._run, daemon=True).start()
 
+    # Test-only affordance, not part of ServoRepository - see docs/DESIGN_NOTES.md.
     def read_raw_counts(self) -> int:
         """Returns the absolute encoder position in counts.
 
-        TEST AFFORDANCE, not part of ServoRepository. The simulator
-        cannot fail a read, so a bare int is safe here; production code
-        must go through read_snapshot() and honour its `valid` flag.
-
         Returns:
-            Current raw counts.
+            int: Current raw encoder counts.
         """
         with self._lock:
             return round(self._counts)
 
     def read_snapshot(self) -> TelemetrySnapshot:
-        """Returns position, motion flag and mock telemetry.
+        """Returns position, motion flag, and mock telemetry.
 
         Returns:
-            The instantaneous readout.
+            TelemetrySnapshot: The instantaneous readout.
         """
         with self._lock:
             moving = (self._torque_enabled
-                     and abs(self._target - self._counts)
-                     > self._deadband_counts)
+                      and abs(self._target - self._counts)
+                      > self._deadband_counts)
             counts = round(self._counts)
             overload = self._overload
         base_current = 0.9 if moving else 0.18
@@ -81,18 +86,10 @@ class SimulatedServoRepository:
                      acceleration: int) -> None:
         """Starts a move toward an absolute counts target.
 
-        Clears a simulated overload fault, mirroring the hardware rule
-        that a new position command releases the overload de-rate.
-
         Args:
-            target_counts: Absolute encoder counts target.
-            speed_counts_s: Speed in counts per second.
-            acceleration: Accepted and recorded; the simulated motion
-                profile stays linear (acceleration shaping is a hardware
-                behavior, irrelevant to contract testing).
-
-        Returns:
-            None.
+            target_counts (int): Absolute encoder counts target.
+            speed_counts_s (int): Speed in counts per second.
+            acceleration (int): Servo acceleration parameter (0-254).
         """
         with self._lock:
             self._target = float(target_counts)
@@ -101,27 +98,16 @@ class SimulatedServoRepository:
             self._overload = False
 
     def command_stop(self) -> None:
-        """Stops motion at the current position.
-
-        Returns:
-            None.
-        """
+        """Stops motion at the current position."""
         with self._lock:
             self._target = self._counts
 
     def configure_range(self, multi_turn: bool, angle_resolution: int) -> None:
         """Records the range configuration.
 
-        The simulator already models unbounded signed counts, so nothing
-        needs to change in its motion behaviour; the values are recorded so
-        tests can assert the startup path passed them through.
-
         Args:
-            multi_turn: Enable multi-turn absolute positioning.
-            angle_resolution: Amplification factor 1..3.
-
-        Returns:
-            None.
+            multi_turn (bool): Enable multi-turn absolute positioning.
+            angle_resolution (int): Amplification factor 1..3.
         """
         with self._lock:
             self._multi_turn = multi_turn
@@ -131,67 +117,50 @@ class SimulatedServoRepository:
         """Configures the simulated dead-zone width.
 
         Args:
-            counts: Dead-zone width in encoder counts.
-
-        Returns:
-            None.
+            counts (int): Dead-zone width in encoder counts.
         """
         with self._lock:
             self._deadband_counts = max(1, counts)
 
     def set_torque(self, enabled: bool) -> bool:
-        """Cuts or restores simulated drive torque (R2).
-
-        Mirrors the real controller's un-isolate ordering: restoring
-        torque snaps the target to the present position first, so the
-        simulator does not resume driving toward a stale goal, matching
-        what ServoController/BridgeServoRepository do on real hardware.
+        """Cuts or restores simulated drive torque.
 
         Args:
-            enabled: True to restore drive torque, false to cut it.
+            enabled (bool): True to restore drive torque, false to cut it.
 
         Returns:
-            Always True - the simulator cannot fail an acknowledgement.
+            bool: Always True on simulated hardware.
         """
         with self._lock:
-            if enabled and not self._torque_enabled:
+            if (enabled is True) and (self._torque_enabled is False):
                 self._target = self._counts
             self._torque_enabled = enabled
         return True
 
     def read_torque_register(self) -> int:
-        """Returns the simulated torque state (R2 board verification).
+        """Returns the simulated torque state.
 
         Returns:
-            1 when torque is enabled, 0 when isolated - the simulator
-            cannot fail this read.
+            int: 1 when torque is enabled, 0 when isolated.
         """
         with self._lock:
             return 1 if self._torque_enabled else 0
 
     def simulate_overload(self) -> None:
-        """Trips the simulated overload fault (testing/commissioning aid).
-
-        Returns:
-            None.
-        """
+        """Trips the simulated overload fault."""
         with self._lock:
             self._overload = True
 
     def _run(self) -> None:
-        """Advances position toward the target until the process ends.
-
-        Returns:
-            None.
-        """
-        while True:
+        """Advances position toward target until process termination."""
+        while self._running is True:
             with self._lock:
-                if not self._torque_enabled:
-                    pass  # isolated: nothing drives the shaft (R2)
+                if self._torque_enabled is False:
+                    pass
                 else:
                     delta = self._target - self._counts
                     if abs(delta) <= self._deadband_counts:
-                        pass  # inside the dead zone: servo stops driving
+                        pass
                     else:
                         step = self._speed_counts_s * _TICK_SECONDS
                         if abs(delta) <= step:

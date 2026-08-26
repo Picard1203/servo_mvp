@@ -14,15 +14,22 @@ class TelemetryRepository(ABC):
         """Persists one sample.
 
         Args:
-            sample: The sample to store.
-
-        Returns:
-            None.
+            sample (TelemetrySample): The sample to store.
         """
 
     @abstractmethod
-    def count_range(self, ts_from: float, ts_to: float, limit: int) -> tuple[int, float]:
-        """Counts samples in range and returns count and base timestamp."""
+    def count_range(self, ts_from: float, ts_to: float,
+                    limit: int) -> tuple[int, float]:
+        """Counts samples in range and returns count and base timestamp.
+
+        Args:
+            ts_from (float): Range start unix timestamp.
+            ts_to (float): Range end unix timestamp.
+            limit (int): Maximum rows to count.
+
+        Returns:
+            tuple[int, float]: Matching sample count and base timestamp.
+        """
 
     @abstractmethod
     def query(self, ts_from: float, ts_to: float,
@@ -30,12 +37,12 @@ class TelemetryRepository(ABC):
         """Yields samples inside a time range, oldest first.
 
         Args:
-            ts_from: Range start, unix timestamp.
-            ts_to: Range end, unix timestamp.
-            limit: Maximum rows to yield.
+            ts_from (float): Range start unix timestamp.
+            ts_to (float): Range end unix timestamp.
+            limit (int): Maximum rows to yield.
 
         Returns:
-            An iterator over matching samples.
+            Iterator[TelemetrySample]: Iterator over matching samples.
         """
 
     @abstractmethod
@@ -43,8 +50,8 @@ class TelemetryRepository(ABC):
         """Deletes samples older than the retention window.
 
         Args:
-            days: Retention in days.
+            days (int): Retention window in days.
 
         Returns:
-            Number of deleted rows.
+            int: Number of deleted rows.
         """

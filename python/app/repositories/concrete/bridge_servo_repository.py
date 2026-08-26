@@ -1,17 +1,4 @@
-"""Servo access through the Bridge to the MCU.
-
-This is the production counterpart to SimulatedServoRepository. It speaks the
-contract defined in sketch/src/BridgeApi.h: plain comma-separated payloads
-over Bridge.call, chosen over a binary struct because they are readable in a
-log and neither side can silently drift from a field order the other assumes.
-
-Snapshot payload, in order:
-    valid,counts,moving,temp_c,volt_v,curr_a,torque_kgcm,load,status_bits
-
-Fault bits in the final field mirror the servo's status register 0x41:
-    bit0 voltage, bit1 sensor, bit2 temperature, bit3 current,
-    bit4 angle, bit5 overload
-"""
+"""Servo access through the Bridge to the MCU."""
 
 import threading
 import time
@@ -24,7 +11,6 @@ from app.repositories.abstract.servo_repository import ServoRepository
 
 _SIGN_BIT = 15
 
-# Status register 0x41 bit positions, verified against the Feetech table.
 _BIT_VOLTAGE = 1 << 0
 _BIT_SENSOR = 1 << 1
 _BIT_OVERHEAT = 1 << 2
@@ -38,65 +24,52 @@ _SNAPSHOT_FIELDS = 9
 def decode_sign_magnitude(value: int, sign_bit: int = _SIGN_BIT) -> int:
     """Decodes a sign-magnitude field from the servo wire format.
 
-    STS position fields carry the sign in a dedicated bit rather than two's
-    complement, so naive parsing shows roughly 32700 when the position
-    crosses below zero. The sketch decodes this before sending, but the
-    function stays here because the same rule applies to any raw register a
-    caller reads directly.
-
     Args:
-        value: Raw unsigned register value.
-        sign_bit: Index of the sign bit (15 for position, 11 for the offset
-            register 0x1F).
+        value (int): Raw unsigned register value.
+        sign_bit (int): Index of the sign bit.
 
     Returns:
-        The signed magnitude.
+        int: The signed magnitude.
     """
     mask = 1 << sign_bit
-    if value & mask:
+    if (value & mask) != 0:
         return -(value & (mask - 1))
     return value
 
 
 class BridgeServoRepository(ServoRepository):
-    """Talks to the servo through the MCU Bridge."""
+    """Talks to the servo through the MCU Bridge.
+
+    Attributes:
+        _bridge (object): Object exposing Bridge RPC call interface.
+        _lock (threading.RLock): Reentrant lock serializing Bridge calls.
+        _cache_seconds (float): Cache duration for servo snapshots.
+        _cached (Optional[TelemetrySnapshot]): Cached snapshot instance.
+        _cached_at (float): Monotonic timestamp of last cached read.
+    """
 
     def __init__(self, bridge: Optional[object] = None,
                  cache_seconds: float = 0.25) -> None:
         """Creates the repository.
 
         Args:
-            bridge: Object exposing call(name, payload). Defaults to the
-                Arduino Bridge; injectable so tests need no board.
-            cache_seconds: How long one servo reading may be reused. The
-                telemetry sampler and every HTTP request all want the same
-                value at roughly the same moment; without this they each pay
-                a bus round trip.
+            bridge (Optional[object]): Optional Bridge implementation.
+            cache_seconds (float): Lifetime of cached servo readings.
         """
         if bridge is None:
             from arduino.app_utils import Bridge
             bridge = Bridge
         self._bridge = bridge
-        # ONE Bridge conversation at a time. The RPC multiplexes requests and
-        # replies over a single link by message id; two threads calling into
-        # it concurrently interleave those ids, and a reply then arrives for
-        # a request the caller has already abandoned - which shows up as
-        # "Response for unknown msgid" followed by 10 s timeouts. The
-        # sampler thread and every HTTP request both read the servo, so this
-        # is not a rare race, it is the normal case.
         self._lock = threading.RLock()
         self._cache_seconds = cache_seconds
         self._cached: Optional[TelemetrySnapshot] = None
         self._cached_at = 0.0
 
-    # ------------------------------------------------------------ reading
-
     def read_snapshot(self) -> TelemetrySnapshot:
         """Reads one coherent snapshot from the servo.
 
         Returns:
-            The snapshot. On a bus failure every reading is zero and the
-            fault flags are clear, matching what the sketch reports.
+            TelemetrySnapshot: The latest snapshot readout.
         """
         with self._lock:
             now = time.monotonic()
@@ -109,10 +82,10 @@ class BridgeServoRepository(ServoRepository):
             return snapshot
 
     def _read_uncached(self) -> TelemetrySnapshot:
-        """Performs one real bus read. The caller must hold the lock.
+        """Performs one real bus read.
 
         Returns:
-            The snapshot, or an empty one when the read failed.
+            TelemetrySnapshot: The snapshot or empty fallback on failure.
         """
         raw = self._call("servo_read", "")
         parts = raw.split(",") if raw else []
@@ -124,10 +97,6 @@ class BridgeServoRepository(ServoRepository):
         try:
             status = int(parts[8])
             if parts[0] != "1":
-                # The sketch says the bus did not answer. Everything after
-                # field 0 is zero padding, not a reading. Treating it as data
-                # is how a failed read once became a calibration datum of 0,
-                # which silently put half the travel out of reach.
                 logger.warning("servo reported an invalid reading",
                                metadata={"event": "servo.read.invalid"},
                                extra={"payload": raw})
@@ -152,42 +121,27 @@ class BridgeServoRepository(ServoRepository):
                            extra={"payload": raw})
             return self._empty_snapshot()
 
-    # ------------------------------------------------------------ commands
-
     def command_move(self, target_counts: int, speed_counts_s: int,
                      acceleration: int) -> None:
         """Starts a move toward an absolute counts target.
 
-        A new position command also clears a tripped overload, which is the
-        servo's own rule for releasing the de-rate.
-
         Args:
-            target_counts: Absolute encoder counts target.
-            speed_counts_s: Speed in counts per second.
-            acceleration: Servo acceleration parameter (0-254).
-
-        Returns:
-            None.
+            target_counts (int): Absolute encoder counts target.
+            speed_counts_s (int): Speed in counts per second.
+            acceleration (int): Servo acceleration parameter (0-254).
         """
         payload = f"{target_counts},{speed_counts_s},{acceleration}"
         self._command("servo_move", payload)
 
     def command_stop(self) -> None:
-        """Stops motion at the current position.
-
-        Returns:
-            None.
-        """
+        """Stops motion at the current position."""
         self._command("servo_stop", "")
 
     def set_deadband(self, counts: int) -> None:
-        """Configures the servo's dead-zone width.
+        """Configures the servo dead-zone width.
 
         Args:
-            counts: Dead-zone width in encoder counts (0-32).
-
-        Returns:
-            None.
+            counts (int): Dead-zone width in encoder counts (0-32).
         """
         self._command("servo_set_deadband", str(counts))
 
@@ -196,31 +150,24 @@ class BridgeServoRepository(ServoRepository):
         """Configures single-turn or multi-turn absolute positioning.
 
         Args:
-            multi_turn: Enable multi-turn absolute positioning.
-            angle_resolution: Amplification factor 1..3 (multi-turn only).
-
-        Returns:
-            None.
+            multi_turn (bool): Enable multi-turn absolute positioning.
+            angle_resolution (int): Amplification factor 1..3.
         """
         payload = f"{1 if multi_turn else 0},{angle_resolution}"
         self._command("servo_configure_range", payload)
 
     def set_torque(self, enabled: bool) -> bool:
-        """Cuts or restores drive torque while sensors stay powered (R2).
-
-        Uses _call directly, not _command: the ack is load-bearing here,
-        unlike every other command in this class (see the abstract
-        contract's docstring).
+        """Cuts or restores drive torque while sensors stay powered.
 
         Args:
-            enabled: True to restore drive torque, false to cut it.
+            enabled (bool): True to restore drive torque, false to cut it.
 
         Returns:
-            True when the servo acknowledged the command.
+            bool: True when the servo acknowledged the command.
         """
         with self._lock:
             reply = self._call("servo_set_torque", "1" if enabled else "0")
-            self._cached = None          # state may have changed
+            self._cached = None
         if reply != "ok":
             logger.warning("servo torque command not acknowledged",
                            metadata={"event": "servo.torque.rejected"},
@@ -228,35 +175,30 @@ class BridgeServoRepository(ServoRepository):
         return reply == "ok"
 
     def read_torque_register(self) -> Optional[int]:
-        """Reads register 0x28 directly (R2 board verification).
-
-        Diagnostic only - independent of set_torque()'s own write
-        acknowledgement, and not part of normal reconciliation.
+        """Reads register 0x28 directly.
 
         Returns:
-            0 or 1 as read from the servo, or None when the read failed.
+            Optional[int]: Register value (0 or 1), or None if read failed.
         """
         reply = self._call("servo_read_torque", "")
         if reply not in ("0", "1"):
             return None
         return int(reply)
 
-    # ------------------------------------------------------------ internals
-
     def _call(self, name: str, payload: str) -> str:
         """Invokes a Bridge function, converting failures into empty results.
 
         Args:
-            name: Bridge function name.
-            payload: Request payload.
+            name (str): Bridge function name.
+            payload (str): Request payload string.
 
         Returns:
-            The reply string, or an empty string when the call failed.
+            str: The reply string or empty string on failure.
         """
         try:
             with self._lock:
                 return str(self._bridge.call(name, payload))
-        except Exception as exc:                      # noqa: BLE001
+        except Exception as exc:
             logger.error("bridge call failed",
                          metadata={"event": "servo.bridge.error"},
                          extra={"function": name, "error": str(exc)})
@@ -266,15 +208,12 @@ class BridgeServoRepository(ServoRepository):
         """Invokes a Bridge function and logs a non-ok acknowledgement.
 
         Args:
-            name: Bridge function name.
-            payload: Request payload.
-
-        Returns:
-            None.
+            name (str): Bridge function name.
+            payload (str): Request payload string.
         """
         with self._lock:
             reply = self._call(name, payload)
-            self._cached = None          # state may have changed
+            self._cached = None
         if reply != "ok":
             logger.warning("servo command not acknowledged",
                            metadata={"event": "servo.command.rejected"},
@@ -285,7 +224,7 @@ class BridgeServoRepository(ServoRepository):
         """Builds the reading used when the bus did not answer.
 
         Returns:
-            A snapshot with zeroed readings and no faults raised.
+            TelemetrySnapshot: Snapshot with zeroed readings.
         """
         return TelemetrySnapshot(
             raw_counts=0, moving=False, temperature_c=0.0, voltage_v=0.0,

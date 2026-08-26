@@ -41,9 +41,31 @@ rule itself is in `CLAUDE.md` §4.
 ---
 
 ### T15 — Code-level documentation reads as unprofessional and costs tokens
-**Status:** unblocked, split into two Antigravity sessions · **Raised by:**
-the operator, 24 August 2026 · **Decided:** `OPEN_QUESTIONS.md` Q10,
-26 August 2026
+**Status:** T15a run 26 August 2026, corrected the same session (see below) ·
+T15b still open · **Raised by:** the operator, 24 August 2026 · **Decided:**
+`OPEN_QUESTIONS.md` Q10, 26 August 2026
+
+**T15a ran 26 August 2026 and needed real correction, not just review.**
+Antigravity's own report claimed every file's relocations were complete; a
+full manual diff read afterward found genuine load-bearing content silently
+deleted with no relocation at all in several files — most seriously
+`isolation_service.py` (this session's own torque-inversion fix comment) and
+`servo_state.py`'s `_baseline_counts()` (the flagship D9 example T15's own
+entry already cited by name). Restored to `docs/DESIGN_NOTES.md` and, in the
+two cases judged genuinely safety-critical, as one-line inline pointers (the
+operator's call, not a blanket exception). **Lesson, now the standing rule
+for any future Antigravity run: verify against the actual diff, never take a
+self-reported "complete" at face value** — see the hardened prompts and the
+Part D addendum in `docs/handoff/antigravity-firmware-prose-strip.md`.
+
+**`python/static/app.js` was reverted whole, not distilled.** Its entire
+diff turned out to be comment/whitespace removal with zero functional,
+docstring, or type contribution — confirmed by the report's own counts (all
+zero except comments removed) and by re-checking the diff programmatically.
+`CONVENTIONS.md` has no JavaScript section, so there was no decided
+convention to strip *to* in the first place — including it in T15a's scope
+was a scoping mistake, not a judgment failure on Antigravity's part. It
+waits for **T18** to establish real JS conventions first.
 
 **Decision (Q10):** docstring summary lines and the typed `Args:`/
 `Returns:`/`Raises:`/`Attributes:` blocks stay and get completed — types were
@@ -60,7 +82,9 @@ the same Antigravity run as the prose strip, not a separate one.
 **Split into two sessions, each with its own exact prompt** (not left to the
 session to interpret):
 
-- **T15a — `python/app/` + `python/static/*.js`.**
+- **T15a — `python/app/` only.** Done, corrected. `python/static/*.js` was
+  removed from this prompt's scope after the run (see above) — a separate,
+  future decision under T18, not a re-run of this one.
   `docs/handoff/antigravity-python-prose-strip.md`.
 - **T15b — `sketch/src/`.** Deliberately separate: firmware comments encode
   hardware rules with no type system underneath, and `RELAY_NOTES.md`
@@ -138,24 +162,6 @@ rest of the project assumes, per the gear-ratio audit in
 output arm attached? enough of R4's mechanical assembly to have a real lever?)
 and when it's realistically available, before spending more bench time on a
 test the current setup cannot support.
-
----
-
-### T1 — Apply `CONVENTIONS.md` across the codebase
-**Status:** open, folded into T15a's Antigravity run · **Flow:**
-`WORKFLOWS.md` W4 · suited to an executing agent
-
-The MVP was written "dirty" on purpose. Measured gap in `python/app/`: 67 `Args:`
-lines missing `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list
-comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
-
-**Runs as part of T15a**, not a separate session — both touch the same
-docstrings, and running them apart would mean Antigravity annotating lines
-in one pass that a second pass immediately rewrites. See
-`docs/handoff/antigravity-python-prose-strip.md`.
-
-**Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
-and the suite (207 tests as of Batch 2) still passes.
 
 ---
 

@@ -4,14 +4,26 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.deps import (get_isolation_service, get_motion_service,
-                      get_servo_repository, get_state_store, get_zero_service)
+from app.deps import (
+    get_isolation_service,
+    get_motion_service,
+    get_servo_repository,
+    get_state_store,
+    get_zero_service,
+)
 from app.repositories.abstract.servo_repository import ServoRepository
-from app.schemas.servo import (IsolateRequest, IsolateResponse, LockRequest,
-                               LockResponse, MoveAcceptedResponse,
-                               MoveRequest, RecoverResponse,
-                               ServoStateResponse, StopResponse,
-                               TorqueRegisterResponse)
+from app.schemas.servo import (
+    IsolateRequest,
+    IsolateResponse,
+    LockRequest,
+    LockResponse,
+    MoveAcceptedResponse,
+    MoveRequest,
+    RecoverResponse,
+    ServoStateResponse,
+    StopResponse,
+    TorqueRegisterResponse,
+)
 from app.schemas.zeros import ZeroResponse
 from app.services.isolation_service import IsolationService
 from app.services.motion_service import MotionService
@@ -32,10 +44,10 @@ def get_state(state: StateDep) -> ServoStateResponse:
     """Returns the full state snapshot for the client.
 
     Args:
-        state: Injected servo state store.
+        state (ServoStateStore): Injected servo state store.
 
     Returns:
-        Current position, flags and telemetry.
+        ServoStateResponse: Current position, flags, and telemetry.
     """
     view = state.snapshot()
     return ServoStateResponse.from_view(view)
@@ -43,15 +55,15 @@ def get_state(state: StateDep) -> ServoStateResponse:
 
 @router.post("/move", status_code=202, response_model=MoveAcceptedResponse)
 def post_move(request: MoveRequest,
-                    motion: MotionDep) -> MoveAcceptedResponse:
-    """Starts a move; domain errors are mapped to HTTP by the app.
+              motion: MotionDep) -> MoveAcceptedResponse:
+    """Starts a move toward the requested target angle.
 
     Args:
-        request: Target angle and speed.
-        motion: Injected motion service.
+        request (MoveRequest): Target angle, speed, and acceleration.
+        motion (MotionService): Injected motion service.
 
     Returns:
-        Acknowledgement with the accepted target.
+        MoveAcceptedResponse: Acknowledgement with accepted target angle.
     """
     motion.move_to(request.target_deg, request.speed_dps,
                    request.acceleration)
@@ -63,10 +75,10 @@ def post_stop(motion: MotionDep) -> StopResponse:
     """Stops the current move.
 
     Args:
-        motion: Injected motion service.
+        motion (MotionService): Injected motion service.
 
     Returns:
-        Acknowledgement.
+        StopResponse: Acknowledgement of stop command.
     """
     motion.stop()
     return StopResponse(stopped=True)
@@ -74,15 +86,15 @@ def post_stop(motion: MotionDep) -> StopResponse:
 
 @router.post("/lock", response_model=LockResponse)
 def post_lock(request: LockRequest,
-                    motion: MotionDep) -> LockResponse:
+              motion: MotionDep) -> LockResponse:
     """Changes the digital lock state.
 
     Args:
-        request: Desired lock state.
-        motion: Injected motion service.
+        request (LockRequest): Desired lock state.
+        motion (MotionService): Injected motion service.
 
     Returns:
-        The applied lock state.
+        LockResponse: The applied lock state.
     """
     motion.set_lock(request.locked)
     return LockResponse(locked=request.locked)
@@ -90,19 +102,15 @@ def post_lock(request: LockRequest,
 
 @router.post("/isolate", response_model=IsolateResponse)
 def post_isolate(request: IsolateRequest,
-                       isolation: IsolationDep) -> IsolateResponse:
+                 isolation: IsolationDep) -> IsolateResponse:
     """Sets motor isolation intent and reconciles it immediately.
 
-    The response reflects intent, accepted synchronously - it does not
-    guarantee the servo has acknowledged the write. Poll /servo/state
-    (or the SSE stream) for the confirmed isolated field.
-
     Args:
-        request: Desired isolation state.
-        isolation: Injected isolation service.
+        request (IsolateRequest): Desired isolation state.
+        isolation (IsolationService): Injected isolation service.
 
     Returns:
-        The intent that was set.
+        IsolateResponse: The isolation intent that was set.
     """
     isolation.set_isolated(request.isolated)
     return IsolateResponse(isolated=request.isolated)
@@ -112,15 +120,11 @@ def post_isolate(request: IsolateRequest,
 def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
     """Captures the current physical position as the calibration datum.
 
-    Call when the mechanism is physically at the documented reference
-    position (install, and after any power-off). Creates or updates the
-    datum zero, activates it, and marks the position verified.
-
     Args:
-        zeros: Injected zero service.
+        zeros (ZeroService): Injected zero service.
 
     Returns:
-        The stored datum zero.
+        ZeroResponse: The stored datum zero reference.
     """
     datum = zeros.calibrate()
     return ZeroResponse(id=datum.id, name=datum.name,
@@ -130,18 +134,15 @@ def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
 
 
 @router.get("/diagnostics/torque_register",
-           response_model=TorqueRegisterResponse)
+            response_model=TorqueRegisterResponse)
 def get_torque_register(servo: ServoDep) -> TorqueRegisterResponse:
-    """Reads the servo's torque-enable register directly (R2 board
-    verification), independent of the isolate command's own write ack.
-
-    Diagnostic only - not part of the settled ServoStateResponse shape.
+    """Reads the servo torque-enable register directly.
 
     Args:
-        servo: Injected servo repository.
+        servo (ServoRepository): Injected servo repository.
 
     Returns:
-        The raw register value, or null when the bus did not answer.
+        TorqueRegisterResponse: Raw register value or None if read failed.
     """
     return TorqueRegisterResponse(
         torque_register=servo.read_torque_register())
@@ -149,13 +150,13 @@ def get_torque_register(servo: ServoDep) -> TorqueRegisterResponse:
 
 @router.post("/recover", response_model=RecoverResponse)
 def post_recover(motion: MotionDep) -> RecoverResponse:
-    """Clears a tripped overload fault by re-commanding the position.
+    """Clears a tripped overload fault by re-commanding position.
 
     Args:
-        motion: Injected motion service.
+        motion (MotionService): Injected motion service.
 
     Returns:
-        Acknowledgement.
+        RecoverResponse: Acknowledgement of recovery action.
     """
     motion.recover()
     return RecoverResponse(recovered=True)

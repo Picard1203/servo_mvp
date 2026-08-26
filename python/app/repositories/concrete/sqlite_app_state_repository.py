@@ -6,19 +6,23 @@ from app.db.database import Database
 
 
 class SqliteAppStateRepository:
-    """Stores small operator-intent flags in the app_state table."""
+    """Stores small operator-intent flags in the app_state table.
+
+    Attributes:
+        _db (Database): Database wrapper providing SQLite access.
+    """
 
     def __init__(self, database: Database) -> None:
-        self._db = database
+        self._db: Database = database
 
     def get(self, key: str) -> Optional[str]:
         """Returns a stored value.
 
         Args:
-            key: State key.
+            key (str): State key to retrieve.
 
         Returns:
-            The stored value, or None when never set.
+            Optional[str]: The stored value, or None when never set.
         """
         with self._db.write_lock:
             row = self._db.connection.execute(
@@ -30,12 +34,9 @@ class SqliteAppStateRepository:
         """Persists a value, replacing any previous one for the same key.
 
         Args:
-            key: State key.
-            value: Value to store.
-            updated_at: ISO timestamp of this write.
-
-        Returns:
-            None.
+            key (str): State key to persist.
+            value (str): Value string to store.
+            updated_at (str): ISO timestamp of this write.
         """
         with self._db.write_lock:
             self._db.connection.execute(

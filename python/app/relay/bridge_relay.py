@@ -1,9 +1,4 @@
-"""Linux half of the TCP relay; counterpart of EthernetRelay (sketch).
-
-Architecture validated in the demo (chunk size 128, under the Bridge
-frame limit). Gateway pattern: ser2net / SerialToTCPBridgeProtocol.
-Constructed once at startup and stored on app.state.
-"""
+"""Linux half of the TCP relay; counterpart of EthernetRelay (sketch)."""
 
 import socket
 from threading import Lock, Thread
@@ -15,7 +10,17 @@ from app.core.config import Settings
 
 
 class BridgeRelay:
-    """Byte pump between the sketch's network clients and FastAPI."""
+    """Byte pump between the sketch's network clients and FastAPI.
+
+    Attributes:
+        _settings (Settings): Application settings for network config.
+        _sockets (dict[int, socket.socket]): Active sockets keyed by slot.
+        _client_ips (dict[int, str]): Client IP addresses keyed by slot.
+        _map_lock (Lock): Mutex protecting socket and IP mappings.
+        _bridge_lock (Lock): Mutex serializing calls across Bridge RPC.
+        _bridge (Optional[object]): Arduino Bridge module or None.
+        connections_total (int): Total lifetime accepted connection count.
+    """
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -27,15 +32,7 @@ class BridgeRelay:
         self.connections_total = 0
 
     def register(self) -> None:
-        """Registers all Bridge callbacks. Call once at startup.
-
-        On a machine without the board runtime (dev computer) the
-        Bridge is unavailable; registration is skipped with a warning
-        instead of crashing, so the same code runs everywhere.
-
-        Returns:
-            None.
-        """
+        """Registers all Bridge callbacks."""
         try:
             from arduino.app_utils import Bridge
         except ImportError:
@@ -52,18 +49,13 @@ class BridgeRelay:
         """Handles a new network client reported by the sketch.
 
         Args:
-            slot: Connection slot assigned by the sketch.
-            client_ip: Remote IP address as seen by the shield.
-
-        Returns:
-            None.
+            slot (int): Connection slot assigned by the sketch.
+            client_ip (str): Remote IP address seen by shield.
         """
         self._drop(slot, tell_mcu=False)
         try:
             sock = socket.create_connection(
                 (self._settings.api_host, self._settings.api_port), timeout=5)
-            # Clear the connect timeout so recv() in _pump_replies blocks
-            # indefinitely while FastAPI generates large responses (e.g. XLSX).
             sock.settimeout(None)
         except OSError as exc:
             logger.error("FastAPI unreachable for client",
@@ -79,21 +71,17 @@ class BridgeRelay:
             self.connections_total += 1
         Thread(target=self._pump_replies, args=(slot, sock),
                daemon=True).start()
-        # debug, not info: one line per HTTP request drowns the log.
         logger.debug("client connected",
                      metadata={"event": "relay.conn.open",
-                              "client_ip": client_ip},
-                    extra={"slot": slot})
+                               "client_ip": client_ip},
+                     extra={"slot": slot})
 
     def _on_rx(self, slot: int, data: bytes) -> None:
         """Forwards client bytes to FastAPI.
 
         Args:
-            slot: Connection slot.
-            data: Raw bytes from the network client.
-
-        Returns:
-            None.
+            slot (int): Connection slot identifier.
+            data (bytes): Raw payload bytes from network client.
         """
         with self._map_lock:
             sock = self._sockets.get(slot)
@@ -105,39 +93,32 @@ class BridgeRelay:
             self._drop(slot, tell_mcu=True)
 
     def _on_close(self, slot: int) -> None:
-        """Handles the network client going away.
+        """Handles the network client disconnecting.
 
         Args:
-            slot: Connection slot.
-
-        Returns:
-            None.
+            slot (int): Connection slot identifier.
         """
         with self._map_lock:
             client_ip = self._client_ips.get(slot, "?")
         logger.debug("client disconnected",
                      metadata={"event": "relay.conn.close",
-                              "client_ip": client_ip},
-                    extra={"slot": slot})
+                               "client_ip": client_ip},
+                     extra={"slot": slot})
         self._drop(slot, tell_mcu=False)
 
     def _pump_replies(self, slot: int, sock: socket.socket) -> None:
         """Streams FastAPI reply bytes back down to the sketch.
 
         Args:
-            slot: Connection slot.
-            sock: Local socket connected to FastAPI.
-
-        Returns:
-            None.
+            slot (int): Connection slot identifier.
+            sock (socket.socket): Local socket connected to FastAPI.
         """
         try:
-            while True:
-                data = sock.recv(self._settings.relay_chunk_bytes)
-                if not data:
-                    break
+            data = sock.recv(self._settings.relay_chunk_bytes)
+            while len(data) > 0:
                 with self._bridge_lock:
                     self._bridge.call("net_tx", slot, data)
+                data = sock.recv(self._settings.relay_chunk_bytes)
         except OSError:
             pass
         finally:
@@ -147,11 +128,8 @@ class BridgeRelay:
         """Closes and forgets one mirrored connection.
 
         Args:
-            slot: Connection slot.
-            tell_mcu: Also ask the sketch to close its client.
-
-        Returns:
-            None.
+            slot (int): Connection slot identifier.
+            tell_mcu (bool): True to request MCU close remote client.
         """
         with self._map_lock:
             sock = self._sockets.pop(slot, None)
@@ -161,7 +139,7 @@ class BridgeRelay:
                 sock.close()
             except OSError:
                 pass
-        if tell_mcu and self._bridge is not None:
+        if (tell_mcu is True) and (self._bridge is not None):
             try:
                 with self._bridge_lock:
                     self._bridge.call("net_shutdown", slot)

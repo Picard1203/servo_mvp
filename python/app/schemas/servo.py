@@ -14,9 +14,9 @@ class MoveRequest(BaseModel):
     """Command to move to an output angle relative to the active zero.
 
     Attributes:
-        target_deg: Target output angle in degrees.
-        speed_dps: Output speed in degrees per second.
-        acceleration: Servo acceleration parameter (native units, 0-254).
+        target_deg (float): Target output angle in degrees.
+        speed_dps (float): Output speed in degrees per second.
+        acceleration (int): Servo acceleration parameter (0-254).
     """
 
     target_deg: float = Field(ge=_settings.output_min_deg,
@@ -31,7 +31,7 @@ class LockRequest(BaseModel):
     """Command to engage or release the digital lock.
 
     Attributes:
-        locked: Desired lock state.
+        locked (bool): Desired lock state.
     """
 
     locked: bool
@@ -41,8 +41,8 @@ class MoveAcceptedResponse(BaseModel):
     """Acknowledgement of an accepted move.
 
     Attributes:
-        accepted: Always True on success.
-        target_deg: The accepted output angle.
+        accepted (bool): Always True on success.
+        target_deg (float): The accepted output angle.
     """
 
     accepted: bool
@@ -53,7 +53,7 @@ class StopResponse(BaseModel):
     """Acknowledgement of a stop command.
 
     Attributes:
-        stopped: Always True on success.
+        stopped (bool): Always True on success.
     """
 
     stopped: bool
@@ -63,7 +63,7 @@ class LockResponse(BaseModel):
     """Result of a lock-state change.
 
     Attributes:
-        locked: The applied lock state.
+        locked (bool): The applied lock state.
     """
 
     locked: bool
@@ -73,7 +73,7 @@ class IsolateRequest(BaseModel):
     """Command to engage or release motor isolation.
 
     Attributes:
-        isolated: Desired isolation state.
+        isolated (bool): Desired isolation state.
     """
 
     isolated: bool
@@ -83,22 +83,17 @@ class IsolateResponse(BaseModel):
     """Acknowledgement of an isolation-state change request.
 
     Attributes:
-        isolated: The intent that was set - not necessarily yet the
-            acknowledged hardware state. Poll /servo/state (or the SSE
-            stream)'s own isolated field for confirmation, since a write
-            can be accepted here and still fail against the servo.
+        isolated (bool): The operator isolation intent that was set.
     """
 
     isolated: bool
 
 
 class TorqueRegisterResponse(BaseModel):
-    """Diagnostic read of the servo's torque-enable register (R2 board
-    verification), independent of set_torque()'s own write acknowledgement.
+    """Diagnostic read of the servo torque-enable register.
 
     Attributes:
-        torque_register: 0 or 1 as read from the servo, or None when the
-            bus did not answer.
+        torque_register (Optional[int]): Register value (0 or 1), or None.
     """
 
     torque_register: Optional[int]
@@ -108,7 +103,7 @@ class RecoverResponse(BaseModel):
     """Acknowledgement of an overload recovery action.
 
     Attributes:
-        recovered: Always True on success.
+        recovered (bool): Always True on success.
     """
 
     recovered: bool
@@ -118,58 +113,30 @@ class ServoStateResponse(BaseModel):
     """Full state snapshot for the client poller.
 
     Attributes:
-        output_deg: Current output angle vs. the active zero, or null
-            when the servo did not answer. Clients must render null as
-            "unknown" and never as 0 - a failed read is not a position.
-        reading_valid: False when this snapshot has no position in it.
-        moving: True while a move is in progress, or null when the servo
-            did not answer (D23, amends ADR-0008). The rule stated above
-            for output_deg governs this and the six fault flags below
-            identically: a failed read states nothing measured, not
-            "not moving, no faults" - clients must render null as
-            unknown, not as false.
-        locked: Digital lock state.
-        settling: True while inside the post-lock settle window.
-        position_verified: False after boot until calibration; a False
-            here means the shown angle may be off by whole turns.
-        active_zero: Name of the active baseline.
-        temperature_c: Servo temperature in Celsius, or null when the
-            servo did not answer. The rule stated above for output_deg
-            applies to these four identically - a failed read is not a
-            measurement, and 0.00 V shown as one reads to an operator
-            as a servo that has lost power.
-        voltage_v: Supply voltage in Volts, or null when the servo did
-            not answer.
-        current_a: Motor current in Amperes, or null when the servo did
-            not answer.
-        torque_kgcm: Estimated torque in kg*cm, or null when the servo
-            did not answer.
-        overload: Servo overload protection tripped, or null on a failed
-            read (D23) - see moving's docstring above.
-        overcurrent: Overcurrent fault flag, or null on a failed read.
-        overheat: Overheat fault flag, or null on a failed read.
-        voltage_fault: Supply-voltage fault flag, or null on a failed read.
-        sensor_fault: Angle-sensor fault flag, or null on a failed read.
-        angle_fault: Angle-sensor range fault flag, or null on a failed
-            read.
-        servo_deg: The servo's own shaft angle before the gear ratio,
-            same baseline as output_deg. Follows output_deg's own
-            validity.
-        target_deg: The last target angle, or null if none since
-            boot. Not a measurement - never render it as one.
-        target_stale: True after a stop(); the target is kept, not
-            cleared, but is no longer being pursued.
-        output_min_deg: Lower reachable output angle from the active
-            baseline.
-        output_max_deg: Upper reachable output angle from the active
-            baseline.
-        isolated: True once drive torque is confirmed cut. Never null on
-            a failed read, unlike moving and the fault flags above - this
-            is state the system holds, not a servo measurement, and only
-            ever True once the servo has acknowledged the write.
-        isolation_idle_timeout_s: The configured idle-auto-isolate
-            timeout, so the client can state the rule accurately instead
-            of holding a second, hardcoded copy of the number.
+        output_deg (Optional[float]): Output angle or None if read failed.
+        reading_valid (bool): False when snapshot has no valid position.
+        moving (Optional[bool]): True if moving or None if read failed.
+        locked (bool): Digital lock state.
+        settling (bool): True during post-lock settle delay window.
+        position_verified (bool): True once position reference confirmed.
+        active_zero (str): Name of the active baseline.
+        temperature_c (Optional[float]): Temperature or None if read failed.
+        voltage_v (Optional[float]): Voltage or None if read failed.
+        current_a (Optional[float]): Current or None if read failed.
+        torque_kgcm (Optional[float]): Torque or None if read failed.
+        overload (Optional[bool]): Overload flag or None if read failed.
+        overcurrent (Optional[bool]): Overcurrent or None if read failed.
+        overheat (Optional[bool]): Overheat flag or None if read failed.
+        voltage_fault (Optional[bool]): Voltage fault or None if read failed.
+        sensor_fault (Optional[bool]): Sensor fault or None if read failed.
+        angle_fault (Optional[bool]): Angle fault or None if read failed.
+        servo_deg (Optional[float]): Pre-ratio servo angle or None.
+        target_deg (Optional[float]): Commanded target angle or None.
+        target_stale (bool): True after stop until next commanded move.
+        output_min_deg (float): Minimum reachable output angle limit.
+        output_max_deg (float): Maximum reachable output angle limit.
+        isolated (bool): True if motor isolation was acknowledged.
+        isolation_idle_timeout_s (float): Idle timeout before auto-isolation.
     """
 
     output_deg: Optional[float]
@@ -201,15 +168,11 @@ class ServoStateResponse(BaseModel):
     def from_view(cls, view: ServoStateView) -> "ServoStateResponse":
         """Builds the response from one coherent state view.
 
-        The single builder for both call sites (the poller and the SSE
-        stream) - two independent field lists here is exactly the twin-
-        path shape that has cost this project four defects already.
-
         Args:
-            view: The state store's snapshot.
+            view (ServoStateView): The state store snapshot.
 
         Returns:
-            The API response.
+            ServoStateResponse: The API response model.
         """
         return cls(
             output_deg=view.output_deg, reading_valid=view.reading_valid,

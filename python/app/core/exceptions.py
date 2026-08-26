@@ -14,22 +14,11 @@ class MovingError(DomainError):
 
 
 class IsolatedError(DomainError):
-    """Raised when movement is requested while the motor is isolated (R2).
-
-    Deliberately not guarded by the same moving-in-progress check that
-    protects lock changes (MovingError) - a manual isolate command must
-    take effect immediately, even mid-move, since it is meant to double
-    as R8's future emergency-stop mechanism.
-    """
+    """Raised when movement is requested while the motor is isolated."""
 
 
 class LockedAndIsolatedError(DomainError):
-    """Raised when movement is refused for both reasons at once.
-
-    Without this, whichever gate is checked first hides the other -
-    clearing it would only surface a second refusal the operator was
-    never told about.
-    """
+    """Raised when movement is refused for both reasons at once."""
 
 
 class NotFoundError(DomainError):
@@ -45,14 +34,7 @@ class DatumZeroError(DomainError):
 
 
 class OutOfTravelError(DomainError):
-    """Raised when a target lies outside the servo's physical count range.
-
-    The servo is configured with angle limits 0..4095 and silently CLAMPS
-    anything beyond them - it does not refuse, it just stops early and
-    reports success. Commanding -90 deg from a datum captured near count 0
-    therefore looked accepted while the mechanism halted at zero. This turns
-    that silent clamp into an explicit refusal.
-    """
+    """Raised when a target lies outside the servo's physical count range."""
 
 
 class InvalidReadingError(DomainError):

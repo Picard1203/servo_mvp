@@ -1,10 +1,4 @@
-"""FastAPI application assembly: routers and domain-error mapping.
-
-Construction of services lives in deps.py (cached providers). This module
-only builds the ASGI app and maps domain exceptions to HTTP responses.
-Startup initialization (logging, background threads, relay) is done
-explicitly in main.py.
-"""
+"""FastAPI application assembly: routers and domain-error mapping."""
 
 from pathlib import Path
 
@@ -14,11 +8,18 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
-from app.core.exceptions import (ActiveZeroError, DatumZeroError,
-                                 InvalidReadingError, IsolatedError,
-                                 LockedAndIsolatedError, LockedError,
-                                 MovingError, NotFoundError, OutOfTravelError,
-                                 StepError)
+from app.core.exceptions import (
+    ActiveZeroError,
+    DatumZeroError,
+    InvalidReadingError,
+    IsolatedError,
+    LockedAndIsolatedError,
+    LockedError,
+    MovingError,
+    NotFoundError,
+    OutOfTravelError,
+    StepError,
+)
 from app.routers import servo, stream, system, telemetry, zeros
 
 
@@ -26,7 +27,7 @@ def create_app() -> FastAPI:
     """Creates and configures the FastAPI application.
 
     Returns:
-        The configured application.
+        FastAPI: The configured application.
     """
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.version)
@@ -39,7 +40,7 @@ def create_app() -> FastAPI:
     _register_error_handlers(app)
 
     static_dir = Path(__file__).resolve().parent.parent / "static"
-    if static_dir.is_dir():
+    if static_dir.is_dir() is True:
         app.mount("/", StaticFiles(directory=static_dir, html=True),
                   name="static")
 
@@ -50,22 +51,19 @@ def _register_error_handlers(app: FastAPI) -> None:
     """Maps domain exceptions to HTTP responses.
 
     Args:
-        app: The FastAPI application.
-
-    Returns:
-        None.
+        app (FastAPI): The FastAPI application.
     """
 
-    def error(status: int, detail: str, **extra) -> JSONResponse:
+    def error(status: int, detail: str, **extra: object) -> JSONResponse:
         """Builds a JSON error body.
 
         Args:
-            status: HTTP status code.
-            detail: Error description.
-            **extra: Additional response fields.
+            status (int): HTTP status code.
+            detail (str): Error description.
+            **extra (object): Additional response fields.
 
         Returns:
-            The JSON response.
+            JSONResponse: The JSON response.
         """
         return JSONResponse(status_code=status,
                             content={"detail": detail, **extra})

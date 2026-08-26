@@ -7,19 +7,23 @@ from app.models.entities import ZeroReference
 
 
 class SqliteZeroRepository:
-    """Stores zero references in the zeros table."""
+    """Stores zero references in the zeros table.
+
+    Attributes:
+        _db (Database): Database wrapper providing SQLite access.
+    """
 
     def __init__(self, database: Database) -> None:
-        self._db = database
+        self._db: Database = database
 
     def add(self, zero: ZeroReference) -> ZeroReference:
         """Persists a new zero reference.
 
         Args:
-            zero: Entity with id=None.
+            zero (ZeroReference): Entity with id=None.
 
         Returns:
-            The stored entity with its assigned id.
+            ZeroReference: The stored entity with assigned id.
         """
         with self._db.write_lock:
             cursor = self._db.connection.execute(
@@ -35,21 +39,24 @@ class SqliteZeroRepository:
         """Returns all zero references, newest first.
 
         Returns:
-            All stored zeros.
+            list[ZeroReference]: All stored zero references.
         """
         with self._db.write_lock:
             rows = self._db.connection.execute(
                 "SELECT * FROM zeros ORDER BY id DESC").fetchall()
-        return [self._to_entity(row) for row in rows]
+        result: list[ZeroReference] = []
+        for row in rows:
+            result.append(self._to_entity(row))
+        return result
 
     def get(self, zero_id: int) -> Optional[ZeroReference]:
         """Returns one zero reference by id.
 
         Args:
-            zero_id: Database id.
+            zero_id (int): Database identifier.
 
         Returns:
-            The entity, or None when missing.
+            Optional[ZeroReference]: The entity, or None when missing.
         """
         with self._db.write_lock:
             row = self._db.connection.execute(
@@ -60,10 +67,10 @@ class SqliteZeroRepository:
         """Deletes one zero reference.
 
         Args:
-            zero_id: Database id.
+            zero_id (int): Database identifier.
 
         Returns:
-            True when a row was deleted.
+            bool: True when a row was deleted.
         """
         with self._db.write_lock:
             cursor = self._db.connection.execute(
@@ -75,10 +82,10 @@ class SqliteZeroRepository:
         """Marks one zero active and clears the previous active flag.
 
         Args:
-            zero_id: Database id.
+            zero_id (int): Database identifier.
 
         Returns:
-            True when the zero exists and was activated.
+            bool: True when the zero exists and was activated.
         """
         with self._db.write_lock:
             self._db.connection.execute(
@@ -93,7 +100,7 @@ class SqliteZeroRepository:
         """Returns the active zero reference, if any.
 
         Returns:
-            The active zero, or None.
+            Optional[ZeroReference]: Active zero reference or None.
         """
         with self._db.write_lock:
             row = self._db.connection.execute(
@@ -101,14 +108,14 @@ class SqliteZeroRepository:
         return self._to_entity(row) if row is not None else None
 
     def upsert_datum(self, raw_counts: int, created_at: str) -> ZeroReference:
-        """Creates or updates THE calibration datum zero.
+        """Creates or updates the calibration datum zero.
 
         Args:
-            raw_counts: Captured raw encoder counts at the reference.
-            created_at: ISO timestamp of this capture.
+            raw_counts (int): Captured raw encoder counts.
+            created_at (str): ISO timestamp of capture.
 
         Returns:
-            The stored datum zero.
+            ZeroReference: The stored datum zero entity.
         """
         with self._db.write_lock:
             row = self._db.connection.execute(
@@ -127,14 +134,14 @@ class SqliteZeroRepository:
             self._db.connection.commit()
         return self.get(datum_id)
 
-    def _to_entity(self, row) -> ZeroReference:
+    def _to_entity(self, row: object) -> ZeroReference:
         """Maps a database row to the entity.
 
         Args:
-            row: SQLite row.
+            row (object): SQLite row.
 
         Returns:
-            The mapped entity.
+            ZeroReference: The mapped entity.
         """
         return ZeroReference(
             id=row["id"], name=row["name"], raw_counts=row["raw_counts"],

@@ -14,10 +14,10 @@ class ZeroRepository(ABC):
         """Persists a new zero reference.
 
         Args:
-            zero: Entity with id=None.
+            zero (ZeroReference): Entity with id=None.
 
         Returns:
-            The stored entity with its assigned id.
+            ZeroReference: The stored entity with its assigned id.
         """
 
     @abstractmethod
@@ -25,7 +25,7 @@ class ZeroRepository(ABC):
         """Returns all zero references, newest first.
 
         Returns:
-            All stored zeros.
+            list[ZeroReference]: All stored zero references.
         """
 
     @abstractmethod
@@ -33,10 +33,10 @@ class ZeroRepository(ABC):
         """Returns one zero reference by id.
 
         Args:
-            zero_id: Database id.
+            zero_id (int): Database identifier.
 
         Returns:
-            The entity, or None when missing.
+            Optional[ZeroReference]: Matching zero reference or None.
         """
 
     @abstractmethod
@@ -44,21 +44,21 @@ class ZeroRepository(ABC):
         """Deletes one zero reference.
 
         Args:
-            zero_id: Database id.
+            zero_id (int): Database identifier.
 
         Returns:
-            True when a row was deleted.
+            bool: True when a row was deleted.
         """
 
     @abstractmethod
     def set_active(self, zero_id: int) -> bool:
-        """Marks one zero active and clears the previous active flag.
+        """Marks one zero active and clears previous active flag.
 
         Args:
-            zero_id: Database id.
+            zero_id (int): Database identifier.
 
         Returns:
-            True when the zero exists and was activated.
+            bool: True when the zero exists and was activated.
         """
 
     @abstractmethod
@@ -66,21 +66,17 @@ class ZeroRepository(ABC):
         """Returns the active zero reference, if any.
 
         Returns:
-            The active zero, or None.
+            Optional[ZeroReference]: Active zero reference or None.
         """
 
     @abstractmethod
     def upsert_datum(self, raw_counts: int, created_at: str) -> ZeroReference:
-        """Creates or updates THE calibration datum zero.
-
-        At most one datum exists: the first call creates it (named
-        'datum'), later calls update its captured counts and timestamp
-        (re-homing after a power cycle re-captures the same reference).
+        """Creates or updates the calibration datum zero.
 
         Args:
-            raw_counts: Captured raw encoder counts at the reference.
-            created_at: ISO timestamp of this capture.
+            raw_counts (int): Captured raw encoder counts.
+            created_at (str): ISO timestamp of capture.
 
         Returns:
-            The stored datum zero.
+            ZeroReference: The stored datum zero entity.
         """

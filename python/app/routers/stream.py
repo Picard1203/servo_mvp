@@ -29,20 +29,18 @@ async def _stream_generator(
     """Generates SSE events for state, zeros and events.
 
     Args:
-        request: The incoming request.
-        state_store: The servo state store.
-        zero_service: The zero service.
-        event_service: The event service.
-        settings: Application settings.
+        request (Request): The incoming HTTP request.
+        state_store (ServoStateStore): Injected servo state store.
+        zero_service (ZeroService): Injected zero service.
+        event_service (EventService): Injected event service.
+        settings (Settings): Application configuration settings.
 
     Yields:
-        SSE formatted strings.
+        str: Server-sent event formatted text frames.
     """
     count = 0
     active = True
     interval = settings.sampler_interval_seconds
-    # Zeros/events push roughly every 15s of wall clock, regardless of the
-    # state-push interval - the two are unrelated cadences that share a loop.
     zeros_events_every = max(1, round(15.0 / interval))
     try:
         while active is True:
@@ -54,10 +52,10 @@ async def _stream_generator(
                 state = ServoStateResponse.from_view(view)
                 yield f"event: state\ndata: {state.model_dump_json()}\n\n"
 
-                if ((count % zeros_events_every) == 0):
+                if (count % zeros_events_every) == 0:
                     zeros_list = await asyncio.to_thread(zero_service.list_all)
-                    
-                    zeros_resp = []
+
+                    zeros_resp: list[ZeroResponse] = []
                     for z in zeros_list:
                         zeros_resp.append(
                             ZeroResponse(
@@ -69,14 +67,15 @@ async def _stream_generator(
                                 created_at=z.created_at,
                             )
                         )
-                    
-                    zeros_json_list = []
+
+                    zeros_json_list: list[dict] = []
                     for z in zeros_resp:
                         zeros_json_list.append(z.model_dump(mode="json"))
                     yield f"event: zeros\ndata: {json.dumps(zeros_json_list)}\n\n"
 
-                    recent_events = await asyncio.to_thread(event_service.recent, 50)
-                    events_list = []
+                    recent_events = await asyncio.to_thread(
+                        event_service.recent, 50)
+                    events_list: list[EventResponse] = []
                     for e in recent_events:
                         events_list.append(
                             EventResponse(
@@ -103,21 +102,21 @@ async def stream(
     event_service: EventService = Depends(get_event_service),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    """Streams servo state, zeros and events.
+    """Streams servo state, zeros, and events over SSE.
 
     Args:
-        request: The incoming request.
-        state_store: The servo state store.
-        zero_service: The zero service.
-        event_service: The event service.
-        settings: Application settings.
+        request (Request): The incoming HTTP request.
+        state_store (ServoStateStore): Injected servo state store.
+        zero_service (ZeroService): Injected zero service.
+        event_service (EventService): Injected event service.
+        settings (Settings): Application configuration settings.
 
     Returns:
-        The streaming response.
+        StreamingResponse: Continuous SSE streaming response.
     """
     return StreamingResponse(
         _stream_generator(request, state_store, zero_service, event_service,
-                           settings),
+                          settings),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

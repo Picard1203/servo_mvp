@@ -2034,3 +2034,31 @@ unscheduled** — its own entry says do it opportunistically, not as a sweep;
 
 **What is not in any batch is as important as what is:** if a batch slips, the
 cut line in `PROJECT_STATE.md` says what ships anyway.
+
+---
+
+### T1 — Apply `CONVENTIONS.md` across the codebase
+**Status:** done · 26 August 2026 · via T15a's Antigravity run, hand-corrected same session
+
+Measured gap in `python/app/`: 67 `Args:` lines missing `(type)`, 4
+implicit-truthiness checks, 3 `while True`, 3 list comprehensions, 2 `break`.
+Folded into T15a's prose-strip prompt rather than run separately, since both
+touch the same docstrings.
+
+Antigravity's run matched every expected count exactly (4/4 truthiness, 3/3
+`while True`, 3/3 list comprehensions, 2/2 `break`; `Args:`/`Returns:` types
+completed, matching the ~67 baseline) — confirmed by a full manual diff
+review after the run, not taken on the self-report alone (see T15's entry).
+`Attributes:` blocks were also completed with types, a gap T1's own count
+never measured. `tools/verify.py` unchanged (293/194/96, all green).
+
+**Original report follows.**
+
+**Status:** open · **Flow:** `WORKFLOWS.md` W4 · suited to an executing agent
+
+The MVP was written "dirty" on purpose. Measured gap in `python/app/`: 67 `Args:`
+lines missing `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list
+comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
+
+**Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
+and the suite (207 tests as of Batch 2) still passes.

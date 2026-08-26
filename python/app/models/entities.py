@@ -9,13 +9,12 @@ class ZeroReference:
     """A saved baseline position.
 
     Attributes:
-        id: Database id; None before persistence.
-        name: Operator-given unique name.
-        raw_counts: Servo raw encoder counts captured.
-        is_active: Whether this zero is the current baseline.
-        is_datum: Whether this zero is the install calibration datum
-            (protected from deletion; at most one exists).
-        created_at: ISO timestamp of capture.
+        id (Optional[int]): Database identifier or None before saving.
+        name (str): Unique name for this zero reference.
+        raw_counts (int): Absolute encoder position in raw counts.
+        is_active (bool): True if this zero is the active baseline.
+        is_datum (bool): True if this zero is the calibration datum.
+        created_at (str): ISO timestamp of capture.
     """
 
     id: Optional[int]
@@ -31,19 +30,19 @@ class TelemetrySnapshot:
     """Instantaneous sensory readout from the servo layer.
 
     Attributes:
-        raw_counts: Absolute encoder counts (multi-turn; may exceed
-            0..4095 and be negative - see ServoRepository contract).
-        moving: True while a move is in progress.
-        temperature_c: Servo temperature, Celsius.
-        voltage_v: Supply voltage, Volts.
-        current_a: Motor current, Amperes.
-        torque_kgcm: Estimated output torque, kg*cm.
-        overload: Servo overload protection tripped.
-        overcurrent: Overcurrent fault flag.
-        overheat: Overheat fault flag.
-        voltage_fault: Supply-voltage fault flag.
-        sensor_fault: Angle-sensor fault flag.
-        angle_fault: Angle error flag (status bit 4).
+        raw_counts (int): Absolute multi-turn encoder count.
+        moving (bool): True while a move is in progress.
+        temperature_c (float): Servo temperature in Celsius.
+        voltage_v (float): Supply voltage in Volts.
+        current_a (float): Motor current in Amperes.
+        torque_kgcm (float): Estimated output torque in kg*cm.
+        overload (bool): True if overload protection tripped.
+        overcurrent (bool): True if overcurrent fault flag set.
+        overheat (bool): True if overheat fault flag set.
+        voltage_fault (bool): True if supply voltage fault set.
+        sensor_fault (bool): True if angle sensor fault set.
+        angle_fault (bool): True if angle error flag set.
+        valid (bool): True if readout was successfully received.
     """
 
     raw_counts: int
@@ -63,76 +62,34 @@ class TelemetrySnapshot:
 
 @dataclass(slots=True, frozen=True)
 class ServoStateView:
-    """Coherent snapshot of servo + lock + baseline, read atomically.
+    """Coherent snapshot of servo, lock, and baseline state.
 
     Attributes:
-        output_deg: Output angle relative to the active zero, or None
-            when the read failed. None means "not measured" and must
-            never be substituted with a number: a failed read reports
-            count 0, and 0 is indistinguishable from a genuine reading
-            at the bottom of travel.
-        raw_counts: Absolute encoder counts, or None when the read
-            failed.
-        reading_valid: False when the servo did not answer this read.
-        moving: True while a move is in progress, or None when the read
-            failed. The rule stated for output_deg governs this and the
-            six fault flags below identically (D23, amends ADR-0008): a
-            failed read states nothing measured, not "not moving, no
-            faults" - false statements about hardware nothing was heard
-            from.
-        locked: Digital lock state.
-        settling: True while inside the post-lock settle window.
-        position_verified: False after boot until calibration confirms
-            the position reference (multi-turn context can be lost on
-            power-off); True after a successful calibrate.
-        active_zero_name: Name of the active baseline, or 'factory'.
-        temperature_c: Servo temperature in Celsius, or None when the
-            read failed. The rule stated for output_deg governs these
-            four readings identically: a failed read reports 0.0 for
-            each, and 0.0 V is indistinguishable from a genuine
-            measurement of a servo that has lost power.
-        voltage_v: Supply voltage in Volts, or None when the read
-            failed.
-        current_a: Motor current in Amperes, or None when the read
-            failed.
-        torque_kgcm: Estimated output torque in kg*cm, or None when the
-            read failed.
-        overload: Servo overload protection tripped, or None on a failed
-            read (D23) - see moving's docstring above.
-        overcurrent: Overcurrent fault flag, or None on a failed read.
-        overheat: Overheat fault flag, or None on a failed read.
-        voltage_fault: Supply-voltage fault flag, or None on a failed read.
-        sensor_fault: Angle-sensor fault flag, or None on a failed read.
-        angle_fault: Angle-sensor range fault flag, or None on a failed
-            read.
-        servo_deg: The servo's own shaft angle, before the gear ratio -
-            same baseline as output_deg (zero at the datum), just
-            un-geared. Follows output_deg's own validity: None exactly
-            when output_deg is None.
-        target_deg: The last target angle, or None if no move has
-            been commanded since boot. Independent of reading_valid - a
-            target is still known when the servo goes silent. Never a
-            measurement; never substituted with 0.0.
-        target_stale: True after stop() until the next accepted move -
-            the target is kept (not cleared) but is no longer being
-            pursued.
-        output_min_deg: Lower reachable output angle from the active
-            baseline (see ServoStateStore.reachable_output_range_deg).
-        output_max_deg: Upper reachable output angle from the active
-            baseline. Sent so the client can scale a travel display
-            against the real range instead of a second, hardcoded copy
-            of it - the config already lives in exactly one place.
-        isolated: Motor isolation state (backlog R2) - True once the
-            servo has ACKNOWLEDGED that drive torque is cut, never on
-            unacknowledged intent alone. A plain bool, never None on a
-            failed read, following locked's shape rather than moving's:
-            this is state the system already holds, not a servo
-            measurement, so a failed read has no bearing on whether it
-            is known.
-        isolation_idle_timeout_s: The configured idle-auto-isolate
-            timeout, sent as data rather than declared a second time in
-            the client - the same reasoning output_min_deg/max_deg and
-            the telemetry export's gear-ratio field already rest on.
+        output_deg (Optional[float]): Output angle or None if read failed.
+        raw_counts (Optional[int]): Encoder counts or None if read failed.
+        reading_valid (bool): False when servo did not answer read.
+        moving (Optional[bool]): True if moving or None if read failed.
+        locked (bool): Digital lock engagement state.
+        settling (bool): True during post-lock settle delay window.
+        position_verified (bool): True once datum calibration confirmed.
+        active_zero_name (str): Active baseline name or 'factory'.
+        temperature_c (Optional[float]): Temperature or None if read failed.
+        voltage_v (Optional[float]): Voltage or None if read failed.
+        current_a (Optional[float]): Current or None if read failed.
+        torque_kgcm (Optional[float]): Torque or None if read failed.
+        overload (Optional[bool]): Overload flag or None if read failed.
+        overcurrent (Optional[bool]): Overcurrent or None if read failed.
+        overheat (Optional[bool]): Overheat flag or None if read failed.
+        voltage_fault (Optional[bool]): Voltage fault or None if read failed.
+        sensor_fault (Optional[bool]): Sensor fault or None if read failed.
+        angle_fault (Optional[bool]): Angle fault or None if read failed.
+        servo_deg (Optional[float]): Pre-ratio servo angle or None.
+        target_deg (Optional[float]): Commanded target angle or None.
+        target_stale (bool): True after stop until next commanded move.
+        output_min_deg (float): Minimum reachable output angle limit.
+        output_max_deg (float): Maximum reachable output angle limit.
+        isolated (bool): True if motor isolation was acknowledged.
+        isolation_idle_timeout_s (float): Idle timeout before auto-isolation.
     """
 
     output_deg: Optional[float]
@@ -167,26 +124,23 @@ class TelemetrySample:
     """One persisted telemetry row.
 
     Attributes:
-        timestamp: Unix timestamp of the sample.
-        raw_counts: Encoder counts at sample time.
-        output_deg: Output angle relative to the active zero.
-        moving: Movement flag.
-        locked: Digital lock state.
-        temperature_c: Servo temperature, Celsius.
-        voltage_v: Supply voltage, Volts.
-        current_a: Motor current, Amperes.
-        torque_kgcm: Estimated torque, kg*cm.
-        overload: Servo overload protection tripped.
-        overcurrent: Overcurrent fault flag.
-        overheat: Overheat fault flag.
-        voltage_fault: Supply-voltage fault flag.
-        sensor_fault: Angle-sensor fault flag.
-        target_deg: The target angle in effect at sample time, or None
-            when no move had been commanded since boot. Servo-side degree
-            (pre-ratio) is NOT stored - it is a pure function of
-            output_deg and the (fixed) gear ratio, so storing it would
-            duplicate data across a 30-day export for nothing.
-        isolated: Motor isolation state in effect at sample time (R2).
+        timestamp (float): Unix timestamp of the sample.
+        raw_counts (int): Encoder counts at sample time.
+        output_deg (float): Output angle relative to active zero.
+        moving (bool): True if motion was in progress.
+        locked (bool): Digital lock engagement state.
+        temperature_c (float): Servo temperature in Celsius.
+        voltage_v (float): Supply voltage in Volts.
+        current_a (float): Motor current in Amperes.
+        torque_kgcm (float): Estimated torque in kg*cm.
+        overload (bool): True if overload protection tripped.
+        overcurrent (bool): True if overcurrent fault flag set.
+        overheat (bool): True if overheat fault flag set.
+        voltage_fault (bool): True if supply voltage fault set.
+        sensor_fault (bool): True if angle sensor fault set.
+        angle_fault (bool): True if angle error flag set.
+        target_deg (Optional[float]): Target angle in effect or None.
+        isolated (bool): True if motor isolation was in effect.
     """
 
     timestamp: float

@@ -1,13 +1,4 @@
-"""Composition root: cached provider functions that construct and wire.
-
-This is the ONLY module that names concrete classes. Each provider is
-cached, so every component is a process-wide singleton built on first
-use. Routers depend on the service providers via FastAPI's Depends;
-main.py calls the same providers at startup to initialize eagerly and
-to start background work.
-
-Sprint-2 hardware swap happens in one place: get_servo_repository.
-"""
+"""Composition root: cached provider functions that construct and wire."""
 
 from functools import lru_cache
 
@@ -21,15 +12,20 @@ from app.repositories.abstract.servo_repository import ServoRepository
 from app.repositories.abstract.telemetry_repository import TelemetryRepository
 from app.repositories.abstract.zero_repository import ZeroRepository
 from app.repositories.concrete.bridge_servo_repository import (
-    BridgeServoRepository)
+    BridgeServoRepository,
+)
 from app.repositories.concrete.simulated_servo_repository import (
-    SimulatedServoRepository)
+    SimulatedServoRepository,
+)
 from app.repositories.concrete.sqlite_app_state_repository import (
-    SqliteAppStateRepository)
+    SqliteAppStateRepository,
+)
 from app.repositories.concrete.sqlite_telemetry_repository import (
-    SqliteTelemetryRepository)
+    SqliteTelemetryRepository,
+)
 from app.repositories.concrete.sqlite_zero_repository import (
-    SqliteZeroRepository)
+    SqliteZeroRepository,
+)
 from app.services.isolation_service import IsolationService
 from app.services.motion_service import MotionService
 from app.services.servo_state import ServoStateStore
@@ -42,7 +38,7 @@ def get_event_service() -> EventService:
     """Returns the shared event buffer.
 
     Returns:
-        The process-wide event service.
+        EventService: The process-wide event service.
     """
     return EventService(get_settings().event_buffer_size)
 
@@ -52,7 +48,7 @@ def get_database() -> Database:
     """Returns the shared database wrapper.
 
     Returns:
-        The process-wide database.
+        Database: The process-wide database.
     """
     return Database(get_settings().db_path)
 
@@ -61,16 +57,11 @@ def get_database() -> Database:
 def get_servo_repository() -> ServoRepository:
     """Returns the servo repository chosen by use_hardware_servo.
 
-    Simulated by default so the dev machine and the test suite need no
-    hardware; the board sets USE_HARDWARE_SERVO=true in its .env. Range and
-    dead zone are applied at construction either way, so the startup path is
-    identical for both backends.
-
     Returns:
-        The process-wide servo repository.
+        ServoRepository: The process-wide servo repository.
     """
     settings = get_settings()
-    if settings.use_hardware_servo:
+    if settings.use_hardware_servo is True:
         repository: ServoRepository = BridgeServoRepository()
     else:
         repository = SimulatedServoRepository()
@@ -85,7 +76,7 @@ def get_zero_repository() -> ZeroRepository:
     """Returns the zero repository.
 
     Returns:
-        The process-wide zero repository.
+        ZeroRepository: The process-wide zero repository.
     """
     return SqliteZeroRepository(get_database())
 
@@ -95,7 +86,7 @@ def get_telemetry_repository() -> TelemetryRepository:
     """Returns the telemetry repository.
 
     Returns:
-        The process-wide telemetry repository.
+        TelemetryRepository: The process-wide telemetry repository.
     """
     return SqliteTelemetryRepository(get_database())
 
@@ -105,7 +96,7 @@ def get_app_state_repository() -> AppStateRepository:
     """Returns the persisted operator-intent repository.
 
     Returns:
-        The process-wide app-state repository.
+        AppStateRepository: The process-wide app-state repository.
     """
     return SqliteAppStateRepository(get_database())
 
@@ -115,7 +106,7 @@ def get_state_store() -> ServoStateStore:
     """Returns the atomic servo/lock/baseline/isolation state store.
 
     Returns:
-        The process-wide state store.
+        ServoStateStore: The process-wide state store.
     """
     settings = get_settings()
     return ServoStateStore(
@@ -133,7 +124,7 @@ def get_motion_service() -> MotionService:
     """Returns the motion service.
 
     Returns:
-        The process-wide motion service.
+        MotionService: The process-wide motion service.
     """
     return MotionService(get_servo_repository(), get_state_store(),
                          get_event_service(), get_settings())
@@ -143,13 +134,8 @@ def get_motion_service() -> MotionService:
 def get_isolation_service() -> IsolationService:
     """Returns the motor-isolation service.
 
-    Constructing this reconciles hardware toward persisted intent once,
-    so eager construction at startup (see main.py) matters: a fresh
-    process should stop energising an isolated motor as soon as possible,
-    not only once something else happens to touch this provider first.
-
     Returns:
-        The process-wide isolation service.
+        IsolationService: The process-wide isolation service.
     """
     return IsolationService(get_servo_repository(), get_state_store(),
                             get_app_state_repository(), get_event_service(),
@@ -161,7 +147,7 @@ def get_zero_service() -> ZeroService:
     """Returns the zero service.
 
     Returns:
-        The process-wide zero service.
+        ZeroService: The process-wide zero service.
     """
     return ZeroService(get_zero_repository(), get_servo_repository(),
                        get_event_service(), get_state_store())
@@ -171,12 +157,8 @@ def get_zero_service() -> ZeroService:
 def get_telemetry_service() -> TelemetryService:
     """Returns the telemetry service.
 
-    Also ticks the isolation reconciler and idle timer once per sample -
-    see IsolationService.tick()'s docstring for why it rides this loop
-    rather than starting its own thread.
-
     Returns:
-        The process-wide telemetry service.
+        TelemetryService: The process-wide telemetry service.
     """
     return TelemetryService(get_telemetry_repository(), get_state_store(),
                             get_settings(), isolation=get_isolation_service())
@@ -187,16 +169,16 @@ def get_relay() -> BridgeRelay:
     """Returns the Bridge relay.
 
     Returns:
-        The process-wide relay.
+        BridgeRelay: The process-wide relay.
     """
     return BridgeRelay(get_settings())
 
 
 @lru_cache
 def get_mcu_log() -> McuLog:
-    """Returns the MCU diagnostic-log receiver (backlog D3).
+    """Returns the MCU diagnostic log receiver.
 
     Returns:
-        The process-wide receiver.
+        McuLog: The process-wide receiver.
     """
     return McuLog(get_settings())

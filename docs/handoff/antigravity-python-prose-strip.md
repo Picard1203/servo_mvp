@@ -1,7 +1,24 @@
-# Task: strip explanatory prose from python/app/ and python/static/
+# Task: strip explanatory prose from python/app/
+
+**Already run once, 26 August 2026 (T15a) — this file is the historical
+record of that prompt, not a live task.** If this is being re-run for any
+reason, note two corrections made after the first run, from a full manual
+diff review that found real content silently deleted despite this file's
+existing Part C:
+- `python/static/*.js` is **removed from scope**. The first run stripped it
+  too; every line of that diff turned out to be comment removal with zero
+  other contribution, and `CONVENTIONS.md` has no JavaScript section to
+  strip *to* — it was reverted whole. See T18 and `docs/DESIGN_NOTES.md`'s
+  final section.
+- Before reporting any file complete, re-read it once more specifically for
+  contract-mismatch/sentinel warnings and twin-path/defect-precedent
+  comments (see `docs/handoff/antigravity-firmware-prose-strip.md` Part D
+  for both classes, written after this run) — the first pass missed real
+  instances of both, most seriously in `isolation_service.py` and
+  `servo_state.py`.
 
 STYLE ONLY. No behaviour changes. No test added, removed or edited.
-Do not touch `sketch/`, `python/tests/`, or `tools/`.
+Do not touch `sketch/`, `python/static/`, `python/tests/`, or `tools/`.
 
 Read `CONVENTIONS.md` in full first — its Docstrings section was rewritten
 26 August 2026 and is the authority here. If it disagrees with anything
@@ -15,14 +32,22 @@ more than 5, STOP and report before changing anything.
 **KEEP, and complete:**
 - The one-line summary sentence.
 - The `Args:` / `Returns:` / `Raises:` / `Attributes:` blocks, in full.
-  **Every `Args:` and `Returns:` entry must carry its type in parentheses**,
-  taken from the signature — `name (str):`, `Returns: Optional[ZeroReference]:`.
-  About 67 are currently missing it. Class docstrings carry `Attributes:`
-  with each attribute typed. **Do not remove or shorten these blocks. Do not
-  omit the `(type)` parentheses because the signature is already annotated —
+  **Every `Args:`, `Returns:` AND `Attributes:` entry must carry its type in
+  parentheses** — this applies to all three equally, not just `Args:`/
+  `Returns:` — taken from the signature (or, for `Attributes:`, from the
+  attribute's own annotation) — `name (str):`, `Returns: Optional[ZeroReference]:`,
+  `_servo (ServoRepository):`. About 67 `Args:`/`Returns:` entries are
+  currently missing it; `Attributes:` has not been counted, so report
+  whatever you find. **Do not remove or shorten these blocks. Do not omit
+  the `(type)` parentheses because the signature is already annotated —
   this project deliberately keeps them in both places.**
   **Exception: omit the `Returns:` block entirely when the function returns
-  `None`** — there is nothing to type or describe. Report your count
+  `None`** — there is nothing to type or describe.
+  **Every entry inside these blocks is ONE line** —
+  `name (type): description.` A wrapped, multi-line entry should be rare,
+  not routine as it is today. Where a description does not fit one line,
+  shorten the description rather than wrapping it; only let it run past one
+  line when shortening genuinely fails. Report your count
   of types added.
 
 **REMOVE:** every explanatory paragraph between the summary and the first
@@ -39,8 +64,7 @@ later human pass — do not act on that suspicion yourself.
 
 ## B — inline comments
 
-Delete EVERY `#` comment in `python/app/**/*.py` (147 lines) and every `//`
-and `/* */` comment in `python/static/*.js` (186 lines).
+Delete EVERY `#` comment in `python/app/**/*.py` (147 lines).
 
 Exceptions that stay: tool directives (`# type: ignore`, `# noqa`,
 `# pragma: no cover`), shebangs, encoding declarations, licence headers.
@@ -48,9 +72,9 @@ Exceptions that stay: tool directives (`# type: ignore`, `# noqa`,
 "Every" means every, including ones that look important. Part C is how they
 survive.
 
-**`python/static/style.css` and `python/static/index.html` are OUT OF
-SCOPE for this task** — a separate item covers the front end's own
-conventions and structure. Do not touch either file.
+**All of `python/static/` (`app.js`, `style.css`, `index.html`) is OUT OF
+SCOPE for this task** — the front end has no conventions of its own yet;
+see T18.
 
 ## C — relocate what is not already written down
 
@@ -106,8 +130,7 @@ python3 tools/verify.py
 
 - No `git` commands. No branch, commit, stash, or reset.
 - Do not edit `tools/verify_baseline.json`.
-- Do not edit anything under `python/tests/`, `sketch/`, or `tools/`.
-- Do not edit `python/static/style.css` or `python/static/index.html`.
+- Do not edit anything under `python/tests/`, `sketch/`, `python/static/`, or `tools/`.
 - Do not change any string literal, log message, error message, or any text
   the operator can see in the UI.
 

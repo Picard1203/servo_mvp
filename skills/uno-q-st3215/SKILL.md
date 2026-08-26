@@ -274,6 +274,7 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
 | UI moves convincingly, servo never twitches | Running the simulated backend; `.env` missing on the board |
 | Calibration captured a datum of 0 | A failed read was stored as a position — `valid` flag discarded |
 | One fault never trips | Status decoder missing bit4 (angle) |
+| A torque/move write always "succeeds" even when the servo never answers | Checked the SCServo library's write-return value (`EnableTorque`, `WritePosEx`) against `-1` — that sentinel is for this library's *read* calls only; writes return `Ack()`'s own convention, 0 fail / 1 success, never -1 |
 
 ---
 

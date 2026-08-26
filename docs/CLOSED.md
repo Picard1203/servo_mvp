@@ -1499,5 +1499,160 @@ it fresh with whatever evidence the recurrence provides.
 
 ---
 
+### R2 — Motor isolation: cut drive power, keep sensors alive
+**Status:** CLOSED · 26 August 2026 · **Confirmed on hardware, register level
+and hand-felt**
+
+Board verification (the item R2 was left open for since Session 9) found two
+real bugs on the way, both fixed and confirmed against the real servo:
+
+- **`IsolationService._reconcile()` had the boolean backwards.** Pressing
+  Isolate reported the motor as isolated while the write actually sent to
+  the servo asked it to *restore* torque, and un-isolating cut it — the raw
+  isolated-intent flag was passed straight into `set_torque()`, never
+  negated against that method's own contract (`enabled=True` means
+  restore). Caught by reading register 0x28 back directly — a new
+  diagnostic-only Bridge command, `servo_read_torque` — rather than
+  trusting the write's own acknowledgement.
+- **`ServoController.cpp` checked the wrong failure sentinel on every
+  torque and move write** (`Begin()`, `SetTorque()`, `Move()`):
+  `EnableTorque`/`WritePosEx` return the SCServo library's own Ack()
+  convention (0 fail / 1 success), never -1 — that sentinel belongs to this
+  file's *read* calls, not its writes. A torque write the servo never
+  acknowledged was silently reported as a success regardless. This is why
+  the inversion above was invisible from the UI: isolating still logged a
+  clean acknowledged event no matter what the servo actually did with the
+  write.
+
+Both fixed (`!= -1` → `!= 0`; `set_torque(intent)` → `set_torque(not
+intent)`). Verified live, repeatably, in both directions: register reads 0
+after isolate, 1 after un-isolate — including through an unplanned
+mid-session board restart, which also confirmed ADR-0010's boot re-apply
+(`reason: "boot"` event, torque re-cut before any move could reach the
+servo).
+
+**Also corroborated by hand, at small scale:** a full free-spin test isn't
+possible on this bench (bare servo, no rig, not enough leverage to turn the
+shaft at all - see below), but a small nudge (roughly a tenth of a degree,
+about the most the current setup allows) showed the expected qualitative
+difference repeatably: un-isolated, the shaft resists and corrects back;
+isolated, it stays wherever it was moved. Felt, not measured with an
+independent instrument - real corroboration, not the rigorous multi-turn
+test R2's board-verification list originally wanted.
+
+Also closed in the same delivery, found reviewing the UI live against the
+board:
+- The status chip beside the live angle readout had no LOCKED state
+  (indistinguishable from idle-unlocked); added, ranked below ISOLATED and
+  above MOVING/SETTLING/HOLDING.
+- The `isoHint` countdown text was a permanent line under all three control
+  cubes regardless of state; scoped to show only while locked and not yet
+  isolated, and now names Isolate explicitly.
+- `MotionService.move_to()` checked `is_locked()` before
+  `is_isolated_intent()` and raised immediately, so a servo that was both
+  never told the operator about the isolation half until the lock was
+  cleared and the move retried. New `LockedAndIsolatedError` /
+  `reason="locked_isolated"` names both at once.
+
+**R2's own stated acceptance is now fully confirmed on real hardware**: drive
+power cuts and is visibly shown, telemetry keeps reading throughout, a move
+while isolated is refused with a reason, state is reported correctly, and
+reboot behaviour matches ADR-0010.
+
+**Left explicitly open — see new backlog item T17:** the full-range,
+multi-turn scenario (position tracking surviving a hand-turned shaft under
+real mechanical load) stays untested. The current bench is a bare servo
+with no belt, arm, or lever attached; the small-scale nudge above is real
+evidence but not a substitute for that test. Not the same as "passed" -
+stays open until a rig exists.
+
+**Original report follows.**
+
+**Scope:** in MVP · **Priority:** feature, not critical — must ship with the MVP
+so that MVP testing exercises it.
+
+**Motivation, from the operator directly (25 Aug 2026) — sharper than "the
+mechanical team wanted it":** the board runs at field sites for months.
+Holding the servo energised the whole time costs continuous power and wear
+for no reason once movement isn't needed. Post-MVP (**R4**) the mechanical
+team adds a physical lock — two butterfly screws clamping a 3D-printed arch
+onto the shaft; it already exists today as a manual, unsensed mechanism —
+that holds position by friction, so the motor can rest whenever it's
+engaged. R8 (emergency stop, post-MVP) is expected to compose isolation with
+the digital Lock and the physical lock together for an instant stop.
+
+**Feasible in firmware, no hardware change needed.** `ServoRegisters.h:53`
+defines `kTorqueSwitch = 0x28` — writing 0 disables drive torque while the
+servo's electronics remain powered, so telemetry keeps reading. (Note 128 is
+already used on that register as the set-centre-position command.)
+
+**Relationship to Lock: separate control, but Lock now *triggers* isolation.**
+Digital Lock and motor isolation stay two distinct controls (R4 unifies them
+post-MVP with the physical restraint; R8 may compose them for e-stop) — but
+isolation is not only a direct button press:
+
+- **Manual isolate** — operator presses the isolate cube directly. Executes
+  immediately; motion state does not gate it, deliberately, because this is
+  meant to double as R8's future stop mechanism and refusing it mid-move
+  would defeat that.
+- **Auto-isolate (backup only)** — fires after the digital Lock has been
+  engaged *and* idle for a configurable timeout (`config.py` convention, not
+  hardcoded — D21's lesson). Placeholder default **15 min**, untuned until
+  real-hardware testing with the mechanical team (the dev rig doesn't have
+  the belt mounted yet). Never fires while unlocked — isolating a still-movable
+  servo risks catching the operator mid-task.
+- Not mutually exclusive: pressing isolate manually satisfies the goal
+  immediately; the idle timer only covers "locked but forgot to isolate."
+
+**Un-isolating is always an explicit action** — releasing Lock does not
+auto-clear isolation (would silently re-energise a motor rested on purpose),
+and a move request does not implicitly wake it either.
+
+**Move command while isolated: refused**, mirroring `locked` exactly — new
+`IsolatedError` (`exceptions.py`), checked in `MotionService.move_to()`
+alongside `is_locked()`; `REFUSALS["isolated"] = "refused — motor is
+isolated"` (`app.js`, D14's mechanism).
+
+**Operator-visible state:**
+- Third `.cube`, same pattern as `lockCube`/`calCube` — `Isolate` idle,
+  `Isolated` engaged.
+- Every isolate action (manual or auto) shows a transient notice via the
+  existing `say()` (`app.js:196`), because the software has no way to know
+  the physical lock is actually engaged: *"Motor isolated — physical lock is
+  manual, confirm it's engaged."* (auto variant: *"Motor isolated after
+  idle — physical lock is manual, confirm it's engaged."*)
+- A persistent indicator, not just the transient notice, is also needed so
+  the state isn't missed on a screen that's mostly left open — exact
+  placement against the existing layout is `/deliver`'s to design.
+
+**`ServoStateResponse` — new `isolated: bool` field**, following `locked`'s
+shape exactly: never null on a failed read, since it's DB-stored operator
+intent rather than a servo measurement — the same situation `locked` is
+already in. Recorded in telemetry (own column, like `moving`) and in the R5
+export. The null-on-failed-read question **for the telemetry/export column
+specifically** is left open, deliberately — decide it in `/deliver`'s
+functional-design step, not here.
+
+**Reboot behaviour: latches — see `docs/adr/0010-motor-isolation-state-survives-a-reboot.md`**
+(was `OPEN_QUESTIONS.md` Q4; promoted 25 August 2026).
+
+**Explicitly out of scope for R2 (confirmed 25 August 2026):** sensing the
+physical lock — no hardware exists yet, that's R4. Back-drive/self-locking
+behaviour of the belt under load is the mechanical team's concern, not
+something R2's software hedges against — the existing calibration-on-boot
+flow (ADR-0007) is the safety net for any drift, same as it already is for
+every other source of position doubt.
+
+**Acceptance:** the operator can cut drive power from the UI (manually or via
+the idle backup) and see plainly that it is cut; telemetry keeps reading
+throughout, proving the sensors stayed alive; a move while isolated is
+refused with a message that says why; the state is reported in
+`/servo/state` and recorded in telemetry; reboot behaviour is `ADR-0010`.
+
+**Blocks:** MVP handover. **Wants first:** D14 (done, Session 1 — so the
+refusal reads properly).
+
+---
+
 ## Requirements captured but not yet designed
 

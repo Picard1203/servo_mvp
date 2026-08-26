@@ -20,7 +20,9 @@ more than 5, STOP and report before changing anything.
   About 67 are currently missing it. Class docstrings carry `Attributes:`
   with each attribute typed. **Do not remove or shorten these blocks. Do not
   omit the `(type)` parentheses because the signature is already annotated —
-  this project deliberately keeps them in both places.** Report your count
+  this project deliberately keeps them in both places.**
+  **Exception: omit the `Returns:` block entirely when the function returns
+  `None`** — there is nothing to type or describe. Report your count
   of types added.
 
 **REMOVE:** every explanatory paragraph between the summary and the first

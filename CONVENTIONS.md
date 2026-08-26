@@ -32,6 +32,9 @@ letter of Google's own style guide (which permits dropping it when PEP 484
 annotations are present) — decided 26 August 2026, so it does not get
 "corrected" back to that guidance later.
 
+**Exception: omit the `Returns:` block entirely when the function returns
+`None`.** There is nothing to type or describe, so the block is noise.
+
 **The summary is one line.** If it does not fit one honest sentence, that is
 a signal — weighed under single-responsibility, not a rule on its own — that
 the function may be doing too much and splitting it is worth considering.

@@ -26,7 +26,8 @@ Python task.
 - `@param` and `@return` lines, one per parameter and return value, each
   with a short description of what the value is (not a restated type — C++
   signatures already carry types, unlike the Python docstring blocks in the
-  sibling task).
+  sibling task). **Omit `@return` entirely for a `void` function** — same
+  exception as the Python task's `Returns:` block, nothing to describe.
 
 **REMOVE:** explanatory paragraphs after the summary — the mechanism
 narrative, the reasoning, the incident history, cross-references to other

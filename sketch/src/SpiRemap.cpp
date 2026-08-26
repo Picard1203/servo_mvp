@@ -36,9 +36,9 @@ void SpiRemap::ReleaseTopHeaderCopies() {
 }
 
 void SpiRemap::ApplyJspiMapping() {
-  SetAlternateFunction(3, 1);  // PD1 = JSPI SCK
-  SetAlternateFunction(2, 2);  // PC2 = JSPI MISO
-  SetAlternateFunction(2, 3);  // PC3 = JSPI MOSI
+  SetAlternateFunction(3, 1);
+  SetAlternateFunction(2, 2);
+  SetAlternateFunction(2, 3);
   ReleaseTopHeaderCopies();
 }
 

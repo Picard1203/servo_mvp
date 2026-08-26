@@ -14,7 +14,6 @@
 namespace app {
 namespace {
 
-// Static storage: no heap on the MCU, and the lifetimes are the program's.
 SMS_STS g_driver;
 servo::ServoBus g_bus(g_driver, config::kServoId, config::kBusReadRetries);
 servo::ServoController g_controller(g_bus);
@@ -22,7 +21,6 @@ net::NetworkRelay g_relay(config::kEthernetCsPin, config::kApiPort,
                           config::kRelayChunkBytes);
 api::BridgeApi g_api(g_controller, &g_relay);
 
-// Static network identity. Change to match the deployment subnet.
 const uint8_t kMac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0x01};
 const uint8_t kIp[4] = {192, 168, 10, 60};
 const uint8_t kGateway[4] = {192, 168, 10, 1};
@@ -33,24 +31,18 @@ bool g_servo_ready = false;
 }  // namespace
 
 void App::Begin() {
-  // Before anything else can fail and want to log it. Single-threaded here
-  // (setup(), before Poll() or any Bridge callback can run), so this is the
-  // one safe place to initialise the shared lock without a race.
   diag::DiagLog::Init();
 
   Serial.begin(config::kConsoleBaud);
   const uint32_t started = millis();
   while (!Serial && millis() - started < 2000) {
-    // Give the console a moment to attach, but never block boot on it.
   }
 
   Bridge.begin();
 
-  // The servo bus lives on Serial1 (USART1 on D0/D1). The Router Bridge uses
-  // LPUART1, a separate peripheral, so the two do not collide.
   Serial1.begin(config::kServoBaud);
   g_driver.pSerial = &Serial1;
-  delay(600);  // let the servo finish its own power-up
+  delay(600);
 
   g_servo_ready = g_controller.Begin(
       config::kMultiTurnEnabled, config::kAngleResolution,
@@ -77,17 +69,9 @@ void App::Begin() {
 
 void App::Tick() {
   g_relay.Poll();
-
-  // Drain the diagnostic ring toward the Bridge. Bounded per tick, same
-  // reasoning as the delay() below: a burst of events must never make
-  // loop() spin instead of yield.
   g_api.DrainDiagLog();
 
-  // Yield. The Bridge RPC runs on its own thread; a loop() that spins
-  // without ever giving up the CPU starves it, and servo_read then misses
-  // its deadline and the late reply comes back as an unknown msgid.
-  // One millisecond is far below the relay's latency budget and costs
-  // nothing, but it guarantees the scheduler gets a look in.
+  // Yield to Bridge RPC thread per RELAY_NOTES.md rule 3.
   delay(1);
 }
 

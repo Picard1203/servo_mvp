@@ -2,6 +2,55 @@
 
 Distilled facts, rationale, and implementation details relocated from source docstrings and comments.
 
+## sketch/src/Config.h
+
+- **Bus read retries**: `kBusReadRetries = 4` to handle transient single-register misses on the half-duplex servo bus.
+- **Log ring capacity and drain pacing**: `kLogRingCapacity = 32` absorbs event bursts between `Tick()` drains without consuming RAM; `kMcuLogDrainPerTick = 4` bounds Bridge notifications per pass to ensure `loop()` yields (RELAY_NOTES.md rule 3).
+- **Socket allocations**: W5500 provides 8 hardware sockets; 1 is consumed by the listener and 6 are allocated for client relay slots (`kMaxRelaySockets = 6`), leaving 1 spare.
+
+## sketch/src/LogRing.h
+
+- **String storage in LogRecord**: `LogRecord` stores raw `const char*` pointers expected to reference flash-resident literals (`F(...)`), avoiding dynamic allocation in the ring buffer.
+- **Eviction policy**: When full, `LogRing::Push()` overwrites the oldest entry to retain the freshest state and increments `dropped_total_` to monitor drain lag.
+
+## sketch/src/ServoRegisters.h
+
+- **Torque constant scaling**: `kKgCmPerAmp = 11.0F` derived from the 12V ST3215 model stall rating: `2.7 A * 11.0 kg·cm/A = 29.7 kg·cm` (~30 kg·cm rated stall torque).
+- **Sign bit locations**: STS multi-turn position and speed fields use bit 15 (`kPositionSignBit = 15`), whereas the EEPROM position offset register (0x1F) uses bit 11 (`kOffsetSignBit = 11`).
+
+## sketch/src/DiagLog.h
+
+- **Global sink pattern**: Process-wide static ring and mutex avoids threading references through every subsystem; drained exclusively by `BridgeApi::DrainDiagLog()` from `Tick()` outside locks (RELAY_NOTES.md rule 7 note).
+
+## sketch/src/ServoBus.h / sketch/src/ServoBus.cpp
+
+- **EEPROM write preservation**: `WriteEepromByte` and `WriteEepromWord` read current register values first and return immediately if unchanged, avoiding EEPROM write-cycle wear.
+- **Telemetry refresh failure logging**: `ServoBus::Refresh()` logs `mcu.servo.refresh_failed` as a distinct event rather than folding into byte/word failures because persistent refresh exhaustion indicates bus stalls.
+
+## sketch/src/ServoController.h / sketch/src/ServoController.cpp
+
+- **SCServo Ack return convention trap**: `EnableTorque` and `WritePosEx` return `Ack()`'s 0 (fail) / 1 (success) convention, *never* -1. Comparing against `-1` causes failed writes to be treated as success.
+- **Reachability guard defence-in-depth**: `ServoController::Move()` verifies `0 <= target_counts < 4096` before dispatching to `WritePosEx`, protecting against silent hardware clamping and logging `mcu.servo.move_rejected_out_of_range` if Linux reachability checks failed or diverged.
+- **Re-command before torque enable**: Restoring torque re-commands the current position while torque is still off to prevent the servo from snapping to a stale goal or a manually displaced position upon re-energising.
+- **Position mode invariant**: `ConfigureRange` enforces mode 0 (position mode) for both single-turn and multi-turn; mode 3 (step mode) is relative stepping and invalid for absolute positioning.
+
+## sketch/src/NetworkRelay.h / sketch/src/NetworkRelay.cpp
+
+- **Running total diagnostic args**: In `WriteToClient` and `Poll` rejection logs, event arguments carry running totals (`write_lock_timeouts_`, `rejected_total_`) so offline analysis (`soak_report.py`) can detect dropped log records.
+- **Thread lock and callback sequencing**: `chip_lock_` is always released before invoking `OpenSink`, `ByteSink`, or `CloseSink` callbacks to prevent deadlocking with Bridge thread calls (`net_tx`/`net_shutdown`) (RELAY_NOTES.md rule 7).
+
+## sketch/src/BridgeApi.h / sketch/src/BridgeApi.cpp
+
+- **get_status signature**: `HandleGetStatus` takes zero parameters because Python calls `get_status` without payload; adding a parameter prevents Bridge method binding.
+- **uptime_s roll-over prevention**: `ForwardDiagLog` converts `uptime_ms` to whole seconds before sending via Bridge so that 32-bit integer representations do not overflow after ~24.8 days during extended runs.
+- **Health status diagnostic metrics**: `HandleGetStatus` appends `relay=<conn>/rejected=<rej>` and `diag_dropped=<dropped>` to the health string to surface network exhaustion and log drop metrics to operator health checks.
+- **CentreHere deliberate exclusion**: `CentreHere()` is not exposed across the Bridge because zero calibration is managed in Python/SQLite; exposing it would create competing sources of truth.
+
+## sketch/src/App.h / sketch/src/App.cpp
+
+- **Boot ordering and static allocation**: Static global instances avoid heap allocation on the MCU; `DiagLog::Init()` is invoked first in `App::Begin()` before multi-threaded activity can occur.
+- **UART peripheral separation**: `Serial1` (USART1 on D0/D1) is dedicated to the servo bus while Router Bridge uses `LPUART1`, avoiding hardware peripheral conflict.
+
 ## python/app/core/config.py
 
 - **Settings env_file path**: Configured using an absolute path anchored to `Path(__file__).resolve().parent.parent.parent / ".env"` rather than a relative path, ensuring settings load consistently regardless of working directory (see D8/CLAUDE.md §5 for what a relative path breaks on the board).
@@ -103,3 +152,12 @@ Distilled facts, rationale, and implementation details relocated from source doc
 ## python/static/app.js
 
 **Not touched by T15a** — this file's comments were reverted to their original state after review. `CONVENTIONS.md` has no JavaScript section yet, so there was no decided convention to strip *to*; stripping proceeded anyway on the first run and lost real content (the twin-path telemetry warning, the D9/D16/D25 rendering-logic rationale, the whole XLSX/OOXML verification history) with almost nothing relocated. **T18** establishes JS conventions first; `app.js` gets its own considered pass against that rule, not a byproduct of the Python one.
+
+## sketch/src/ (T15b, 26 August 2026)
+
+Most of what this pass touched was already covered in `skills/uno-q-st3215/SKILL.md` and `sketch/src/RELAY_NOTES.md` — the register-128 collision, the SpiRemap-twice quirk, the dead-zone table, the STS-vs-SC warning, the SetTorque re-command rationale, and the whole relay threading model were all already documented there, often more thoroughly than the removed comments. Genuinely new facts, not previously written down:
+
+- **`ServoRegisters.h`'s provenance**: cross-checked against the SCServo library headers and confirmed by a full register dump from the project's own servo (firmware 3.9 / servo 9.3).
+- **`Config.h`'s `kTorqueLimit = 1000`**: full torque in service — not a reduced/protective value.
+- **`ServoBus.cpp`'s `Refresh()` failure gets its own diagnostic event** (`mcu.servo.refresh_failed`), not folded into the byte/word read failures, because the sampler calls it once a second and exhaustion here is the same signature as the D4/D10 stalls.
+- **`DiagLog::Init()` must be called synchronously, before any thread that could call `Push()` starts** — `App::Begin()` is single-threaded (before `loop()` or any Bridge callback can run), which is what makes it the one safe place to initialise the shared mutex without a race.

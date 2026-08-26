@@ -1,10 +1,3 @@
-// Decoded view of the servo status register (0x41).
-//
-// Bit layout confirmed from the official memory table:
-//   bit0 voltage, bit1 sensor, bit2 temperature, bit3 current,
-//   bit4 angle, bit5 overload.
-//
-// Header-only and Arduino-free so it is unit testable on a dev machine.
 #ifndef SERVO_STATUS_H
 #define SERVO_STATUS_H
 

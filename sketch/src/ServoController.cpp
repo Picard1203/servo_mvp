@@ -35,15 +35,14 @@ bool ServoController::Begin(bool multi_turn, uint8_t angle_resolution,
   ok = SetDeadband(deadband_counts) && ok;
   ok = bus_.WriteWord(reg::kTorqueLimit,
                       static_cast<int16_t>(torque_limit)) && ok;
-  // EnableTorque returns Ack()'s convention (0 fail / 1 success), never -1 -
-  // that sentinel belongs to the *read* calls in this file, not writes.
+  // EnableTorque: 0 fail / 1 success, never -1.
   ok = bus_.driver().EnableTorque(bus_.servo_id(), 1) != 0 && ok;
   return ok;
 }
 
 ServoSnapshot ServoController::ReadSnapshot() {
   ServoSnapshot snapshot;
-  if (!bus_.Refresh()) return snapshot;  // valid stays false
+  if (!bus_.Refresh()) return snapshot;
 
   SMS_STS& driver = bus_.driver();
   const int id = bus_.servo_id();
@@ -58,7 +57,6 @@ ServoSnapshot ServoController::ReadSnapshot() {
   snapshot.torque_kgcm = snapshot.current_a * units::kKgCmPerAmp;
   snapshot.load_duty = static_cast<int16_t>(driver.ReadLoad(id));
 
-  // The status register has no accessor in the library; read it directly.
   const int status = bus_.ReadByte(reg::kStatus);
   if (status >= 0) {
     snapshot.faults = ServoFaults::FromStatusByte(static_cast<uint8_t>(status));
@@ -73,14 +71,8 @@ int32_t ServoController::ReadRawCounts() {
 }
 
 bool ServoController::Move(const MoveCommand& command) {
-  // Defence in depth. The Linux side checks reachability too, but the servo
-  // clamps silently outside its angle limits - it stops early and still
-  // acknowledges - so a bad target must never reach WritePosEx.
   if (command.target_counts < 0 ||
       command.target_counts > static_cast<int32_t>(units::kCountsPerTurn) - 1) {
-    // The Linux side already checks reachability - reaching here means that
-    // check disagreed with this one or was bypassed, which is worth knowing
-    // about on its own, not just silently refusing.
     diag::DiagLog::Push(diag::log_level::kWarn,
                         "Move rejected: target outside one servo turn",
                         "mcu.servo.move_rejected_out_of_range",
@@ -95,8 +87,7 @@ bool ServoController::Move(const MoveCommand& command) {
   uint16_t speed = command.speed_counts_per_second;
   if (speed == 0) speed = 1;
   if (speed > units::kMaxGoalSpeed) speed = units::kMaxGoalSpeed;
-  // WritePosEx returns genWrite()'s Ack() convention (0 fail / 1 success),
-  // never -1 - same sentinel mismatch as EnableTorque below.
+  // WritePosEx: 0 fail / 1 success, never -1.
   return bus_.driver().WritePosEx(bus_.servo_id(), target, speed,
                                   acceleration) != 0;
 }
@@ -142,15 +133,11 @@ bool ServoController::ConfigureRange(bool multi_turn,
              static_cast<uint8_t>(phase) &
                  static_cast<uint8_t>(~kPhaseMultiTurnBit)) && ok;
   }
-  // Position servo mode either way; step mode (3) is relative stepping and
-  // is not what absolute positioning needs.
   ok = bus_.WriteEepromByte(reg::kMode, 0) && ok;
   return ok;
 }
 
 bool ServoController::ClearFault() {
-  // Hardware rule: the overload de-rate is released by the next position
-  // command, so re-commanding where we already are clears it without moving.
   diag::DiagLog::Push(diag::log_level::kInfo,
                       "Fault-clear issued: re-commanding current position",
                       "mcu.servo.fault_clear_issued");
@@ -164,9 +151,6 @@ bool ServoController::CentreHere() {
 bool ServoController::SetTorque(bool enabled) {
   bool ok = true;
   if (enabled) {
-    // Re-command the present position BEFORE re-enabling the drive. Torque
-    // is still off here, so this only updates the goal register - nothing
-    // moves - and the drive has nothing left to correct once it re-engages.
     const int32_t here = ReadRawCounts();
     MoveCommand hold;
     hold.target_counts = here;
@@ -174,8 +158,7 @@ bool ServoController::SetTorque(bool enabled) {
     hold.acceleration = 0;
     ok = Move(hold) && ok;
   }
-  // Same sentinel mismatch as Begin(): Ack()'s convention is 0 fail /
-  // 1 success, never -1.
+  // EnableTorque: 0 fail / 1 success, never -1.
   ok = bus_.driver().EnableTorque(bus_.servo_id(), enabled ? 1 : 0) != 0 &&
        ok;
   return ok;

@@ -1,15 +1,3 @@
-// Conversion between output degrees and raw encoder counts.
-//
-// The belt makes the output turn more slowly than the servo:
-//   output_deg = servo_deg * (30 / 44)
-// One encoder count is 360/4096 = 0.0879 servo degrees, so at the output a
-// single count is 0.0599 degrees. That is the true resolution; the Python
-// side rounds displayed values to 0.06.
-//
-// Direction is applied to BOTH conversions so a reversed mounting stays
-// self-consistent: a value converted to counts and back is unchanged.
-//
-// Header-only and Arduino-free so it is unit testable on a dev machine.
 #ifndef ANGLE_MATH_H
 #define ANGLE_MATH_H
 
@@ -19,9 +7,10 @@ namespace servo {
 
 class AngleConverter {
  public:
-  /// @param counts_per_turn         Encoder counts per servo revolution.
+  /// Constructs an angle converter with the given geometry and direction.
+  /// @param counts_per_turn Encoder counts per servo revolution.
   /// @param servo_deg_per_output_deg Belt ratio, 44/30 for our mechanism.
-  /// @param direction               +1 normal, -1 for a reversed mounting.
+  /// @param direction +1 normal, -1 for a reversed mounting.
   AngleConverter(uint16_t counts_per_turn, float servo_deg_per_output_deg,
                  int8_t direction)
       : counts_per_turn_(counts_per_turn),
@@ -65,26 +54,24 @@ class AngleConverter {
   }
 
   /// Reports whether a count target is inside the servo's physical range.
-  ///
-  /// The servo is configured with angle limits 0..counts_per_turn-1 and
-  /// CLAMPS silently outside them: it stops early and still reports the
-  /// command as accepted. Anything commanding a position must check first,
-  /// or an unreachable target looks like a successful one.
-  ///
   /// @param counts Absolute counts target.
   /// @return True when the servo can actually reach it.
   bool IsCountReachable(int32_t counts) const {
     return counts >= 0 && counts <= static_cast<int32_t>(counts_per_turn_) - 1;
   }
 
+  /// Returns encoder counts per servo revolution.
   /// @return Encoder counts per servo revolution.
   uint16_t counts_per_turn() const { return counts_per_turn_; }
 
+  /// Returns the configured direction, +1 or -1.
   /// @return The configured direction, +1 or -1.
   int8_t direction() const { return direction_; }
 
  private:
   /// Rounds half away from zero without pulling in <cmath>.
+  /// @param value Floating-point value to round.
+  /// @return Value rounded to the nearest integer.
   static int32_t RoundToInt(float value) {
     return static_cast<int32_t>(value >= 0 ? value + 0.5F : value - 0.5F);
   }

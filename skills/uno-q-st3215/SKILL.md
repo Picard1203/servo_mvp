@@ -50,7 +50,9 @@ Arduino compiles `src/` **recursively** and does **no preprocessing** on
 ## 2. The ST3215 servo
 
 Use the **SMS_STS** protocol class. **Never SCSCL** — wrong protocol family for
-this servo.
+this servo, and its register map genuinely differs (e.g. mode sits at offset
+19 in the SC map, 33 in the STS map — the same register number means a
+different thing in each).
 
 ### Register map (the ones that matter)
 
@@ -235,6 +237,19 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
 
 - Payloads are **plain CSV strings** — readable verbatim in a log, which is the
   whole point on a boundary that fails silently.
+- Servo command payload shapes:
+  ```
+  servo_read              ""                        -> snapshot CSV
+  servo_move              "counts,speed,accel"      -> "ok" | "err"
+  servo_stop               ""                        -> "ok" | "err"
+  servo_set_deadband       "counts"                  -> "ok" | "err"
+  servo_configure_range    "multiturn,amplification" -> "ok" | "err"
+  servo_set_torque         "enabled"                 -> "ok" | "err"
+  servo_read_torque        (no payload)              -> "0" | "1" | "err"
+  get_status               (no payload)              -> "ready" | "no-servo"
+  ```
+  `get_status` takes no parameter because Python calls it with no payload at
+  all (the health check) — a `String` parameter on that handler fails to bind.
 - Snapshot fields:
   `valid,counts,moving,temp_c,volt_v,curr_a,torque_kgcm,load,status_bits`
 - **Field 0 is `valid`.** Never discard it. Discarding it is how a failed read

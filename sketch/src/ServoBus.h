@@ -1,7 +1,3 @@
-// Thin, retrying wrapper around the SCServo SMS_STS driver.
-//
-// Everything that touches the serial bus goes through here, which keeps the
-// retry policy and the EEPROM unlock ritual in exactly one place.
 #ifndef SERVO_BUS_H
 #define SERVO_BUS_H
 
@@ -13,9 +9,10 @@ namespace servo {
 
 class ServoBus {
  public:
-  /// @param driver     The SCServo driver, already bound to a serial port.
-  /// @param servo_id   Bus address of the servo.
-  /// @param retries    Read attempts before reporting failure.
+  /// Constructs a servo bus interface with retry handling.
+  /// @param driver The SCServo driver, already bound to a serial port.
+  /// @param servo_id Bus address of the servo.
+  /// @param retries Read attempts before reporting failure.
   ServoBus(SMS_STS& driver, uint8_t servo_id, uint8_t retries);
 
   /// Checks that the servo answers.
@@ -34,27 +31,25 @@ class ServoBus {
 
   /// Writes one byte to a volatile (SRAM) register.
   /// @param address Register address.
-  /// @param value   Value to write.
+  /// @param value Value to write.
   /// @return True on success.
   bool WriteByte(uint8_t address, uint8_t value);
 
   /// Writes two bytes to a volatile (SRAM) register.
   /// @param address Register address of the low byte.
-  /// @param value   Value to write.
+  /// @param value Value to write.
   /// @return True on success.
   bool WriteWord(uint8_t address, int16_t value);
 
   /// Writes one byte to an EEPROM register, unlocking and re-locking.
-  /// Skips the write when the register already holds the value, because
-  /// EEPROM has a finite number of write cycles.
   /// @param address Register address.
-  /// @param value   Value to write.
+  /// @param value Value to write.
   /// @return True on success or when no write was needed.
   bool WriteEepromByte(uint8_t address, uint8_t value);
 
   /// Writes two bytes to an EEPROM register, unlocking and re-locking.
   /// @param address Register address of the low byte.
-  /// @param value   Value to write.
+  /// @param value Value to write.
   /// @return True on success or when no write was needed.
   bool WriteEepromWord(uint8_t address, int16_t value);
 
@@ -62,9 +57,11 @@ class ServoBus {
   /// @return True when the block was read.
   bool Refresh();
 
+  /// Returns the underlying SCServo driver.
   /// @return The driver, for the few calls with no register equivalent.
   SMS_STS& driver() { return driver_; }
 
+  /// Returns the configured bus address.
   /// @return The configured bus address.
   uint8_t servo_id() const { return servo_id_; }
 

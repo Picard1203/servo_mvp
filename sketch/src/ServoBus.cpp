@@ -65,7 +65,7 @@ bool ServoBus::WriteWord(uint8_t address, int16_t value) {
 
 bool ServoBus::WriteEepromByte(uint8_t address, uint8_t value) {
   const int current = ReadByte(address);
-  if (current == static_cast<int>(value)) return true;  // save a write cycle
+  if (current == static_cast<int>(value)) return true;
   driver_.unLockEprom(servo_id_);
   const bool ok = WriteByte(address, value);
   driver_.LockEprom(servo_id_);
@@ -88,9 +88,6 @@ bool ServoBus::Refresh() {
     if (driver_.FeedBack(servo_id_) != -1) return true;
     delay(kRetryDelayMs);
   }
-  // The sampler calls this once a second, so exhaustion here is the same
-  // signature as the D4/D10 stalls - worth its own event, not folded into
-  // the byte/word read failures above.
   diag::DiagLog::Push(diag::log_level::kWarn,
                       "Servo feedback refresh failed after retries",
                       "mcu.servo.refresh_failed",

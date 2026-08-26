@@ -41,37 +41,6 @@ rule itself is in `CLAUDE.md` §4.
 ---
 
 
-### T16 — Enhance `twin-review`: a fifth lens, and lenses made selectable
-**Status:** open · **Raised by:** the operator, 25 August 2026, during R2
-
-Two changes to `skills/twin-review/SKILL.md` (and its installed copy at
-`~/.claude/skills/twin-review/`), decided but not yet made:
-
-1. **A fifth lens, general correctness, composed by reference to
-   `/code-review`** at a chosen effort level (medium by default) — the same
-   composition pattern lens #2 already uses for `operator-lens` ("Load the
-   operator-lens skill for the five questions"). The current four lenses
-   (twin path, operator impact, relay/hardware safety, doc truth) are each
-   specialised; none of them is a general bug hunt, so a plain logic error
-   with no "twin" shape (wrong comparison, off-by-one, a leak with no mirror)
-   can pass all four uncaught.
-2. **Lens selection, not a fixed four (or five).** A small change that
-   touches none of `sketch/`, no error path, no mirror gets no value from
-   the relay-safety or twin-path lenses; forcing every run through all of
-   them regardless of the diff wastes tokens on lenses with nothing to say.
-   Should default to "everything relevant to what changed," not an
-   unconditional fixed set.
-
-**Deliberately deferred, together with actually running the enhanced skill**
-— on the whole app, in one sitting, rather than piecemeal per feature. Includes
-retroactively covering R2's `feature/motor-isolation` diff, which shipped
-without a `twin-review` pass by explicit operator decision (see R2's entry).
-
-**Also raised, not yet scoped:** folding this into `deliver`'s own pipeline
-(`skills/deliver/SKILL.md`) rather than leaving it a manual on-demand step.
-
----
-
 ### T17 — Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested
 **Status:** open · **Raised by:** the operator, 26 August 2026, closing out R2
 

@@ -29,20 +29,23 @@ The only enforced limit anywhere is `kMaxRelaySockets = 6`.
   all and the budget is the remote screens alone. **Unverified. Do not report
   R1 as met on the strength of it.**
 
-**Measured, 8 August 2026 — target not met at 3 operators, cause still open.**
-`synthetic_operator.py` models each operator as 3 independent poll streams
-(state, zeros, events), matching what `app.js` actually does per-tab, not
-the "one connection per screen" assumption above. 3 operators = up to 9
-concurrent streams against 6 slots: **1462 rejections in ~22 minutes**,
-ending in a stall that needed a restart to clear. **1 operator = 3 streams,
-comfortably under the ceiling: only 49 rejections and no oversubscription
-signature** — but the same D4 stall still occurred twice and self-recovered.
-So the socket ceiling explains the rejection *count*, but not the stall
-itself, which reproduces even without oversubscription (see D4). **R1
-cannot be closed by tuning `timeout_keep_alive` alone until D4's reopened
-cause is understood** — a faster slot turnover does not fix a fault that
-also happens with slots to spare. Still unverified: the USB-C/Q9 question
-above, unchanged by tonight's runs (no on-site session was part of either).
+**Measured, 8 August 2026 — target not met at 3 operators, against an
+architecture since replaced.** `synthetic_operator.py` modelled each operator
+as 3 independent poll streams (state, zeros, events), matching what `app.js`
+did per-tab at the time. 3 operators = up to 9 concurrent streams against 6
+slots: **1462 rejections in ~22 minutes**, ending in a stall that needed a
+restart to clear. **1 operator = 3 streams, comfortably under the ceiling:
+only 49 rejections and no oversubscription signature** — but the same D4
+stall still occurred twice and self-recovered.
+
+**Stale as of 11 August 2026 — do not read this measurement as current.**
+Two things changed since: D4 closed (cause and fix in `docs/CLOSED.md`), and
+the SSE migration collapsed those 3 poll streams/operator to 1 stream/operator,
+so "9 concurrent streams for 3 operators" no longer describes what `app.js`
+opens. **R1 is not blocked on D4 any more; it is simply unmeasured against
+the current architecture.** Re-measurement (synthetic, 1 SSE stream/operator)
+is scheduled for session 16 (`../BACKLOG.md`), not repeated here. Still
+unverified regardless: the USB-C/Q9 question above.
 
 ---
 

@@ -6,6 +6,12 @@ verbatim — every rule is checkable without judgement calls.
 Status: **draft**. Derived from the standard used in `Eyal-FastAPI-Project` and
 `Krusty-Crab`, with two deliberate updates noted under *Types*.
 
+**The machine-checkable subset of the Python rules below is encoded in
+`python/ruff.toml`** — run via `ruff check python/app --config
+python/ruff.toml`, advisory only (not part of `tools/verify.py`'s gate).
+Where the two disagree, this file wins — the config is adapted from a general
+personal standard, not written for this repo.
+
 ---
 
 ## Types

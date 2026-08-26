@@ -1,0 +1,43 @@
+target-version = "py314"
+line-length = 80
+
+[lint]
+# A = flake8-builtins: check for shadowing builtins
+# B = flake8-bugbear: find possible bugs and design problems
+# C4 = flake8-comprehensions: write better list/set/dict comprehensions
+# D = pydocstyle: check for docstring conventions (PEP257)
+# E = pycodestyle errors: check for style errors
+# F = pyflakes: check for logical errors
+# I = isort: check for import order
+# PIE = flake8-pie: check for various improvements
+# PLC = Pylint conventions: check for conventions
+# PLE = Pylint errors: check for errors
+# PLW = Pylint warnings: check for warnings
+# RUF = Ruff-specific rules
+# SIM = flake8-simplify: check for simplifications
+# TID = flake8-tidy-imports: check for tidy imports
+# ARG = flake8-unused-arguments: check for unused arguments
+select = ["A", "B", "C4", "D", "E", "F", "I", "PIE", "PLC", "PLE", "PLW", "RUF", "SIM", "TID", "ARG"]
+# E501 (line too long) ignored deliberately, same as the source standard.
+# UP (pyupgrade) is NOT selected above: it would push Optional[X] toward
+# X | None, the opposite of CONVENTIONS.md's Types rule. Do not add it.
+ignore = ["D413", "D203", "D213", "B008", "E501", "SIM108"]
+
+[lint.pydocstyle]
+# CONVENTIONS.md declares Google-format docstrings; the source config
+# (Eyal-FastAPI-Project / Krusty-Crab) never set this, so D-rules defaulted
+# to pydocstyle's convention-less mode. Set explicitly for this repo.
+convention = "google"
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[format]
+# Use double quotes for strings, like Black.
+quote-style = "double"
+# Indent with spaces, rather than tabs, like Black.
+indent-style = "space"
+# Respect magic trailing commas, like Black.
+skip-magic-trailing-comma = false
+# Automatically detect the line ending.
+line-ending = "auto"

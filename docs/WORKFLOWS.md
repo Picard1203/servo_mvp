@@ -220,7 +220,7 @@ Antigravity).
 |---|---|
 | `deliver` | "We need X" → done. Orient on the graph → plan → **one stop for approval** → run the whole thing → verify → update the backlog entry and sweep for doc truth. Board-touching steps always stop and hand over the commands. |
 | `operator-lens` | Walks the control surface as the operator or the receiving team, not the developer. Five questions per control; files findings into `BACKLOG.md` in house format. |
-| `twin-review` | Four parallel reviewers on one diff — twin path, operator impact, relay safety, doc truth. **On demand only.** Iteration cap 2, then escalate. |
+| `twin-review` | Parallel reviewers on a diff or the whole app (chunked) — twin path, operator impact, relay safety, doc truth, general correctness; lenses selected by scope, candidates narrowed by tool before any reviewer reasons. **On demand only.** Iteration cap 2 in diff mode; inventory mode is findings-only, written to `docs/REVIEW_FINDINGS.md`. |
 
 **`grilling`** is not one of these three — it is a generic, non-project-specific
 skill (stress-tests a plan or decision by questioning it relentlessly), used

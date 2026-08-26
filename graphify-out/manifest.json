@@ -445,8 +445,8 @@
     "semantic_hash": "c1bc0257942b52e0574e2cc2e8fb9c39"
   },
   "CLAUDE.md": {
-    "mtime": 1787752489.5227802,
-    "ast_hash": "d2316206f89258354cd1f684fe72a003",
+    "mtime": 1787762617.4379241,
+    "ast_hash": "1e799f7dc1cc9ec3c3bf439262e4d469",
     "semantic_hash": ""
   },
   "CONTEXT.md": {
@@ -485,8 +485,8 @@
     "semantic_hash": "f133bc0d393c42ad9a82836591718be1"
   },
   "python/requirements-dev.txt": {
-    "mtime": 1787573335.3394556,
-    "ast_hash": "c6b1a8c1c61dba51d48d3d13e77e3fa8",
+    "mtime": 1787763595.0525503,
+    "ast_hash": "cb517bb97270de036178a0d9204b6502",
     "semantic_hash": ""
   },
   "python/requirements.txt": {
@@ -520,13 +520,13 @@
     "semantic_hash": ""
   },
   "CONVENTIONS.md": {
-    "mtime": 1787759855.9078054,
-    "ast_hash": "6999250b071d20d4507229b030406a8a",
+    "mtime": 1787763760.355137,
+    "ast_hash": "7b29b173b0271a4d73f6b6494a4053e8",
     "semantic_hash": ""
   },
   "docs/BACKLOG.md": {
-    "mtime": 1787761567.0550165,
-    "ast_hash": "3f88ec1913a48cbd942c10f7364b3b37",
+    "mtime": 1787763787.3914108,
+    "ast_hash": "c9cf9e750aa29ae262c0e2dc8fb68e5b",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -570,8 +570,8 @@
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1787746634.4794035,
-    "ast_hash": "42c77f661c80d7c55b6d0c95fb892217",
+    "mtime": 1787763047.9509697,
+    "ast_hash": "b29d6f97b4f883dda9d418aab30a646f",
     "semantic_hash": ""
   },
   "skills/README.md": {
@@ -610,8 +610,8 @@
     "semantic_hash": ""
   },
   "skills/twin-review/SKILL.md": {
-    "mtime": 1787657042.4780548,
-    "ast_hash": "9606a2ae02315f03b0e6166e180f5289",
+    "mtime": 1787763747.0536747,
+    "ast_hash": "060c2294eb2bdbc5eef861d1bfd843dd",
     "semantic_hash": ""
   },
   "docs/OPEN_QUESTIONS.md": {
@@ -625,8 +625,8 @@
     "semantic_hash": ""
   },
   "docs/CLOSED.md": {
-    "mtime": 1787761536.6411436,
-    "ast_hash": "7bf76814a7a045bc3ce3ea543aa33d07",
+    "mtime": 1787763781.875517,
+    "ast_hash": "a12310996114cb7a10081e9350fccd96",
     "semantic_hash": ""
   },
   "python/app/relay/mcu_log.py": {
@@ -730,13 +730,13 @@
     "semantic_hash": ""
   },
   "docs/backlog/R.md": {
-    "mtime": 1787752314.9454212,
-    "ast_hash": "8b565bb3200121ac44f52f41a763a687",
+    "mtime": 1787762528.662294,
+    "ast_hash": "8fbfe05b6928315c1b19659b75f97efd",
     "semantic_hash": ""
   },
   "docs/backlog/T.md": {
-    "mtime": 1787761514.196136,
-    "ast_hash": "cf2e81a0283f83405876bc9c7f39075c",
+    "mtime": 1787763097.3497853,
+    "ast_hash": "37c5be207eb23c43ca7e6d829535b6ce",
     "semantic_hash": ""
   },
   "docs/handoff/antigravity-firmware-prose-strip.md": {

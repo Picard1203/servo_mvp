@@ -84,7 +84,8 @@ see `WORKFLOWS.md` W8):
 - **`deliver`** — "we need X" → done. One stop at the plan, then the full run.
 - **`operator-lens`** — sees the system as the operator and the receiving team
   do. Run it before planning anything they can see.
-- **`twin-review`** — four parallel reviewers on one diff. On demand only.
+- **`twin-review`** — parallel reviewers, several lenses, on a diff or the
+  whole app. On demand only.
 
 One fact lives in exactly one file. If you find the same fact in two places, that
 is a defect — fix it rather than updating one copy.

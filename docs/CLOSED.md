@@ -2137,3 +2137,80 @@ genuinely load-bearing rationale relocated to the matching `docs/adr/` entry,
 
 **Related:** T1 (mechanical `CONVENTIONS.md` gaps, different axis), CLAUDE.md
 §4's "write every document distilled" rule (same cost, different location).
+
+---
+
+### T16 — Enhance `twin-review`: a fifth lens, and lenses made selectable
+**Status:** CLOSED · 26 August 2026 · **Severity:** open (enhancement)
+
+Went further than the two scoped changes once it became clear the skill, as
+written, was diff-only and would not survive being pointed at the whole app in
+session 14 — restructured, not just extended:
+
+- **Lens 5, general correctness**, composed by reference (`Skill` tool,
+  `code-review`, medium effort) rather than reimplemented — catches
+  non-twin-shaped bugs the other four can't.
+- **Scope: diff or inventory mode**, the latter chunked (`python/app/`,
+  `sketch/src/`, `python/static/`, `docs/`) so no reviewer is ever handed the
+  whole codebase; graphify's known `.ino`/`.css` blind spots are named, not
+  silently skipped.
+- **Lens selection** generalized from lens 3's existing conditional — a
+  diff-mode cost control; inventory mode runs every applicable lens per chunk.
+- **Lens 4 was stale and fixed**: it pointed at "the three verification
+  numbers in the docs," but `verify.py` runs four now and the counts live in
+  `verify_baseline.json` — exactly the D24 rot this lens exists to catch.
+- **Cost control moved from output-trimming to input-narrowing**, after a web
+  check of current practice confirmed the approach (deterministic pre-filter,
+  then LLM judgment only on what's left) over the first draft's "cap yourself"
+  instruction, which risked losing real findings on session 14's first-ever
+  whole-app pass. Each lens now names a concrete `grep`/`graphify`/existing-tool
+  query to build its candidate list before any reviewer reads source.
+- **Output contract added**: inventory mode writes to `docs/REVIEW_FINDINGS.md`
+  (file:line, issue, why it matters, severity, fix) — session 15 has no memory
+  of the run, so findings must be self-contained; the file is a transient
+  triage input, not a second backlog.
+- Iteration cap 2 scoped to diff mode only; inventory mode is findings-only.
+- Synced to `~/.claude/skills/twin-review/` and `~/.agents/skills/`; "four" /
+  "one diff" wording dropped from `CLAUDE.md` and `WORKFLOWS.md`'s summaries
+  per D24 (don't quote a count that will go stale).
+
+**Deferred, unchanged:** actually running it on the whole app (session 14,
+`BACKLOG.md`), and folding it into `deliver`'s pipeline (not yet scoped).
+
+**Related:** D24, R2 (raised it), session 14/15 (`BACKLOG.md`).
+
+---
+
+### T19 — Add `ruff` as an advisory Python lint pass, wired into `twin-review`
+**Status:** CLOSED · 26 August 2026 · **Severity:** open (enhancement)
+
+Raised alongside T16: the user has a personally-refined ruff standard on the
+air-gapped network, unexportable; the closest reachable copy was found in
+`~/Coding Projects/Krusty-Crab/pyproject.toml` (most recent of three near-
+identical copies across `Eyal-FastAPI-Project`, `Krusty-Crab`, `Krusty-Crab-
+backup` — the same lineage `CONVENTIONS.md` itself was derived from).
+
+**Adapted, not copied verbatim** — two real corrections against this repo:
+- `[lint.pydocstyle] convention = "google"` added; the source config never
+  set it, so `D`-rules would not actually validate the Google format
+  `CONVENTIONS.md` declares.
+- `UP` (pyupgrade) deliberately **not** selected — it would push
+  `Optional[X]` toward `X | None`, the opposite of `CONVENTIONS.md`'s Types
+  rule. Dropped the Krusty-Crab-specific `[project]` table, its per-file
+  `logging/__init__.py` ignore (no such module here), and the misplaced
+  `fixable = ["ALL"]` (nested under `per-file-ignores`, a no-op in the
+  source; also unwanted while advisory-only means no default auto-fix).
+
+**Advisory only, not part of `tools/verify.py`'s gate** (per the operator) —
+runs against `python/app/`, baseline is 50 findings (`ruff check python/app
+--config python/ruff.toml --statistics`), all plausible (13 `D107`
+undocumented `__init__`, matching `CONVENTIONS.md`'s own noted gap; 11 `D104`
+undocumented packages; 10 `ARG001` unused arguments; the rest cleanup-shaped).
+**Where ruff and `CONVENTIONS.md` disagree, `CONVENTIONS.md` wins** — stated
+in both `CONVENTIONS.md` and the skill.
+
+Wired into `twin-review` (lenses 1, 4, 5) as a pre-pass for the backend
+chunk — narrows what needs LLM judgment, same principle T16 already applied.
+`ruff` added to `python/requirements-dev.txt`; config at `python/ruff.toml`.
+
+**Related:** T16, CONVENTIONS.md.

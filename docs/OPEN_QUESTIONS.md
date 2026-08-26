@@ -17,8 +17,8 @@ the consequence into the item it blocks, and say who answered.
 
 ## For the operators
 
-### Q1 — What screen will you actually use? `half answered`
-**Blocks:** D7, and the layout half of D17. **No longer blocks D15.**
+### Q1 — What screen will you actually use? `answered`
+**Blocks:** nothing now — see D7's updated acceptance criteria.
 
 **The touch half is answered by the operator, 8 August 2026: it is not a touch
 screen.** D15 was therefore designed for a pointer — the busy control uses
@@ -26,13 +26,11 @@ screen.** D15 was therefore designed for a pointer — the busy control uses
 to revisit if that ever changes. Recorded because it is the kind of assumption
 that gets silently inherited.
 
-**The viewport half is still open, and D7 is still blocked on it.** The
-mechanical/ops discussion mentioned an iPad-class size; the exact model was
-never recorded, and "not touch" does not settle the pixels — a wall-mounted
-panel and a laptop are both pointer-driven and lay out nothing alike. The
-layout has still only ever been eyeballed through devtools.
-
-*Still needed:* the device, or failing that the viewport in pixels.
+**The viewport half, 26 August 2026: operator recalls iPad mini but isn't
+sure, and decided the exact device isn't worth blocking on.** Verifying
+against one unconfirmed model buys false precision; a responsive range covers
+the uncertainty at no extra cost. D7's acceptance criteria changed
+accordingly — see `docs/backlog/D.md`.
 
 ### Q2 — How many operators at once, really, and doing what? `answered`
 **Answered by the operator, 8 August 2026.**

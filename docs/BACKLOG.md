@@ -40,9 +40,9 @@ session** (context-reset unit), not a calendar day.
 conventions + `app.js` split, after the demo). **T17** (mechanical rig,
 independent track near Monday's mechanical session — does not gate the demo).
 
-**Open:** D7 is blocked on Q1's viewport half — if the demo runs on a laptop
-or projector rather than the operator's real screen, D7 is not on this list
-at all.
+**D7** is unblocked (Q1 answered 26 Aug — responsive range, not an exact
+device) but still not on this path; it can be picked up whenever, independent
+of the demo sessions.
 
 Full reasoning for this sequence: see the plan this table was built from,
 or ask — it is not re-derived here to keep this table short.
@@ -70,7 +70,7 @@ or ask — it is not re-derived here to keep this table short.
 |---|---|---|
 | D5 | Log output dominated by connect/disconnect noise, phrasing not useful | open · medium |
 | D6 | App load time is sometimes slow (chunk-size half closed) | open · medium |
-| D7 | UI not verified on small operator screens | open · medium · blocked on Q1 |
+| D7 | UI not verified on small operator screens | open · medium |
 | D12 | No way to return to the datum after activating a saved zero | open · medium |
 | D17 | Position bar can't show the negative half of travel | open · medium |
 | D19 | Saved positions listed against a baseline of 0 when no zero is active | open · medium · needs confirmation |

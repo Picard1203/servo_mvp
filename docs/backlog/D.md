@@ -187,20 +187,21 @@ again.
 ---
 
 ### D7 — UI is not verified on small operator screens
-**Status:** open · **Severity:** medium · **still blocked on Q1**
+**Status:** open · **Severity:** medium
 
 **Narrowed 8 August 2026: it is not a touch screen** (operator, answering the
 touch half of Q1). That settles the *interaction* model — and D15 was designed
-against it — but not the size. A wall panel and a laptop are both
-pointer-driven and lay out nothing alike, so **the viewport is still the
-blocker.**
+against it.
 
-Operator screens may be small; the mechanical/ops discussion mentioned an
-iPad-class size (exact model not recorded). The layout has only been eyeballed
-through devtools.
+**26 August 2026: no longer blocked on an exact device.** The operator recalls
+iPad mini but isn't certain, and decided against blocking on a device that
+can't be confirmed. Target a responsive range instead: **768–1024px width**
+(iPad mini portrait/landscape) up through common laptop widths, degrading
+gracefully outside it rather than breaking.
 
-**Acceptance:** target viewport size confirmed with the operators and written
-down here, then the UI verified and fixed at that size.
+**Acceptance:** UI verified via devtools responsive mode at 768px, 1024px, and
+one laptop width (e.g. 1366px); layout fixed at any width in that range that
+breaks rather than degrades.
 
 ---
 

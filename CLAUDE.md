@@ -48,7 +48,7 @@ Read in this order. Each answers a different question.
 |---|---|---|
 | 1 | `CLAUDE.md` (this) | How do I work here? |
 | 2 | `docs/PROJECT_STATE.md` | Where is the project right now? |
-| 3 | `docs/BACKLOG.md` | **What do I do next?** ← the work queue |
+| 3 | `docs/BACKLOG.md` | **What do I do next?** ← the work queue (index only; open `docs/backlog/D.md`/`T.md`/`R.md` for just the item you're picking up) |
 | 3b | `docs/WORKFLOWS.md` | **How do I do it?** ← skill + flow per item |
 | 3c | `docs/OPEN_QUESTIONS.md` | What is blocked on a human answer? ← ask these together |
 | 4 | `CONTEXT.md` | What do the words mean? (glossary only) |

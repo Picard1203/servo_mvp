@@ -25,11 +25,62 @@ def find_zeros(self, name: str, limit: int) -> Optional[list[ZeroReference]]:
 
 ## Docstrings
 
-Google format. **`Args:` and `Returns:` always carry the type in parentheses.**
+Google format. **`Args:` and `Returns:` always carry the type in parentheses
+— never omit `(type)` on the theory that the signature is already annotated.
+This project deliberately keeps the type in both places**, against the
+letter of Google's own style guide (which permits dropping it when PEP 484
+annotations are present) — decided 26 August 2026, so it does not get
+"corrected" back to that guidance later.
 
-Keep them short. No long paragraphs — if a docstring needs three sentences of
-prose to explain the mechanism, the explanation belongs in a comment at the
-relevant line, not in the docstring.
+**The summary is one line.** If it does not fit one honest sentence, that is
+a signal — weighed under single-responsibility, not a rule on its own — that
+the function may be doing too much and splitting it is worth considering.
+
+**No explanatory paragraphs.** No rationale, no mechanism narrative, no
+project history, no incident references, in the docstring. That belongs in
+`docs/` (an ADR, `AUDIT.md`, `CLOSED.md`, or `skills/uno-q-st3215/SKILL.md`
+for hardware behaviour), in the fuller form it deserves there — not
+compressed into source. **Decided 26 August 2026, replacing the previous
+rule** ("push the explanation into a comment at the relevant line"), which is
+exactly what produced a codebase where docstrings and comments outweighed
+code.
+
+Before / after:
+
+```python
+# Before
+def set_torque(self, enabled: bool) -> bool:
+    """Cut or restore drive torque without disturbing telemetry.
+
+    Isolation exists to reduce wear at an unattended field site: the servo's
+    electronics and sensors stay powered while the drive motor rests. This
+    was decided under ADR-0010 after the operator asked whether isolation
+    should survive a reboot...
+
+    Args:
+        enabled (bool): True to restore drive torque, false to cut it.
+
+    Returns:
+        bool: True when every step the servo answered to succeeded.
+    """
+
+# After
+def set_torque(self, enabled: bool) -> bool:
+    """Cut or restore drive torque without disturbing telemetry.
+
+    Args:
+        enabled (bool): True to restore drive torque, false to cut it.
+
+    Returns:
+        bool: True when every step the servo answered to succeeded.
+    """
+```
+
+**Relocation is not a mechanical copy.** Check first whether `docs/` already
+says it — the reboot-latch reasoning above, for instance, is already written
+in `docs/adr/0010-motor-isolation-state-survives-a-reboot.md`, so the removed
+paragraph here is simply deleted, not copied again. Only genuinely new
+rationale gets added, in distilled form, to the matching doc. See T15.
 
 ```python
 def get_zero_by_name(self, name: str) -> Optional[ZeroReference]:
@@ -79,6 +130,15 @@ self._zeros = zeros                                 # this repo today
 
 The annotation goes on, even though the constructor signature already types the
 parameter.
+
+### Inline comments
+
+**None.** Zero `#` comments in `python/app/`, decided the same session as
+the docstring rule above, for the same reason: a comment carrying real
+rationale is exactly the kind of "insider information" that belongs in
+`docs/`, not source, and a comment carrying no rationale is noise. The
+narrow exceptions are tool directives (`# type: ignore`, `# noqa`,
+`# pragma: no cover`), shebangs, encoding declarations, and licence headers.
 
 ## Imports
 
@@ -255,9 +315,27 @@ not "no `while`".
 
 **C++-specific:**
 
-- Doxygen-style `///` comments on every public method — one line of summary,
-  then `@param` and `@return`. This is the C++ analogue of the Google docstring,
-  and `sketch/src/` already uses `///`.
+- Doxygen-style `///` (or `/** */`) comments on every public method — one
+  line of summary, then `@param` and `@return`, each with a short
+  description of the value, not a restated type. This is the C++ analogue of
+  the Google docstring, and `sketch/src/` already uses `///`.
+- **Doc comments live in the header (`.h`), not the `.cpp`.** The header is
+  the public interface; the implementation file states what a line does only
+  where it is genuinely not obvious, never why in prose.
+- **Same explanatory-paragraph rule as Python, decided the same session, 26
+  August 2026**: the summary plus `@param`/`@return` is all that stays. No
+  mechanism narrative, no incident history, no rationale paragraph. That
+  content is relocated **only if it is not already written down** — check
+  `docs/adr/`, `AUDIT.md`, `CLOSED.md`, and (for hardware/servo behaviour)
+  `skills/uno-q-st3215/SKILL.md` first; add it, distilled, only where it is
+  genuinely missing, never as a reflex copy. Comments explain *why* a line
+  exists when it is not obvious from the code; they never restate *what* the
+  line does.
+- **No inline comments beyond that**, same exception list as Python
+  (tool/compiler directives, licence headers) — with one addition specific
+  to this codebase: a comment that exists purely to flag a `RELAY_NOTES.md`
+  rule at the call site stays, but as a one-line pointer naming the rule,
+  not a restatement of it.
 - `constexpr` over `#define` for constants — `Config.h` already does this.
 - Pass by `const&` for anything larger than a machine word; mark methods `const`
   when they do not mutate.
@@ -287,4 +365,6 @@ Measured over `python/app/`:
 | `X \| None` unions | 0 |
 
 The codebase is close to the standard already. The docstring types are the bulk
-of the work and are mechanical.
+of the work and are mechanical. Run alongside T15's prose strip (same
+Antigravity pass, `docs/handoff/antigravity-python-prose-strip.md`) rather
+than as a separate session, since both touch the same docstrings.

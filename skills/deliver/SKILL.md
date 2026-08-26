@@ -33,9 +33,12 @@ pointed at them. Pass this rule to every sub-agent you dispatch.
 
 ## Phase 0 — Orient (cheap, no approval needed)
 
-1. **Read the backlog entry verbatim.** `docs/BACKLOG.md` is the only list of open
-   work. The entry's *Original report follows* section is usually where the real
-   reasoning lives — read it, do not skim to the acceptance line.
+1. **Read the backlog entry verbatim.** `docs/BACKLOG.md` is the index of all
+   open work; find the item there, then open its full entry in
+   `docs/backlog/D.md`, `T.md`, or `R.md` (whichever letter it starts with) —
+   read only that one file, not all three. The entry's *Original report
+   follows* section is usually where the real reasoning lives — read it, do
+   not skim to the acceptance line.
 2. **Read the flow** if the entry names one (`WORKFLOWS.md` W1–W7).
 3. **Check for an ADR that governs it** (`docs/adr/`). If your change contradicts
    one, say so out loud — *"Contradicts ADR-000N because…"* — and do not silently
@@ -87,7 +90,8 @@ On go-ahead, execute the whole plan without further prompting. Use
 - **Test-first where the code is testable.** Use the `tdd` skill. RED must
   actually fail for the stated reason before you write GREEN.
 - **Never bundle unrelated changes into a fix.** If you spot something else,
-  write it into `BACKLOG.md` as a new item and carry on.
+  add it as a new entry in the right detail file (`docs/backlog/D.md`/`T.md`/
+  `R.md`) and a one-line row in `BACKLOG.md`'s index, then carry on.
 - **Use the glossary's words** (`CONTEXT.md`): `timestamp` never `ts`, `count`
   never `tick`, `datum` never `home`. In code, tests, commits and the backlog.
 - **Follow `CONVENTIONS.md`.** Where it marks something undecided, ask rather
@@ -139,9 +143,13 @@ graphify update .
 
 ## Phase 5 — Record, or it is not done
 
-1. **Update the `BACKLOG.md` entry.** An item is not done until its entry says
-   so, with the date and what closed it. Keep the original report below a
-   *Original report follows* line — the reasoning is the record.
+1. **Update the entry in its detail file** (`docs/backlog/D.md`/`T.md`/`R.md`).
+   An item is not done until its entry says so, with the date and what
+   closed it. Keep the original report below a *Original report follows*
+   line — the reasoning is the record. If it is fully closed, cut the whole
+   entry and paste it into `docs/CLOSED.md`, then update its one-line row in
+   `BACKLOG.md`'s index (move it from the open table to the Closed index
+   table there).
 2. **Doc-truth sweep.** One fact lives in exactly one file. If the change moved a
    number or a path, find every copy and fix them together; two copies of one
    fact is a defect, not a housekeeping matter.

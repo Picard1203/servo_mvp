@@ -166,20 +166,29 @@ run mentioned in T9 implies one exists.
 *Needed:* the date, or confirmation that there is not one. A cut line without a
 date is a preference; with one it is a plan.
 
-### Q10 — Should code-level docs/comments carry rationale, or move to `docs/`? `open`
-**Blocks:** T15.
+### Q10 — Should code-level docs/comments carry rationale, or move to `docs/`? `answered`
+**Answered by the operator, 26 August 2026.**
 
-The operator's read (24 August 2026, `BACKLOG.md` T15): current docstrings and
-inline comments are too long, contain disapproved-of inline comments, and carry
-"insider information" — project history, rationale, incident narrative — that
-belongs in `docs/` markdown, not source. This directly contradicts current,
-deliberate policy: `CONVENTIONS.md` (Docstrings, ~L30) says the opposite, and
-the repo's own defect history (`AUDIT.md`, D2, D9) has cases where exactly this
-kind of in-line "why" comment is what stopped the same mistake recurring
-nearby.
+> *"Anything a function or a class wants to say is in the one-liner at the
+> start of the function. If you can't put the description of the function
+> in one line, consider splitting the function — under SOLID, and in
+> general, functions should be single-responsibility. The logic behind* why
+> *is more suited to the docs in the heavier manner, but removing the
+> inline comments is something that 100% needs to happen, whether it goes
+> to `docs/` or not."*
 
-*Needed:* which failure mode the project would rather risk — verbose in-code
-narrative taxing every session's token budget, or a repeated mistake because
-the rationale that would have stopped it lived only in a doc nobody was
-reading at the moment of the edit. Whichever way it goes, `CONVENTIONS.md`'s
-Docstrings section gets rewritten to match before T15's full-repo pass starts.
+**Decided:** the docstring summary line and the typed `Args:`/`Returns:`/
+`Raises:`/`Attributes:` blocks stay and get completed (types were never the
+problem). The explanatory paragraph in between, and every inline comment,
+go — **not deleted outright: relocated with judgment, and only where the
+content is not already written down.** Each is checked against `docs/` (ADR,
+`AUDIT.md`, `CLOSED.md`, or `skills/uno-q-st3215/SKILL.md`) first; genuinely
+missing rationale is added there, distilled — content already covered is
+simply deleted, not duplicated. This is not a naive copy-paste pass; see
+T15's scope for how the Antigravity prompt states it. A docstring that
+cannot fit one honest summary line is a signal worth reporting, weighed
+under single-responsibility — not a rule that forces a split on its own.
+
+`CONVENTIONS.md`'s Docstrings section and C++ section are rewritten to this
+rule (26 August 2026). T15 unblocked; see its entry for the two-session
+Antigravity split.

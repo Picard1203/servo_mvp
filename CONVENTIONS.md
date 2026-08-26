@@ -35,6 +35,18 @@ annotations are present) — decided 26 August 2026, so it does not get
 **Exception: omit the `Returns:` block entirely when the function returns
 `None`.** There is nothing to type or describe, so the block is noise.
 
+**Every entry inside `Args:` / `Returns:` / `Raises:` / `Attributes:` is one
+line** — `name (type): description.`, same reasoning as the summary line
+above. A wrapped, multi-line entry should be rare, not the routine it is
+today; if a description genuinely cannot fit one line, shorten the
+description rather than wrapping it, and only let it run to a second line
+when even that fails.
+
+**`Attributes:` gets the same `(type)` treatment as `Args:`/`Returns:` —
+every attribute typed, no exceptions.** There was no reason this was ever
+different; complete it wherever it is missing, the same pass that completes
+`Args:`/`Returns:`.
+
 **The summary is one line.** If it does not fit one honest sentence, that is
 a signal — weighed under single-responsibility, not a rule on its own — that
 the function may be doing too much and splitting it is worth considering.

@@ -5,7 +5,6 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# python/.env - two levels up from app/core/config.py
 _ENV_FILE = pathlib.Path(__file__).resolve().parents[2] / ".env"
 
 
@@ -13,92 +12,43 @@ class Settings(BaseSettings):
     """Backend configuration, overridable via environment or .env.
 
     Attributes:
-        app_name: Human-readable service name.
-        version: Service version, surfaced in /health.
-        api_host: Bind address for uvicorn; localhost only (the relay and
-            adb port-forward are the two doors to the service).
-        api_port: FastAPI port; must match the sketch listen port.
-        relay_chunk_bytes: Max payload per Bridge message; must match the
-            sketch and stay under the Bridge frame limit (128 verified).
-        db_path: SQLite database file path on the board.
-        log_file: JSON-lines log file path.
-        log_level: Minimum log level.
-        mcu_log_file: JSON-lines file for events forwarded from the MCU
-            side (backlog D3). Deliberately separate from log_file: the two
-            sources are sized and rotated independently, so a volume spike
-            on one side cannot evict the other's history, and either file
-            can be included or dropped from a handover bundle on its own.
-        mcu_log_max_bytes: Rotation threshold for mcu_log_file. This file is
-            written directly, not through Logger461 - see
-            app/relay/mcu_log.py - so its rotation is explicit rather than
-            inherited from the main logger's configuration.
-        event_buffer_size: Number of recent events kept for the UI.
-        counts_per_turn: Encoder counts per full servo turn.
-        servo_deg_per_output_deg: Belt ratio 44:30 expressed as servo
-            degrees required per one output degree.
-        output_min_deg: Lower output soft limit.
-        output_max_deg: Upper output soft limit.
-        output_step_deg: Commanded-angle granularity.
-        default_speed_dps: Default output speed, degrees/second.
-        max_speed_dps: Maximum accepted output speed.
-        settling_seconds: Seconds a move waits after a lock-state change so
-            the physical lock settles before motion.
-        guard_move_to_lock: When True, lock changes are refused while a
-            move is in progress; default False until mechanics decide.
-        use_hardware_servo: When True the real servo is driven through
-            the MCU Bridge; when False the simulator is used. Default
-            False so the test suite and the dev machine need no
-            hardware; the board turns it on in its .env.
-        servo_direction: +1 or -1. Inverts the sense of commanded motion
-            when the servo is mounted reversed relative to the output.
-            Bench-confirmed +1 for our mounting.
-        multi_turn_enabled: When True the startup path configures the servo
-            for multi-turn absolute positioning (angle limits 0, angle
-            resolution amplification, phase BIT4). Not needed while the
-            travel window fits inside one servo turn; kept so a wider
-            window can be enabled without code changes.
-        angle_resolution: Angle-resolution amplification factor, 1..3. Only
-            meaningful with multi_turn_enabled. Higher values widen the
-            range but coarsen every step by the same factor.
-        servo_deadband_counts: Servo dead-zone width in encoder counts
-            (firmware default 10 = ~0.6 deg at the output). Written to the
-            servo's dead-zone registers in sprint 2; the simulator honors
-            it now. Lower = finer positioning, too low = hunting.
-        default_acceleration: Servo acceleration parameter (native
-            WritePosEx units, 0-254) used when a move does not specify one.
-        max_acceleration: Upper bound accepted for acceleration.
-        fine_approach_enabled: When True, moves arrive from a consistent
-            (positive) direction to cancel belt backlash: targets below
-            the current position are approached by overshooting low, then
-            coming back up.
-        fine_approach_overshoot_deg: How far below the target the
-            overshoot leg goes, in output degrees.
-        fine_approach_timeout_seconds: Safety timeout for the overshoot
-            leg before the final leg is commanded anyway.
-        sampler_interval_seconds: Telemetry persistence period.
-        telemetry_retention_days: Telemetry rows older than this are purged.
-        telemetry_purge_interval_seconds: How often retention runs.
-        export_max_rows: Defensive ceiling for a single binary export
-            query, not a practical limit - the day-per-sheet XLSX design
-            removes the reason to cap this near the real data volume.
-            Set well above what 30-day retention can ever hold
-            (5.18M rows at 0.5s sampling), only to stop a truly
-            pathological request (e.g. an accidental from=0).
-        isolation_idle_timeout_s: Seconds the digital lock must stay
-            continuously engaged before motor isolation auto-engages as a
-            backup (backlog R2). Manual isolate is the primary path and
-            is not gated by this at all; this timer only catches "locked
-            but forgot to isolate." Placeholder value, untuned until
-            bench testing with the mechanical team - the dev rig does
-            not have the belt mounted yet.
+        app_name (str): Human-readable service name.
+        version (str): Service version surfaced in /health.
+        api_host (str): Bind address for uvicorn service.
+        api_port (int): FastAPI service port.
+        relay_chunk_bytes (int): Maximum payload bytes per Bridge message.
+        db_path (str): SQLite database file path.
+        log_file (str): Application JSON-lines log file path.
+        log_level (str): Minimum logging severity level.
+        mcu_log_file (str): MCU diagnostic JSON-lines log file path.
+        mcu_log_max_bytes (int): Rotation size threshold for MCU log file.
+        event_buffer_size (int): Number of recent events stored for UI.
+        counts_per_turn (int): Encoder counts per full servo revolution.
+        servo_deg_per_output_deg (float): Ratio in servo deg per output deg.
+        output_min_deg (float): Minimum allowable output angle limit.
+        output_max_deg (float): Maximum allowable output angle limit.
+        output_step_deg (float): Commanded angle resolution step.
+        default_speed_dps (float): Default speed in output deg per second.
+        max_speed_dps (float): Maximum allowable speed in deg per second.
+        servo_direction (int): Motion direction multiplier (+1 or -1).
+        use_hardware_servo (bool): True for hardware servo, False for mock.
+        multi_turn_enabled (bool): True for multi-turn servo positioning.
+        angle_resolution (int): Multi-turn resolution amplification factor.
+        settling_seconds (float): Settle delay before commencing motion.
+        guard_move_to_lock (bool): True to refuse lock changes while moving.
+        servo_deadband_counts (int): Dead-zone threshold in encoder counts.
+        default_acceleration (int): Default servo acceleration parameter.
+        max_acceleration (int): Maximum allowable acceleration parameter.
+        fine_approach_enabled (bool): True to enable anti-backlash approach.
+        fine_approach_overshoot_deg (float): Overshoot angle in output degrees.
+        fine_approach_timeout_seconds (float): Timeout for overshoot approach.
+        sampler_interval_seconds (float): Telemetry sampling interval.
+        telemetry_retention_days (int): Telemetry retention window in days.
+        telemetry_purge_interval_seconds (float): Retention purge interval.
+        export_max_rows (int): Maximum row limit for telemetry exports.
+        isolation_idle_timeout_s (float): Inactivity timeout for isolation.
     """
 
-    # ABSOLUTE path, anchored to this module. A relative "env_file" is
-    # resolved against the process working directory, and on the board the
-    # app runs inside a container whose CWD is not python/ - so a .env
-    # sitting next to main.py was silently never read, and every setting
-    # quietly fell back to its default (including use_hardware_servo, which
-    # left the simulator driving while the real servo never moved).
     model_config = SettingsConfigDict(env_file=_ENV_FILE,
                                       env_file_encoding="utf-8",
                                       extra="ignore")
@@ -116,26 +66,15 @@ class Settings(BaseSettings):
     event_buffer_size: int = 200
     counts_per_turn: int = 4096
     servo_deg_per_output_deg: float = 44.0 / 30.0
-    # Travel window. Bench-confirmed default is the +/-90 deg the operators
-    # asked for: 180 deg output = 264 servo deg = 3004 counts, which fits
-    # inside ONE servo turn (4096) with room to spare. Widen these two
-    # numbers alone to change the window; if the span ever needs more than
-    # one servo turn, also set multi_turn_enabled.
     output_min_deg: float = -90.0
     output_max_deg: float = 90.0
-    # One encoder count at the output = (360/4096) * (30/44) = 0.0599 deg.
-    # 0.06 is that value rounded; commands are absolute so there is no
-    # accumulating drift - each target rounds to the nearest count.
     output_step_deg: float = 0.06
     default_speed_dps: float = 30.0
-    # Measured ceiling: the servo saturates near 1100 counts/s regardless of
-    # the commanded value, which is ~66 deg/s at the output. 60 keeps the
-    # accepted range inside what the hardware can actually deliver.
     max_speed_dps: float = 60.0
-    servo_direction: int = 1        # +1 or -1; bench-confirmed +1
-    use_hardware_servo: bool = False  # True on the board
+    servo_direction: int = 1
+    use_hardware_servo: bool = False
     multi_turn_enabled: bool = False
-    angle_resolution: int = 1       # 1..3; only meaningful with multi-turn
+    angle_resolution: int = 1
     settling_seconds: float = 1.5
     guard_move_to_lock: bool = False
     servo_deadband_counts: int = 0
@@ -148,14 +87,14 @@ class Settings(BaseSettings):
     telemetry_retention_days: int = 30
     telemetry_purge_interval_seconds: float = 3600.0
     export_max_rows: int = 10_000_000
-    isolation_idle_timeout_s: float = 900.0  # 15 min, placeholder - R2
+    isolation_idle_timeout_s: float = 900.0
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """Returns the singleton settings instance.
+    """Returns the process-wide settings singleton.
 
     Returns:
-        The process-wide Settings, constructed once and cached.
+        Settings: The cached settings instance.
     """
     return Settings()

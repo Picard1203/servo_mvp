@@ -25,7 +25,7 @@ session** (context-reset unit), not a calendar day.
 
 | # | Session | Board? |
 |---|---|---|
-| **11** | **Antigravity.** T15a: prose strip on `python/app/` + `python/static/*.js`, plus T1 in full. Prompt: `docs/handoff/antigravity-python-prose-strip.md`. | no |
+| **11** | **DONE, 26 Aug 2026.** T15a: prose strip on `python/app/`, plus T1 in full. Run by Antigravity; corrected by hand the same session after a full diff review found real content silently dropped — see T15's entry. `python/static/*.js` was descoped and reverted whole (no JS conventions exist yet — T18). | no |
 | **12** | **Antigravity.** T15b: same rule on `sketch/src/`, separate prompt. `docs/handoff/antigravity-firmware-prose-strip.md`. | no |
 | **13** | **Claude.** T16: enhance `twin-review` (fifth lens, selectable lenses). Fix R1's stale blocked-on-D4 note. Spot-check sessions 11–12. | no |
 | **14** | **Claude.** Run enhanced `/twin-review`, whole-app, first time. **Findings only** → `docs/REVIEW_FINDINGS.md` (file:line, plain-language issue, why it matters, severity, proposed fix — session 15 has no memory of this run). | no |
@@ -82,7 +82,6 @@ or ask — it is not re-derived here to keep this table short.
 
 | | | Status |
 |---|---|---|
-| T1 | Apply `CONVENTIONS.md` across the codebase | open · folded into T15a |
 | T2 | Package the air-gapped bundle | open · blocked on adapters |
 | T3 | Run the on-target test suite | open |
 | T5 | Add `design_diagrams/` with PlantUML | open |
@@ -92,7 +91,7 @@ or ask — it is not re-derived here to keep this table short.
 | T10 | Write the recovery runbook, in two halves | open · high |
 | T11 | Write the operations manual | open · high |
 | T13 | Distil the remaining documents | open · opportunistic |
-| T15 | Code-level documentation strip (T15a Python, T15b firmware) | unblocked — Q10 answered |
+| T15 | Code-level documentation strip (T15a Python, T15b firmware) | T15a done + corrected · T15b open |
 | T16 | Enhance `twin-review`: fifth lens, selectable lenses | open |
 | T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · independent track |
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
@@ -147,3 +146,4 @@ or ask — it is not re-derived here to keep this table short.
 | **D25** | An overload alarm disappeared once the reading went unknown | 25 August 2026 · Session 8 |
 | **D26** | Suite failed once in ten runs — cause found (sampler thread leak), closed on evidence not proof; reopen fresh if it recurs | 25 August 2026 · Session 8 |
 | **R2** | Motor isolation — board verification found the isolate/un-isolate write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level; UI/refusal gaps closed alongside | 26 August 2026 · hand-turn scenario left open, see T17 |
+| **T1** | `CONVENTIONS.md` gap in `python/app/` (types, control-flow style) closed via T15a | 26 August 2026 · Antigravity, hand-verified against the diff |

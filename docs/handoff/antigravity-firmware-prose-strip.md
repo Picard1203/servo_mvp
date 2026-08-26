@@ -28,6 +28,10 @@ Python task.
   signatures already carry types, unlike the Python docstring blocks in the
   sibling task). **Omit `@return` entirely for a `void` function** — same
   exception as the Python task's `Returns:` block, nothing to describe.
+  **Each `@param`/`@return` line is ONE line.** A wrapped, multi-line entry
+  should be rare, not routine as it is today — shorten the description
+  rather than wrapping it; only let one run past a line when shortening
+  genuinely fails.
 
 **REMOVE:** explanatory paragraphs after the summary — the mechanism
 narrative, the reasoning, the incident history, cross-references to other
@@ -90,6 +94,42 @@ outcome here than an extra line in a doc.
 
 Do not create any other new file. List every relocation in your report.
 
+## D — two comment classes that need special handling, found the hard way
+
+The Python sibling run (session 11) reported every file as complete, but a
+manual check afterward found real content silently deleted in files the
+report never even listed — not relocated, not flagged, just gone, in the
+one file with the most safety-critical comment in the codebase. Two classes
+of comment caused this, and both exist in `sketch/src/` too:
+
+**1. Contract-mismatch / sentinel-convention warnings** — a value or call
+whose meaning is the *opposite* of what it looks like, or a magic number
+that collides with a different meaning elsewhere. `ServoController.cpp`
+already has exactly this: the `EnableTorque`/`WritePosEx` comments noting
+their return convention is Ack()'s own (0 fail / 1 success, **never** -1),
+fixed this session after a real inversion bug shipped. **These do not get
+silently relocated to docs and left bare at the call site — collapse them
+to ONE inline line that states the trap** (e.g. `// EnableTorque: 0 fail /
+1 success, never -1.`), and relocate any fuller reasoning behind them
+separately. Losing the one-line warning at the call site is exactly the
+failure mode that shipped a bug this session.
+
+**2. Twin-path / defect-precedent warnings** — a comment explaining *why* a
+specific check, guard, or comparison exists, where the reason is that
+skipping it once already caused (or would cause) a defect recorded
+elsewhere in this project. These must be relocated in full, even in a file
+that looks purely mechanical (a repository, a struct, a register table) —
+do not assume a file's low narrative density means it has nothing
+load-bearing in it. If you are not sure whether a comment is this class,
+relocate it; the cost of an extra `docs/DESIGN_NOTES.md` line is much lower
+than the cost of losing the second one of these that saved a real repeat.
+
+**Before your final report, re-read every file you have already finished**
+specifically hunting for these two classes — do not rely on having caught
+them the first time through. State plainly, per file, either "no comment of
+either class found" or the classes found and what was done — do not let a
+summary claim completeness that a per-file check would contradict.
+
 ## Verification — after every file, not only at the end
 
 ```
@@ -117,6 +157,10 @@ python3 tools/verify.py
    comments removed, duplicated header/`.cpp` doc comments collapsed.
 2. Total lines removed.
 3. Every relocation made — source, destination.
-4. Any `RELAY_NOTES.md`-adjacent comment you were unsure about — list it
+4. **Per file, a one-line completeness statement per Part D** — either "no
+   contract-mismatch or twin-path comment found" or what was found and how
+   it was handled. Not a single overall claim of completeness — one line
+   per file.
+5. Any `RELAY_NOTES.md`-adjacent comment you were unsure about — list it
    rather than guessing.
-5. The final `make` and `tools/verify.py` summary blocks, pasted verbatim.
+6. The final `make` and `tools/verify.py` summary blocks, pasted verbatim.

@@ -1,9 +1,4 @@
-"""In-memory ring buffer of structured events for the events endpoint.
-
-Kept separate from logging: services log via Logger461 AND record an
-event here when it is worth surfacing to the operator UI. No logger
-coupling in either direction.
-"""
+"""In-memory ring buffer of structured events for the events endpoint."""
 
 from collections import deque
 from dataclasses import dataclass
@@ -17,10 +12,10 @@ class Event:
     """One operator-facing event.
 
     Attributes:
-        timestamp: ISO timestamp.
-        event: Dotted event identifier (e.g. servo.move.accepted).
-        message: Human-readable description.
-        data: Optional structured fields.
+        timestamp (str): ISO timestamp.
+        event (str): Dotted event identifier.
+        message (str): Human-readable description.
+        data (dict): Structured event fields.
     """
 
     timestamp: str
@@ -30,23 +25,25 @@ class Event:
 
 
 class EventService:
-    """Thread-safe fixed-size store of recent events."""
+    """Thread-safe fixed-size store of recent events.
+
+    Attributes:
+        _events (deque[Event]): Fixed-capacity ring buffer of events.
+        _lock (Lock): Mutex protecting event buffer access.
+    """
 
     def __init__(self, capacity: int) -> None:
         self._events: deque[Event] = deque(maxlen=capacity)
-        self._lock = Lock()
+        self._lock: Lock = Lock()
 
     def record(self, event: str, message: str,
                data: Optional[dict] = None) -> None:
         """Stores one event.
 
         Args:
-            event: Dotted event identifier.
-            message: Human-readable description.
-            data: Optional structured fields.
-
-        Returns:
-            None.
+            event (str): Dotted event identifier.
+            message (str): Human-readable description.
+            data (Optional[dict]): Optional structured fields.
         """
         entry = Event(timestamp=datetime.now(timezone.utc)
                       .isoformat(timespec="seconds"),
@@ -58,10 +55,10 @@ class EventService:
         """Returns the newest events, newest first.
 
         Args:
-            limit: Maximum number of events to return.
+            limit (int): Maximum number of events to return.
 
         Returns:
-            The most recent events.
+            list[Event]: The most recent events.
         """
         with self._lock:
             items = list(self._events)

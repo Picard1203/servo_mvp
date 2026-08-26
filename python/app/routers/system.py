@@ -9,8 +9,11 @@ from app.core.config import Settings, get_settings
 from app.core.events import EventService
 from app.deps import get_event_service, get_relay
 from app.relay.bridge_relay import BridgeRelay
-from app.schemas.system import (EventListResponse, EventResponse,
-                                HealthResponse)
+from app.schemas.system import (
+    EventListResponse,
+    EventResponse,
+    HealthResponse,
+)
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
 
@@ -23,15 +26,15 @@ _START_TIME = monotonic()
 
 @router.get("/health", response_model=HealthResponse)
 def get_health(settings: SettingsDep,
-                     relay: RelayDep) -> HealthResponse:
+               relay: RelayDep) -> HealthResponse:
     """Returns service health including the MCU status line.
 
     Args:
-        settings: Injected settings.
-        relay: Injected Bridge relay.
+        settings (Settings): Injected application settings.
+        relay (BridgeRelay): Injected Bridge relay service.
 
     Returns:
-        Uptime, version, MCU status and relay statistics.
+        HealthResponse: Uptime, version, MCU status and relay statistics.
     """
     try:
         from arduino.app_utils import Bridge
@@ -44,24 +47,32 @@ def get_health(settings: SettingsDep,
         service=settings.app_name, version=settings.version,
         uptime_seconds=round(monotonic() - _START_TIME, 1),
         mcu_status=mcu_status,
-        servo_backend=("hardware" if get_settings().use_hardware_servo
+        servo_backend=("hardware" if (get_settings().use_hardware_servo is True)
                        else "simulated"),
         relay_connections_total=relay.connections_total)
 
 
 @router.get("/events", response_model=EventListResponse)
 def get_events(events: EventDep,
-                     limit: Annotated[int, Query(ge=1, le=200)] = 50
-                     ) -> EventListResponse:
+               limit: Annotated[int, Query(ge=1, le=200)] = 50
+               ) -> EventListResponse:
     """Returns recent structured events, newest first.
 
     Args:
-        events: Injected event service.
-        limit: Maximum number of events.
+        events (EventService): Injected event service.
+        limit (int): Maximum number of events.
 
     Returns:
-        The events.
+        EventListResponse: Recent structured events list.
     """
-    return EventListResponse(events=[
-        EventResponse(timestamp=e.timestamp, event=e.event, message=e.message, data=e.data)
-        for e in events.recent(limit)])
+    event_list: list[EventResponse] = []
+    for e in events.recent(limit):
+        event_list.append(
+            EventResponse(
+                timestamp=e.timestamp,
+                event=e.event,
+                message=e.message,
+                data=e.data,
+            )
+        )
+    return EventListResponse(events=event_list)

@@ -5,23 +5,17 @@ from typing import Optional
 
 
 class AppStateRepository(ABC):
-    """Contract for a small persisted key/value store of operator intent.
-
-    Not a general settings store - this exists specifically for latched
-    operator decisions that must survive a restart (ADR-0010), starting
-    with motor isolation and shaped to carry R8's emergency-stop latch
-    later without a new mechanism.
-    """
+    """Contract for a small persisted key-value store of operator intent."""
 
     @abstractmethod
     def get(self, key: str) -> Optional[str]:
         """Returns a stored value.
 
         Args:
-            key: State key.
+            key (str): State key to retrieve.
 
         Returns:
-            The stored value, or None when never set.
+            Optional[str]: The stored value, or None when never set.
         """
 
     @abstractmethod
@@ -29,10 +23,7 @@ class AppStateRepository(ABC):
         """Persists a value, replacing any previous one for the same key.
 
         Args:
-            key: State key.
-            value: Value to store.
-            updated_at: ISO timestamp of this write.
-
-        Returns:
-            None.
+            key (str): State key to persist.
+            value (str): Value string to store.
+            updated_at (str): ISO timestamp of this write.
         """

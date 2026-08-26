@@ -23,6 +23,15 @@ class IsolatedError(DomainError):
     """
 
 
+class LockedAndIsolatedError(DomainError):
+    """Raised when movement is refused for both reasons at once.
+
+    Without this, whichever gate is checked first hides the other -
+    clearing it would only surface a second refusal the operator was
+    never told about.
+    """
+
+
 class NotFoundError(DomainError):
     """Raised when a referenced entity does not exist."""
 

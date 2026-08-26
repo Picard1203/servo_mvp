@@ -118,6 +118,18 @@ class TestIsolationGate:
         with pytest.raises(IsolatedError):
             motion.move_to(12.0, 60.0)
 
+    def test_locked_and_isolated_together_raises_the_combined_error(
+            self, motion):
+        """Neither single-condition gate may fire alone here - an operator
+        who clears one would still be refused a second time for a reason
+        they were never told about."""
+        from app.core.exceptions import LockedAndIsolatedError
+        from app.deps import get_isolation_service
+        motion.set_lock(True)
+        get_isolation_service().set_isolated(True)
+        with pytest.raises(LockedAndIsolatedError):
+            motion.move_to(12.0, 60.0)
+
 
 def _settling(backend) -> bool:
     """Reads the settle state from the store.

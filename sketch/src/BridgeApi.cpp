@@ -96,6 +96,16 @@ String HandleSetTorque(String payload) {
   return String(Ack(api->controller().SetTorque(enabled)));
 }
 
+// Diagnostic only (R2 board verification): reads register 0x28 back
+// directly, independent of SetTorque()'s own write acknowledgement.
+String HandleReadTorque(String /*unused*/) {
+  BridgeApi* api = BridgeApi::instance();
+  if (api == nullptr) return String("err");
+  const int value = api->controller().ReadTorqueRegister();
+  if (value < 0) return String("err");
+  return String(value);
+}
+
 // Python calls this with no payload at all (system.py health check), so it
 // must take no parameter - a String parameter here fails to bind.
 String HandleGetStatus() {
@@ -210,6 +220,7 @@ void BridgeApi::Register() {
   Bridge.provide("servo_set_deadband", HandleSetDeadband);
   Bridge.provide("servo_configure_range", HandleConfigureRange);
   Bridge.provide("servo_set_torque", HandleSetTorque);
+  Bridge.provide("servo_read_torque", HandleReadTorque);
   Bridge.provide("get_status", HandleGetStatus);
 
   if (relay_ != nullptr) {

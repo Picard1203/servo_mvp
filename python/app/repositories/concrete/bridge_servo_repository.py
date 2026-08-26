@@ -227,6 +227,20 @@ class BridgeServoRepository(ServoRepository):
                            extra={"enabled": enabled, "reply": reply})
         return reply == "ok"
 
+    def read_torque_register(self) -> Optional[int]:
+        """Reads register 0x28 directly (R2 board verification).
+
+        Diagnostic only - independent of set_torque()'s own write
+        acknowledgement, and not part of normal reconciliation.
+
+        Returns:
+            0 or 1 as read from the servo, or None when the read failed.
+        """
+        reply = self._call("servo_read_torque", "")
+        if reply not in ("0", "1"):
+            return None
+        return int(reply)
+
     # ------------------------------------------------------------ internals
 
     def _call(self, name: str, payload: str) -> str:

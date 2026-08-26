@@ -49,6 +49,10 @@ class TestReconciliation:
         from app.deps import get_isolation_service, get_state_store
         get_isolation_service().set_isolated(True)
         assert get_state_store().is_isolated_known() is True
+        # The bookkeeping flag is not enough on its own - it can flip
+        # cleanly while the actual argument sent to the servo is inverted.
+        # Assert the real consequence: torque must actually be cut.
+        assert sim.read_torque_register() == 0
 
     def test_manual_un_isolate_reconciles_immediately(self, backend, sim):
         from app.deps import get_isolation_service, get_state_store
@@ -56,6 +60,16 @@ class TestReconciliation:
         isolation.set_isolated(True)
         isolation.set_isolated(False)
         assert get_state_store().is_isolated_known() is False
+        assert sim.read_torque_register() == 1
+
+    def test_isolate_sends_torque_disabled_not_the_raw_intent(
+            self, backend, flaky):
+        """Regression for the inversion bug: `set_torque`'s argument means
+        "restore torque", the opposite of "isolated" intent. FlakyServo
+        already recorded every call; nothing ever asserted on it."""
+        from app.deps import get_isolation_service
+        get_isolation_service().set_isolated(True)
+        assert flaky.calls == [False]
 
     def test_intent_persists_across_a_fresh_service_over_the_same_db(
             self, backend, sim):

@@ -85,6 +85,7 @@ button{font-family:inherit}
 .chip.moving{background:var(--bluebell);color:#fff}
 .chip.alarm{background:var(--alarm);color:#fff}
 .chip.isolated{background:var(--lilac);color:#fff}
+.chip.locked{background:var(--warn);color:#fff}
 /* Target: TANGERINE is a measurement; BLUEBELL is a commanded intent
    (same colour the MOVING chip already uses) - carried through the
    marker, the value and every Excel chart series so one colour means

@@ -1,6 +1,7 @@
 """Abstract servo access: the seam between simulation and hardware."""
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from app.models.entities import TelemetrySnapshot
 
@@ -105,4 +106,16 @@ class ServoRepository(ABC):
 
         Returns:
             True when the servo acknowledged the command.
+        """
+
+    @abstractmethod
+    def read_torque_register(self) -> Optional[int]:
+        """Reads the torque-enable register directly (R2 board verification).
+
+        Diagnostic only, independent of set_torque()'s own write
+        acknowledgement - confirms what the servo's register actually
+        holds, rather than trusting the write's ack alone.
+
+        Returns:
+            0 or 1 as read from the servo, or None when the read failed.
         """

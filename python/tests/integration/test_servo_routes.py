@@ -130,6 +130,25 @@ class TestIsolate:
             "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
         assert isolated_response.json()["reason"] == "isolated"
 
+    def test_move_while_locked_and_isolated_names_both_reasons(self, client):
+        client.post("/api/v1/servo/lock", json={"locked": True})
+        client.post("/api/v1/servo/isolate", json={"isolated": True})
+        response = client.post(
+            "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
+        assert response.status_code == 409
+        assert response.json()["reason"] == "locked_isolated"
+
+    def test_torque_register_reflects_isolation_state(self, client):
+        """GET /api/v1/servo/diagnostics/torque_register - diagnostic,
+        independent of the isolate command's own ack."""
+        assert client.get(
+            "/api/v1/servo/diagnostics/torque_register"
+        ).json()["torque_register"] == 1
+        client.post("/api/v1/servo/isolate", json={"isolated": True})
+        assert wait_until(lambda: client.get(
+            "/api/v1/servo/diagnostics/torque_register"
+        ).json()["torque_register"] == 0)
+
 
 class TestCalibrate:
     """POST /api/v1/servo/calibrate."""

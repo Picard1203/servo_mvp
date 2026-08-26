@@ -159,6 +159,16 @@ class SimulatedServoRepository:
             self._torque_enabled = enabled
         return True
 
+    def read_torque_register(self) -> int:
+        """Returns the simulated torque state (R2 board verification).
+
+        Returns:
+            1 when torque is enabled, 0 when isolated - the simulator
+            cannot fail this read.
+        """
+        with self._lock:
+            return 1 if self._torque_enabled else 0
+
     def simulate_overload(self) -> None:
         """Trips the simulated overload fault (testing/commissioning aid).
 

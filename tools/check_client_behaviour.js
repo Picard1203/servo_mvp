@@ -322,10 +322,9 @@ console.log("\nD14 - a refused connection reads as something to act on");
         $("recoverBtn").disabled === true);
   check("...with the reason stated on the control itself (D25's pattern)",
         /isolated/i.test($("recoverBtn").title), $("recoverBtn").title);
-  check("the hint states the CONFIGURED timeout, not a hardcoded copy"
-        + " that would go stale the moment the setting is retuned (D21)",
-        $("isoHint").textContent === "auto-isolates after 15 min locked",
-        $("isoHint").textContent);
+  check("the hint is hidden once isolated - the countdown it describes is"
+        + " no longer live",
+        $("isoHint").textContent === "", $("isoHint").textContent);
 
   ctx.renderState(Object.assign({}, good, { isolated: false }));
   check("the cube reverts to Isolate",
@@ -339,6 +338,29 @@ console.log("\nD14 - a refused connection reads as something to act on");
         $("movechip").textContent === "FAULT", $("movechip").textContent);
   ctx.renderState(good);   // clear the fault for the checks that follow
 
+  /* ---------- LOCKED movechip state, and the hint's scoping ---------- */
+  console.log("\nLOCKED movechip state, and the isoHint's scoping to it");
+  ctx.renderState(Object.assign({}, good, { locked: true }));
+  check("a locked, idle servo shows LOCKED on the movechip, not plain"
+        + " HOLDING - locked is a distinct operator-set state",
+        $("movechip").textContent === "LOCKED", $("movechip").textContent);
+  check("the hint is shown while locked and not yet isolated - the only"
+        + " state where the auto-isolate countdown is actually live",
+        /^Isolate: auto-engages after 15 min locked$/.test(
+          $("isoHint").textContent),
+        $("isoHint").textContent);
+
+  ctx.renderState(Object.assign({}, good, { locked: false }));
+  check("the hint is hidden again once unlocked",
+        $("isoHint").textContent === "", $("isoHint").textContent);
+
+  ctx.renderState(
+    Object.assign({}, good, { locked: true, isolated: true }));
+  check("ISOLATED still outranks LOCKED on the movechip when both are"
+        + " true - isolation is the more consequential state",
+        $("movechip").textContent === "ISOLATED", $("movechip").textContent);
+  ctx.renderState(good);   // reset for the checks that follow
+
   /* ---------- R2: the refusal names the remedy, not just the state --- */
   console.log("\nR2 - a move refused while isolated says how to fix it");
   toasts.length = 0;
@@ -350,6 +372,18 @@ console.log("\nD14 - a refused connection reads as something to act on");
         + " naming a state with no way out leaves the operator stuck",
         lastToast() && /isolated/.test(lastToast().message) &&
         /un-isolate/.test(lastToast().message), lastToast());
+
+  /* ---------- both gates at once name both reasons -------------------- */
+  console.log("\nlocked AND isolated together - the refusal names both, not"
+             + " just whichever gate the backend happened to check first");
+  toasts.length = 0;
+  const bothErr = new Error("servo is locked and motor is isolated");
+  bothErr.status = 409;
+  bothErr.reason = "locked_isolated";
+  ctx.sayError(bothErr);
+  check("the refusal names locked AND isolated, not just one of them",
+        lastToast() && /locked/.test(lastToast().message) &&
+        /isolated/.test(lastToast().message), lastToast());
 
   /* ---------- R2: isolating reminds about the physical lock ---------- */
   console.log("\nR2 - isolating reminds the operator the physical lock is manual");

@@ -88,6 +88,13 @@ class ServoController {
   /// @return True when every step the servo answered to succeeded.
   bool SetTorque(bool enabled);
 
+  /// Reads register 0x28 directly, independent of SetTorque()'s own write
+  /// acknowledgement - a diagnostic check for R2's board verification, not
+  /// part of normal reconciliation (see IsolationService on the Linux side).
+  /// @return The raw register value (0 or 1), or -1 when the bus did not
+  ///     answer.
+  int ReadTorqueRegister();
+
  private:
   ServoBus& bus_;
 };

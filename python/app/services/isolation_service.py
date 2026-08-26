@@ -124,7 +124,10 @@ class IsolationService:
         intent = self._state.is_isolated_intent()
         if intent == self._state.is_isolated_known():
             return
-        acked = self._servo.set_torque(intent)
+        # set_torque's `enabled` means "restore drive torque" - the exact
+        # opposite of "isolated" intent - so it must be negated here, not
+        # passed straight through.
+        acked = self._servo.set_torque(not intent)
         if not acked:
             logger.warning(
                 "motor torque command not acknowledged",

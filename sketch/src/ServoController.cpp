@@ -35,7 +35,9 @@ bool ServoController::Begin(bool multi_turn, uint8_t angle_resolution,
   ok = SetDeadband(deadband_counts) && ok;
   ok = bus_.WriteWord(reg::kTorqueLimit,
                       static_cast<int16_t>(torque_limit)) && ok;
-  ok = bus_.driver().EnableTorque(bus_.servo_id(), 1) != -1 && ok;
+  // EnableTorque returns Ack()'s convention (0 fail / 1 success), never -1 -
+  // that sentinel belongs to the *read* calls in this file, not writes.
+  ok = bus_.driver().EnableTorque(bus_.servo_id(), 1) != 0 && ok;
   return ok;
 }
 
@@ -93,8 +95,10 @@ bool ServoController::Move(const MoveCommand& command) {
   uint16_t speed = command.speed_counts_per_second;
   if (speed == 0) speed = 1;
   if (speed > units::kMaxGoalSpeed) speed = units::kMaxGoalSpeed;
+  // WritePosEx returns genWrite()'s Ack() convention (0 fail / 1 success),
+  // never -1 - same sentinel mismatch as EnableTorque below.
   return bus_.driver().WritePosEx(bus_.servo_id(), target, speed,
-                                  acceleration) != -1;
+                                  acceleration) != 0;
 }
 
 bool ServoController::Stop() {
@@ -170,9 +174,15 @@ bool ServoController::SetTorque(bool enabled) {
     hold.acceleration = 0;
     ok = Move(hold) && ok;
   }
-  ok = bus_.driver().EnableTorque(bus_.servo_id(), enabled ? 1 : 0) != -1 &&
+  // Same sentinel mismatch as Begin(): Ack()'s convention is 0 fail /
+  // 1 success, never -1.
+  ok = bus_.driver().EnableTorque(bus_.servo_id(), enabled ? 1 : 0) != 0 &&
        ok;
   return ok;
+}
+
+int ServoController::ReadTorqueRegister() {
+  return bus_.ReadByte(reg::kTorqueSwitch);
 }
 
 }  // namespace servo

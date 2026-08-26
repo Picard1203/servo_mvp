@@ -114,6 +114,13 @@ class TestTorque:
         time.sleep(0.2)
         assert abs(sim.read_raw_counts() - held) <= 2
 
+    def test_read_torque_register_reflects_current_state(self, sim):
+        assert sim.read_torque_register() == 1
+        sim.set_torque(False)
+        assert sim.read_torque_register() == 0
+        sim.set_torque(True)
+        assert sim.read_torque_register() == 1
+
 
 class TestRangeConfiguration:
     """configure_range records the travel-range mode."""

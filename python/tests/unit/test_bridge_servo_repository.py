@@ -167,6 +167,29 @@ class TestCommands:
         bridge.raise_on_call = RuntimeError("bridge down")
         assert repo.set_torque(True) is False
 
+    def test_read_torque_register_payload(self, bridge, repo):
+        bridge.reply = "0"
+        repo.read_torque_register()
+        assert bridge.calls[-1] == ("servo_read_torque", "")
+
+    def test_read_torque_register_parses_zero(self, bridge, repo):
+        bridge.reply = "0"
+        assert repo.read_torque_register() == 0
+
+    def test_read_torque_register_parses_one(self, bridge, repo):
+        bridge.reply = "1"
+        assert repo.read_torque_register() == 1
+
+    def test_read_torque_register_none_when_not_acknowledged(self, bridge,
+                                                              repo):
+        bridge.reply = "err"
+        assert repo.read_torque_register() is None
+
+    def test_read_torque_register_none_on_bridge_exception(self, bridge,
+                                                            repo):
+        bridge.raise_on_call = RuntimeError("bridge down")
+        assert repo.read_torque_register() is None
+
 
 class TestResilience:
     """A misbehaving bus must not take the backend down."""

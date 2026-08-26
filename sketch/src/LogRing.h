@@ -1,9 +1,3 @@
-// Fixed-capacity ring buffer for diagnostic log records.
-//
-// Header-only and Arduino/Zephyr-free on purpose - see CONVENTIONS.md: this
-// property is what makes the native test tier possible. Callers on the
-// device (NetworkRelay) own the thread safety with their own k_mutex; this
-// class assumes single-threaded access and never allocates or blocks.
 #ifndef LOG_RING_H
 #define LOG_RING_H
 
@@ -12,9 +6,7 @@
 
 namespace diag {
 
-/// Severity, matching the levels Logger461 already writes on the Linux side
-/// (`app/core/logging_setup.py`), so a receiver there can forward these
-/// verbatim instead of re-mapping a second scale.
+/// Severity levels matching Logger461.
 namespace log_level {
 constexpr uint8_t kDebug = 0;
 constexpr uint8_t kInfo = 1;
@@ -22,9 +14,7 @@ constexpr uint8_t kWarn = 2;
 constexpr uint8_t kError = 3;
 }  // namespace log_level
 
-/// One diagnostic event. `message` and `event` are expected to point at
-/// flash-resident string literals (F(...) on the device) - the ring stores
-/// pointers, never copies or owns the text.
+/// Diagnostic event with pointers to flash-resident string literals.
 struct LogRecord {
   uint8_t level;
   uint32_t uptime_ms;
@@ -34,14 +24,12 @@ struct LogRecord {
   int32_t arg2;
 };
 
-/// Bounded FIFO of LogRecord. When full, Push() overwrites the oldest entry
-/// rather than refusing the new one - the most recent state is what a
-/// diagnostic ring exists to keep - and counts the eviction so a caller can
-/// tell the drain is falling behind the producers.
+/// Bounded FIFO ring buffer of LogRecord entries.
 template <size_t Capacity>
 class LogRing {
  public:
   /// Adds one record, evicting the oldest if the ring is already full.
+  /// @param record Log record to add.
   /// @return False when an existing entry was evicted to make room.
   bool Push(const LogRecord& record) {
     const bool evicted = full();
@@ -57,7 +45,8 @@ class LogRing {
   }
 
   /// Removes and returns the oldest record.
-  /// @return False when the ring was empty; `out` is left untouched.
+  /// @param out Destination pointer for the popped record.
+  /// @return False when the ring was empty; out is left untouched.
   bool Pop(LogRecord* out) {
     if (empty()) return false;
     *out = entries_[head_];
@@ -66,16 +55,21 @@ class LogRing {
     return true;
   }
 
+  /// Returns number of records currently queued.
   /// @return Number of records currently queued.
   size_t size() const { return size_; }
 
+  /// Reports whether the ring buffer is empty.
   /// @return True when there is nothing to Pop().
   bool empty() const { return size_ == 0; }
 
+  /// Returns count of records evicted by Push() when full.
   /// @return Records evicted by Push() because the ring was full.
   uint32_t dropped_total() const { return dropped_total_; }
 
  private:
+  /// Reports whether the ring buffer is full.
+  /// @return True when size equals capacity.
   bool full() const { return size_ == Capacity; }
 
   LogRecord entries_[Capacity] = {};

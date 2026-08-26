@@ -1,4 +1,3 @@
-// Data carried between the servo layer and the Bridge layer.
 #ifndef SERVO_TYPES_H
 #define SERVO_TYPES_H
 
@@ -8,8 +7,7 @@
 
 namespace servo {
 
-/// One coherent reading of the servo. `valid` is false when the bus did not
-/// answer; every other field is meaningless in that case.
+/// One coherent reading of the servo.
 struct ServoSnapshot {
   int32_t raw_counts = 0;
   bool moving = false;
@@ -17,7 +15,7 @@ struct ServoSnapshot {
   float voltage_v = 0.0F;
   float current_a = 0.0F;
   float torque_kgcm = 0.0F;
-  int16_t load_duty = 0;   // PWM duty of the drive output, NOT torque
+  int16_t load_duty = 0;
   ServoFaults faults;
   bool valid = false;
 };

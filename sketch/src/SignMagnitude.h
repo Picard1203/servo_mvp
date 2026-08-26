@@ -1,11 +1,3 @@
-// Sign-magnitude decoding for STS wire fields.
-//
-// STS position and speed fields carry the sign in a dedicated bit rather than
-// using two's complement. Parsing them naively makes a small negative value
-// appear as roughly 32700, which is the classic symptom.
-//
-// Header-only and free of Arduino dependencies so it can be unit tested on a
-// development machine with plain g++.
 #ifndef SIGN_MAGNITUDE_H
 #define SIGN_MAGNITUDE_H
 

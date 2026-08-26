@@ -41,9 +41,6 @@ long FieldAt(const String& payload, uint8_t index, long fallback) {
 
 const char* Ack(bool ok) { return ok ? "ok" : "err"; }
 
-// ---- Bridge callbacks. Free functions because the Bridge takes plain
-// ---- function pointers; they delegate straight to the singleton.
-
 String HandleServoRead(String /*unused*/) {
   BridgeApi* api = BridgeApi::instance();
   if (api == nullptr) return String("0,0,0,0,0,0,0,0,0");
@@ -86,9 +83,6 @@ String HandleConfigureRange(String payload) {
                                                     amplification)));
 }
 
-// Backlog R2 (motor isolation). Field is a plain 0/1, never passed through
-// to the servo unclamped - ServoController::SetTorque() is what keeps a
-// stray value from ever reaching register 0x28 as anything but 0 or 1.
 String HandleSetTorque(String payload) {
   BridgeApi* api = BridgeApi::instance();
   if (api == nullptr) return String(Ack(false));
@@ -96,8 +90,6 @@ String HandleSetTorque(String payload) {
   return String(Ack(api->controller().SetTorque(enabled)));
 }
 
-// Diagnostic only (R2 board verification): reads register 0x28 back
-// directly, independent of SetTorque()'s own write acknowledgement.
 String HandleReadTorque(String /*unused*/) {
   BridgeApi* api = BridgeApi::instance();
   if (api == nullptr) return String("err");
@@ -106,43 +98,23 @@ String HandleReadTorque(String /*unused*/) {
   return String(value);
 }
 
-// Python calls this with no payload at all (system.py health check), so it
-// must take no parameter - a String parameter here fails to bind.
 String HandleGetStatus() {
   BridgeApi* api = BridgeApi::instance();
   if (api == nullptr) return String("no-servo");
   const servo::ServoSnapshot snapshot = api->controller().ReadSnapshot();
   String status(snapshot.valid ? "ready" : "no-servo");
   if (api->relay() != nullptr) {
-    // Relay pressure belongs in the health line: a growing rejected count is
-    // the signature of the browser wanting more parallel connections than the
-    // W5500 has slots for, and it is otherwise completely invisible.
     status += " relay=";
     status += static_cast<int>(api->relay()->connections_total());
     status += "/rejected=";
     status += static_cast<int>(api->relay()->rejected_total());
   }
-  // Same reasoning as relay pressure above: a growing drop count means the
-  // Tick() drain is not keeping up with the producers, and would otherwise
-  // be completely invisible - a dropped record cannot log its own loss.
   status += "/diag_dropped=";
   status += static_cast<int>(diag::DiagLog::dropped_total());
   return status;
 }
 
-// ---- network relay -----------------------------------------------------
-//
-// These four signatures are NOT free choices: they must match what
-// app/relay/bridge_relay.py declares, which is
-//     net_open(slot, client_ip)   net_rx(slot, data)   net_close(slot)
-//     net_tx(slot, data)          net_shutdown(slot)
-// Typed arguments and MsgPack::bin_t for the payload, not a packed string -
-// the byte stream is binary and must survive intact.
-
-/// Linux -> shield: write a reply to a connected client.
-/// @param slot Connection slot.
-/// @param data Raw bytes to send.
-/// @return 1 on success, 0 otherwise.
+/// Linux -> shield: writes a reply to a connected client.
 int HandleNetTx(int slot, MsgPack::bin_t<uint8_t> data) {
   BridgeApi* api = BridgeApi::instance();
   if (api == nullptr || api->relay() == nullptr) return 0;
@@ -152,9 +124,7 @@ int HandleNetTx(int slot, MsgPack::bin_t<uint8_t> data) {
              : 0;
 }
 
-/// Linux -> shield: close a client connection.
-/// @param slot Connection slot.
-/// @return Always 1.
+/// Linux -> shield: closes a client connection.
 int HandleNetShutdown(int slot) {
   BridgeApi* api = BridgeApi::instance();
   if (api != nullptr && api->relay() != nullptr) {
@@ -179,11 +149,6 @@ void ForwardClientClose(uint8_t slot) {
   Bridge.notify("net_close", static_cast<int>(slot));
 }
 
-// ---- diagnostics (backlog D3) -------------------------------------------
-
-/// Shield -> Linux: one diagnostic record drained from DiagLog. uptime is
-/// sent in whole seconds, not milliseconds - T9 plans runs of a month or
-/// more, and a signed 32-bit millisecond count wraps after ~24.8 days.
 void ForwardDiagLog(const diag::LogRecord& record) {
   Bridge.notify("mcu_log", static_cast<int>(record.level),
                String(record.message), String(record.event),
@@ -200,7 +165,7 @@ BridgeApi::BridgeApi(servo::ServoController& controller,
 }
 
 void BridgeApi::FormatSnapshot(const servo::ServoSnapshot& snapshot,
-                               char* out, uint16_t size) {
+                                char* out, uint16_t size) {
   snprintf(out, size, "%d,%ld,%d,%.1f,%.2f,%.3f,%.2f,%d,%u",
            snapshot.valid ? 1 : 0,
            static_cast<long>(snapshot.raw_counts),
@@ -224,8 +189,7 @@ void BridgeApi::Register() {
   Bridge.provide("get_status", HandleGetStatus);
 
   if (relay_ != nullptr) {
-    // provide_safe: these are called from the Bridge thread while loop() may
-    // be inside the relay.
+    // provide_safe: called from Bridge thread per RELAY_NOTES.md rule 7.
     Bridge.provide_safe("net_tx", HandleNetTx);
     Bridge.provide_safe("net_shutdown", HandleNetShutdown);
     relay_->SetSinks(ForwardClientOpen, ForwardClientBytes,

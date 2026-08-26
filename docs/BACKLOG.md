@@ -23,8 +23,8 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **6 — D10 half DONE, 24 Aug 2026** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** Nothing from Session 6's D10 work is a prerequisite for it, but **Session 8 now runs first** (inserted 24 Aug 2026 by T14's triage, see row 8) so R2 designs against a settled `ServoStateResponse` shape — R2 itself is Session 9, not a direct continuation of this row. | R2: yes, for the operator-visible part |
 | **7 — DONE, 24 Aug 2026** | **T14 closed** — all fourteen unslotted items given a real session (rows above and below) or an explicit reason they don't get one (T13, T15 — see their entries); Closed index gained D3/D27/D13 (moved to `CLOSED.md` but never indexed). **D32, D33, D34 closed the same session** — board-tested, verified (suite 223→226), app restarted and checked live. **D35 opened** (speed-step enforcement postponed, see Session 10) — a board measurement during D32's work found commanded and actual servo speed disagree by ~1.5-2x, so the planned fix was not shipped on an unverified unit-conversion assumption. | yes — used to verify D32/D33/D34 live and to bench-test D35's measurement |
 | **8 — DONE, 25 Aug 2026** | All eight closed: **D24** (coverage gated at 99%, two unexercised guards covered), **D26** (sampler-thread leak found and fixed — segfault reproduced pre-fix at ~1-in-10 to 1-in-20, gone after; closed on evidence, see `CLOSED.md`), **D30** (UTC/local cutoff regression test), **T12** (`check_client_behaviour.js` promoted to a real check, folded into new `tools/verify.py`), **D8** (deploy without `.env` now fails loud), **D29** (`LOG_LEVEL` now real on the Logger461 stand-in), **D23** (`moving`/fault flags null on a failed read, amends ADR-0008), **D25** (a reported alarm survives the reading going unknown; recover disabled-with-reason, not hidden). `ServoStateResponse` shape is now settled for R2. Repo hygiene pass same session: stale soak artifacts and `FILE_REGISTRY.md` removed, `.gitignore` gaps closed. | no — board confirmation of D8/D23/D25 still outstanding, first thing to do when the board is next up |
-| **9 — DONE (implementation), 25 Aug 2026** | **R2** — motor isolation. `/grilling` + `/operator-lens` passes ran first, both doc-grounded. Implemented on `feature/motor-isolation`, merged to `dev`. **Board verification still outstanding** — see R2's own entry for the full list (torque actually cutting, un-isolate not snapping to a stale goal, multi-turn tracking under a hand-turned shaft). `/twin-review` deliberately skipped this delivery, deferred to a later whole-app pass (see `T16`). | yes, for the board-verification items — next session up |
-| **10 — opportunistic, any time after 7** | **D28** (MCU boot-time `mcu_log` notify race — needs a flash to fix or confirm) + **D35** (commanded vs. actual speed disagree by ~1.5-2x, found bench-testing D32 this session — needs `PRESENT_SPEED` register-level readback, not just wall-clock timing). D32 itself closed this session (24 Aug) — its speed-step-enforcement piece split into D35 rather than shipped on an unverified assumption. Low severity, no dependency on anything above; ride along with any session that already has the board up. **R2's board-verification list (row 9) is now a natural co-passenger too** — same "board is already up" opportunity, different item. | yes |
+| **9 — DONE, 25-26 Aug 2026** | **R2 — motor isolation, CLOSED** (see `CLOSED.md`). Implemented 25 Aug on `feature/motor-isolation`, merged to `dev`. Board verification 26 Aug found two real bugs — `IsolationService`'s write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level — plus three UI/refusal gaps closed alongside on `feature/motor-isolation-fixes`. Hand-turn/multi-turn-under-load scenario left genuinely untested (no rig on the bench) — see **T17**. `/twin-review` deliberately skipped this delivery, deferred to a later whole-app pass (see `T16`). | yes — used for the full board-verification pass |
+| **10 — opportunistic, any time after 7** | **D28** (MCU boot-time `mcu_log` notify race — needs a flash to fix or confirm) + **D35** (commanded vs. actual speed disagree by ~1.5-2x, found bench-testing D32 this session — needs `PRESENT_SPEED` register-level readback, not just wall-clock timing). D32 itself closed this session (24 Aug) — its speed-step-enforcement piece split into D35 rather than shipped on an unverified assumption. Low severity, no dependency on anything above; ride along with any session that already has the board up. | yes |
 
 **T14 (`CLOSED.md`) has the full reasoning behind this slotting** if it is
 ever needed again — this row is just a pointer to the outcome.
@@ -431,6 +431,7 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 | **D23** | `moving`/fault flags reported as measured on a failed read | 25 August 2026 · Session 8 |
 | **D25** | An overload alarm disappeared once the reading went unknown | 25 August 2026 · Session 8 |
 | **D26** | Suite failed once in ten runs — cause found (sampler thread leak), closed on evidence not proof; reopen fresh if it recurs | 25 August 2026 · Session 8 |
+| **R2** | Motor isolation — board verification found the isolate/un-isolate write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level; UI/refusal gaps closed alongside | 26 August 2026 · hand-turn scenario left open, see T17 |
 
 ---
 
@@ -801,6 +802,36 @@ without a `twin-review` pass by explicit operator decision (see R2's entry).
 
 ---
 
+### T17 — Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested
+**Status:** open · **Raised by:** the operator, 26 August 2026, closing out R2
+
+R2 (motor isolation, closed — see `CLOSED.md`) confirmed torque actually cuts
+and restores correctly, verified at the register level. One scenario from its
+board-verification list stayed genuinely untested: whether the servo can be
+freely hand-turned while isolated, and whether multi-turn position tracking
+survives a shaft that moved without the drive doing it.
+
+**Why it's a planning item, not something to just go do:** the current bench
+is a bare servo with no belt, arm, or lever attached — there is nothing to
+get a real grip on. A full free-spin attempt this session produced no
+detectable difference between isolated and un-isolated; a much smaller nudge
+(roughly a tenth of a degree, about the most the setup allows) did show the
+expected qualitative difference repeatably - resists and corrects back when
+un-isolated, stays put when isolated - but that was felt, not measured, and
+is not the multi-turn-under-load scenario this item is actually about.
+Outside research on this exact servo (STS3215, high-ratio metal gearbox)
+suggests hand-backdriving is not a reliable test for this part even with a
+lever — so this needs the actual mechanical rig (the belt-driven output the
+rest of the project assumes, per the gear-ratio audit in
+`PROJECT_STATE.md`) mounted, not just more attempts on the bare servo.
+
+**Plan, not execute:** figure out what rig state is needed (belt mounted?
+output arm attached? enough of R4's mechanical assembly to have a real lever?)
+and when it's realistically available, before spending more bench time on a
+test the current setup cannot support.
+
+---
+
 ### T1 — Apply `CONVENTIONS.md` across the codebase
 **Status:** open · **Flow:** `WORKFLOWS.md` W4 · suited to an executing agent
 
@@ -1078,99 +1109,6 @@ cannot be closed by tuning `timeout_keep_alive` alone until D4's reopened
 cause is understood** — a faster slot turnover does not fix a fault that
 also happens with slots to spare. Still unverified: the USB-C/Q9 question
 above, unchanged by tonight's runs (no on-site session was part of either).
-
----
-
-### R2 — Motor isolation: cut drive power, keep sensors alive
-**Scope:** in MVP · **Priority:** feature, not critical — must ship with the MVP
-so that MVP testing exercises it. **Status: implemented, 25 August 2026, on
-branch `feature/motor-isolation`.**
-
-**`/twin-review` deliberately skipped this delivery, not blocking it** — the
-operator's call, 25 August 2026: it runs later, on the whole app, once T16
-(below) has enhanced the skill. Merge proceeds through the normal `/deliver`
-pipeline without it this time.
-
-**Motivation, from the operator directly (25 Aug 2026) — sharper than "the
-mechanical team wanted it":** the board runs at field sites for months.
-Holding the servo energised the whole time costs continuous power and wear
-for no reason once movement isn't needed. Post-MVP (**R4**) the mechanical
-team adds a physical lock — two butterfly screws clamping a 3D-printed arch
-onto the shaft; it already exists today as a manual, unsensed mechanism —
-that holds position by friction, so the motor can rest whenever it's
-engaged. R8 (emergency stop, post-MVP) is expected to compose isolation with
-the digital Lock and the physical lock together for an instant stop.
-
-**Feasible in firmware, no hardware change needed.** `ServoRegisters.h:53`
-defines `kTorqueSwitch = 0x28` — writing 0 disables drive torque while the
-servo's electronics remain powered, so telemetry keeps reading. (Note 128 is
-already used on that register as the set-centre-position command.)
-
-**Relationship to Lock: separate control, but Lock now *triggers* isolation.**
-Digital Lock and motor isolation stay two distinct controls (R4 unifies them
-post-MVP with the physical restraint; R8 may compose them for e-stop) — but
-isolation is not only a direct button press:
-
-- **Manual isolate** — operator presses the isolate cube directly. Executes
-  immediately; motion state does not gate it, deliberately, because this is
-  meant to double as R8's future stop mechanism and refusing it mid-move
-  would defeat that.
-- **Auto-isolate (backup only)** — fires after the digital Lock has been
-  engaged *and* idle for a configurable timeout (`config.py` convention, not
-  hardcoded — D21's lesson). Placeholder default **15 min**, untuned until
-  real-hardware testing with the mechanical team (the dev rig doesn't have
-  the belt mounted yet). Never fires while unlocked — isolating a still-movable
-  servo risks catching the operator mid-task.
-- Not mutually exclusive: pressing isolate manually satisfies the goal
-  immediately; the idle timer only covers "locked but forgot to isolate."
-
-**Un-isolating is always an explicit action** — releasing Lock does not
-auto-clear isolation (would silently re-energise a motor rested on purpose),
-and a move request does not implicitly wake it either.
-
-**Move command while isolated: refused**, mirroring `locked` exactly — new
-`IsolatedError` (`exceptions.py`), checked in `MotionService.move_to()`
-alongside `is_locked()`; `REFUSALS["isolated"] = "refused — motor is
-isolated"` (`app.js`, D14's mechanism).
-
-**Operator-visible state:**
-- Third `.cube`, same pattern as `lockCube`/`calCube` — `Isolate` idle,
-  `Isolated` engaged.
-- Every isolate action (manual or auto) shows a transient notice via the
-  existing `say()` (`app.js:196`), because the software has no way to know
-  the physical lock is actually engaged: *"Motor isolated — physical lock is
-  manual, confirm it's engaged."* (auto variant: *"Motor isolated after
-  idle — physical lock is manual, confirm it's engaged."*)
-- A persistent indicator, not just the transient notice, is also needed so
-  the state isn't missed on a screen that's mostly left open — exact
-  placement against the existing layout is `/deliver`'s to design.
-
-**`ServoStateResponse` — new `isolated: bool` field**, following `locked`'s
-shape exactly: never null on a failed read, since it's DB-stored operator
-intent rather than a servo measurement — the same situation `locked` is
-already in. Recorded in telemetry (own column, like `moving`) and in the R5
-export. The null-on-failed-read question **for the telemetry/export column
-specifically** is left open, deliberately — decide it in `/deliver`'s
-functional-design step, not here.
-
-**Reboot behaviour: latches — see `docs/adr/0010-motor-isolation-state-survives-a-reboot.md`**
-(was `OPEN_QUESTIONS.md` Q4; promoted 25 August 2026).
-
-**Explicitly out of scope for R2 (confirmed 25 August 2026):** sensing the
-physical lock — no hardware exists yet, that's R4. Back-drive/self-locking
-behaviour of the belt under load is the mechanical team's concern, not
-something R2's software hedges against — the existing calibration-on-boot
-flow (ADR-0007) is the safety net for any drift, same as it already is for
-every other source of position doubt.
-
-**Acceptance:** the operator can cut drive power from the UI (manually or via
-the idle backup) and see plainly that it is cut; telemetry keeps reading
-throughout, proving the sensors stayed alive; a move while isolated is
-refused with a message that says why; the state is reported in
-`/servo/state` and recorded in telemetry; reboot behaviour is `ADR-0010`.
-
-**Blocks:** MVP handover. **Wants first:** D14 (done, Session 1 — so the
-refusal reads properly).
 
 ---
 

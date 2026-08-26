@@ -92,6 +92,18 @@ class IsolateResponse(BaseModel):
     isolated: bool
 
 
+class TorqueRegisterResponse(BaseModel):
+    """Diagnostic read of the servo's torque-enable register (R2 board
+    verification), independent of set_torque()'s own write acknowledgement.
+
+    Attributes:
+        torque_register: 0 or 1 as read from the servo, or None when the
+            bus did not answer.
+    """
+
+    torque_register: Optional[int]
+
+
 class RecoverResponse(BaseModel):
     """Acknowledgement of an overload recovery action.
 

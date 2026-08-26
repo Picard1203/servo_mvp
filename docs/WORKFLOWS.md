@@ -226,7 +226,7 @@ Antigravity).
 skill (stress-tests a plan or decision by questioning it relentlessly), used
 once so far: **R2's session opens with it**, on R2's own open design questions
 (operator-visible state when isolated, refuse-vs-queue a move, the new
-`ServoStateResponse` field — see `BACKLOG.md`'s R2 entry), per the operator's
+`ServoStateResponse` field — see `CLOSED.md`'s R2 entry), per the operator's
 explicit request that R2 be grounded in the docs rather than a prior session's
 paraphrase.
 

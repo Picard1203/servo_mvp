@@ -284,6 +284,8 @@ const REFUSALS = {
   // state without the remedy leaves the operator in it with no way out
   // in view (D12's lesson - a state they can enter and not leave).
   isolated: "refused — motor is isolated; un-isolate to move",
+  locked_isolated: "refused — servo is locked and motor is isolated; "
+                  + "unlock and un-isolate to move",
   active_zero: "refused — position is in use as the baseline",
   datum_zero: "refused — the reference cannot be removed",
   invalid_reading: "refused — the servo did not answer, so its position "
@@ -524,13 +526,16 @@ function renderState(s) {
   const anyFault = FAULT_FIELDS.some((field) => stickyFaults[field.key] === true);
   const chip = $("movechip");
   // FAULT outranks everything (D25: an alarm must never vanish).
-  // ISOLATED outranks MOVING/SETTLING/HOLDING: with drive torque cut,
-  // "HOLDING" would assert the servo is actively holding position, when
-  // friction (and, once fitted, the physical lock) is what's actually
-  // doing that - the same shape of screen/reality gap D9 was about.
+  // ISOLATED outranks LOCKED and MOVING/SETTLING/HOLDING: with drive
+  // torque cut, "HOLDING" would assert the servo is actively holding
+  // position, when friction (and, once fitted, the physical lock) is
+  // what's actually doing that - the same shape of screen/reality gap D9
+  // was about. LOCKED outranks MOVING/SETTLING/HOLDING in turn - a locked,
+  // idle servo is a distinct operator-set state, not plain HOLDING.
   if (!shown && !anyFault) { chip.className = "chip"; chip.textContent = "—"; }
   else if (anyFault) { chip.className = "chip alarm"; chip.textContent = "FAULT"; }
   else if (s.isolated) { chip.className = "chip isolated"; chip.textContent = "ISOLATED"; }
+  else if (s.locked) { chip.className = "chip locked"; chip.textContent = "LOCKED"; }
   else if (shown.moving) { chip.className = "chip moving"; chip.textContent = "MOVING"; }
   else if (s.settling) { chip.className = "chip"; chip.textContent = "SETTLING"; }
   else { chip.className = "chip holding"; chip.textContent = "HOLDING"; }
@@ -588,8 +593,14 @@ function renderState(s) {
   const iso = $("isoCube");
   iso.classList.toggle("isolated", s.isolated);
   iso.textContent = s.isolated ? "Isolated" : "Isolate";
-  $("isoHint").textContent = "auto-isolates after " +
-    Math.round(s.isolation_idle_timeout_s / 60) + " min locked";
+  // Only shown while the countdown is actually live (locked, not yet
+  // isolated) - permanently visible clutter under all three cubes
+  // regardless of state was the previous behaviour, and only Isolate has
+  // this auto-behaviour to begin with.
+  $("isoHint").textContent = (s.locked && !s.isolated)
+    ? "Isolate: auto-engages after "
+      + Math.round(s.isolation_idle_timeout_s / 60) + " min locked"
+    : "";
 
   const slot = $("alarmslot");
   if (anyFault) {

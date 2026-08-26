@@ -5,11 +5,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.deps import (get_isolation_service, get_motion_service,
-                      get_state_store, get_zero_service)
+                      get_servo_repository, get_state_store, get_zero_service)
+from app.repositories.abstract.servo_repository import ServoRepository
 from app.schemas.servo import (IsolateRequest, IsolateResponse, LockRequest,
                                LockResponse, MoveAcceptedResponse,
                                MoveRequest, RecoverResponse,
-                               ServoStateResponse, StopResponse)
+                               ServoStateResponse, StopResponse,
+                               TorqueRegisterResponse)
 from app.schemas.zeros import ZeroResponse
 from app.services.isolation_service import IsolationService
 from app.services.motion_service import MotionService
@@ -22,6 +24,7 @@ MotionDep = Annotated[MotionService, Depends(get_motion_service)]
 StateDep = Annotated[ServoStateStore, Depends(get_state_store)]
 ZeroDep = Annotated[ZeroService, Depends(get_zero_service)]
 IsolationDep = Annotated[IsolationService, Depends(get_isolation_service)]
+ServoDep = Annotated[ServoRepository, Depends(get_servo_repository)]
 
 
 @router.get("/state", response_model=ServoStateResponse)
@@ -124,6 +127,24 @@ def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
                         raw_counts=datum.raw_counts,
                         is_active=datum.is_active, is_datum=datum.is_datum,
                         created_at=datum.created_at)
+
+
+@router.get("/diagnostics/torque_register",
+           response_model=TorqueRegisterResponse)
+def get_torque_register(servo: ServoDep) -> TorqueRegisterResponse:
+    """Reads the servo's torque-enable register directly (R2 board
+    verification), independent of the isolate command's own write ack.
+
+    Diagnostic only - not part of the settled ServoStateResponse shape.
+
+    Args:
+        servo: Injected servo repository.
+
+    Returns:
+        The raw register value, or null when the bus did not answer.
+    """
+    return TorqueRegisterResponse(
+        torque_register=servo.read_torque_register())
 
 
 @router.post("/recover", response_model=RecoverResponse)

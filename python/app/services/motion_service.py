@@ -10,8 +10,9 @@ from Logger461 import logger
 
 from app.core.config import Settings
 from app.core.events import EventService
-from app.core.exceptions import (IsolatedError, LockedError, MovingError,
-                                 OutOfTravelError, StepError)
+from app.core.exceptions import (IsolatedError, LockedAndIsolatedError,
+                                 LockedError, MovingError, OutOfTravelError,
+                                 StepError)
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.services.servo_state import ServoStateStore
 
@@ -46,6 +47,8 @@ class MotionService:
 
         Raises:
             StepError: If the angle violates the configured step size.
+            LockedAndIsolatedError: If both the digital lock and motor
+                isolation are engaged.
             LockedError: If the digital lock is engaged.
             IsolatedError: If the motor is isolated (R2).
         """
@@ -53,7 +56,24 @@ class MotionService:
         self._validate_reachable(target_deg)
         if acceleration is None:
             acceleration = self._settings.default_acceleration
-        if self._state.is_locked():
+        # Isolation is gated on INTENT, not the acknowledged hardware state -
+        # this must refuse from the very first request the process ever
+        # serves, before IsolationService's reconciler has had any chance to
+        # run (ADR-0010). See ServoStateStore.is_isolated_intent()'s
+        # docstring.
+        locked = self._state.is_locked()
+        isolated = self._state.is_isolated_intent()
+        if locked and isolated:
+            self._events.record("servo.move.rejected",
+                                "move rejected: locked and isolated",
+                                {"target_deg": target_deg})
+            logger.warning("move rejected: locked and isolated",
+                           metadata={"event": "servo.move.rejected",
+                                     "reason": "locked_isolated"},
+                           extra={"target_deg": target_deg})
+            raise LockedAndIsolatedError("servo is locked and motor is "
+                                         "isolated")
+        if locked:
             self._events.record("servo.move.rejected",
                                 "move rejected: locked",
                                 {"target_deg": target_deg})
@@ -62,11 +82,7 @@ class MotionService:
                                      "reason": "locked"},
                            extra={"target_deg": target_deg})
             raise LockedError("servo is locked")
-        # Gated on INTENT, not the acknowledged hardware state - this must
-        # refuse from the very first request the process ever serves,
-        # before IsolationService's reconciler has had any chance to run
-        # (ADR-0010). See ServoStateStore.is_isolated_intent()'s docstring.
-        if self._state.is_isolated_intent():
+        if isolated:
             self._events.record("servo.move.rejected",
                                 "move rejected: isolated",
                                 {"target_deg": target_deg})

@@ -5,8 +5,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/app.py": {
-    "mtime": 1787573334.7474365,
-    "ast_hash": "c57c333ef19d50763f1c7e45a4551116",
+    "mtime": 1787745336.3732483,
+    "ast_hash": "2cf648953513773abb24a6f1eed611d2",
     "semantic_hash": ""
   },
   "python/app/core/__init__.py": {
@@ -15,8 +15,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/core/config.py": {
-    "mtime": 1787573334.827439,
-    "ast_hash": "c37f95177cc3f8e114203e29fae2e3f3",
+    "mtime": 1787670610.4564939,
+    "ast_hash": "9c7a958a151f199bb6bf9aba6550c630",
     "semantic_hash": ""
   },
   "python/app/core/events.py": {
@@ -25,9 +25,9 @@
     "semantic_hash": ""
   },
   "python/app/core/exceptions.py": {
-    "mtime": 1786048312.0,
-    "ast_hash": "71c2787423a5db2da7fec3020c8b6256",
-    "semantic_hash": "71c2787423a5db2da7fec3020c8b6256"
+    "mtime": 1787745302.1110392,
+    "ast_hash": "081599cd9d873ca1242950cf1e60cfd3",
+    "semantic_hash": ""
   },
   "python/app/core/logging_setup.py": {
     "mtime": 1785832022.0,
@@ -40,13 +40,13 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/db/database.py": {
-    "mtime": 1787657040.750445,
-    "ast_hash": "b63fa9b2b02815a03fd496ea4faec13d",
+    "mtime": 1787670610.822873,
+    "ast_hash": "f2006ef98e98959d373fdcf6c20a2381",
     "semantic_hash": ""
   },
   "python/app/deps.py": {
-    "mtime": 1787572985.1180243,
-    "ast_hash": "49f4402028e38c8c5b25f997f3166807",
+    "mtime": 1787670610.8240433,
+    "ast_hash": "cf1c80d6818016580c960e53396ea6e9",
     "semantic_hash": ""
   },
   "python/app/models/__init__.py": {
@@ -55,8 +55,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/models/entities.py": {
-    "mtime": 1787657564.9022086,
-    "ast_hash": "aad16dc1702d13a5b4ea1631d0251f15",
+    "mtime": 1787670610.8858676,
+    "ast_hash": "0028cdf67657708df0e3f76c619f88a2",
     "semantic_hash": ""
   },
   "python/app/relay/__init__.py": {
@@ -80,8 +80,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/repositories/abstract/servo_repository.py": {
-    "mtime": 1786136838.1068695,
-    "ast_hash": "9cd9ae897aa9604321c09c56bc4d0787",
+    "mtime": 1787742102.5936413,
+    "ast_hash": "0ca91a8c8c4f2fa8483597fb8cc1445e",
     "semantic_hash": ""
   },
   "python/app/repositories/abstract/telemetry_repository.py": {
@@ -100,18 +100,18 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/repositories/concrete/bridge_servo_repository.py": {
-    "mtime": 1786136840.178882,
-    "ast_hash": "af8f8412a8416516f2aeb959b90feb66",
+    "mtime": 1787742108.2859938,
+    "ast_hash": "02a55afa7bf413a49761f5dc33f64e49",
     "semantic_hash": ""
   },
   "python/app/repositories/concrete/simulated_servo_repository.py": {
-    "mtime": 1786136850.398943,
-    "ast_hash": "e691d758d91ddab343a71536f6920df7",
+    "mtime": 1787742113.3829424,
+    "ast_hash": "d599d5ac985ae9dae43e06b892bcaade",
     "semantic_hash": ""
   },
   "python/app/repositories/concrete/sqlite_telemetry_repository.py": {
-    "mtime": 1787573574.9132795,
-    "ast_hash": "6900f765431bd49f84dc3f217228ed57",
+    "mtime": 1787670611.9063683,
+    "ast_hash": "077ce0816b4b306a31e0ccdd21ba5b31",
     "semantic_hash": ""
   },
   "python/app/repositories/concrete/sqlite_zero_repository.py": {
@@ -125,8 +125,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/routers/servo.py": {
-    "mtime": 1787573486.7555425,
-    "ast_hash": "c02e040a6e382f6016c514b9d03e6d32",
+    "mtime": 1787742135.5734563,
+    "ast_hash": "7d5862f6b323d32de015215eedd83bba",
     "semantic_hash": ""
   },
   "python/app/routers/system.py": {
@@ -150,8 +150,8 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/schemas/servo.py": {
-    "mtime": 1787657604.460397,
-    "ast_hash": "8a89f0043999952fda8b02c46c047ac5",
+    "mtime": 1787742119.8704655,
+    "ast_hash": "e6a4a91aaa1df35db41e02c31e1f85ba",
     "semantic_hash": ""
   },
   "python/app/schemas/system.py": {
@@ -170,18 +170,18 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "python/app/services/motion_service.py": {
-    "mtime": 1787584712.0427432,
-    "ast_hash": "000aeb81c4cba28f2cacc9f9d058be5c",
+    "mtime": 1787745320.5242908,
+    "ast_hash": "8eb0033fbf9c951b4c87f98d0d3c9eb6",
     "semantic_hash": ""
   },
   "python/app/services/servo_state.py": {
-    "mtime": 1787657574.4365146,
-    "ast_hash": "bbff146fa65ea80a6c1d826978e73d36",
+    "mtime": 1787670612.9363687,
+    "ast_hash": "e780eefb21595de9432efdc16c16cdbe",
     "semantic_hash": ""
   },
   "python/app/services/telemetry_service.py": {
-    "mtime": 1787657040.8791468,
-    "ast_hash": "c411b6661f64f7620a4a7e4d541f68fc",
+    "mtime": 1787670612.9923825,
+    "ast_hash": "ad1af6a246fbf54e46eb611cc9bd311a",
     "semantic_hash": ""
   },
   "python/app/services/zero_service.py": {
@@ -190,8 +190,8 @@
     "semantic_hash": ""
   },
   "python/main.py": {
-    "mtime": 1787657507.444774,
-    "ast_hash": "b105d81abdfb02d8767a27023971fe5e",
+    "mtime": 1787670613.2495375,
+    "ast_hash": "3a442b80d78d04ffebcad311dfb71c56",
     "semantic_hash": ""
   },
   "python/run_dev.py": {
@@ -200,8 +200,8 @@
     "semantic_hash": "12406d28aec8d097fed06de20b60cce7"
   },
   "python/static/app.js": {
-    "mtime": 1787658203.331151,
-    "ast_hash": "ae92705bb544b916141031109d8f12d4",
+    "mtime": 1787745449.7369742,
+    "ast_hash": "8dbddcede9c685e495d75fe44b48fc5d",
     "semantic_hash": ""
   },
   "python/tests/__init__.py": {
@@ -245,8 +245,8 @@
     "semantic_hash": "6eeed8377b7df8c3a8041d4a4ce93058"
   },
   "python/tests/integration/test_servo_routes.py": {
-    "mtime": 1787657693.063215,
-    "ast_hash": "b3746464b2de7b67502dd9bbd92da563",
+    "mtime": 1787745395.4142427,
+    "ast_hash": "5c03f7e574f3f711da631ec3ec8afe07",
     "semantic_hash": ""
   },
   "python/tests/integration/test_system_routes.py": {
@@ -275,8 +275,8 @@
     "semantic_hash": "cde87209ad3139e455c70811129f879f"
   },
   "python/tests/unit/test_bridge_servo_repository.py": {
-    "mtime": 1786136916.4393377,
-    "ast_hash": "aa00622771aaa3afca34497d35a6b7fc",
+    "mtime": 1787742142.7795115,
+    "ast_hash": "21c6f17f7d8aff92907b490e3cb7200e",
     "semantic_hash": ""
   },
   "python/tests/unit/test_config.py": {
@@ -285,8 +285,8 @@
     "semantic_hash": "5eb88265457d091b3c89de34f04d6e58"
   },
   "python/tests/unit/test_database.py": {
-    "mtime": 1787573575.113283,
-    "ast_hash": "724eb3467029ab18bd4fb5de2c7268cb",
+    "mtime": 1787670614.3554988,
+    "ast_hash": "bed71a060ef2c32d9156b0290d972641",
     "semantic_hash": ""
   },
   "python/tests/unit/test_events.py": {
@@ -300,13 +300,13 @@
     "semantic_hash": "5562a5ad3d0be287df6b8bb5d1f461bb"
   },
   "python/tests/unit/test_motion_service.py": {
-    "mtime": 1787584712.700434,
-    "ast_hash": "150066540a067fe38e31fb67189c44e8",
+    "mtime": 1787745248.7235262,
+    "ast_hash": "7d1c4cd147f6c64a9eed13ebb80fecd2",
     "semantic_hash": ""
   },
   "python/tests/unit/test_servo_state.py": {
-    "mtime": 1787657660.8100119,
-    "ast_hash": "ec2aa88bb64b6171b4a85f079a2fc564",
+    "mtime": 1787670614.6194832,
+    "ast_hash": "34fd70764aa45d61ca885a116f9cf544",
     "semantic_hash": ""
   },
   "python/tests/unit/test_sign_magnitude.py": {
@@ -315,14 +315,14 @@
     "semantic_hash": "d1885d90774f63bd44bc30c491e21359"
   },
   "python/tests/unit/test_simulated_servo.py": {
-    "mtime": 1785832786.0,
-    "ast_hash": "69f5b73eccd97aa3806478ab3a7de64f",
-    "semantic_hash": "69f5b73eccd97aa3806478ab3a7de64f"
+    "mtime": 1787742148.6620288,
+    "ast_hash": "3bae3e40694e36426f7a6d527df10150",
+    "semantic_hash": ""
   },
   "python/tests/unit/test_sqlite_telemetry_repository.py": {
-    "mtime": 1785832622.0,
-    "ast_hash": "5c13f032e1d4e5ab2e1d66db8c1a8f6f",
-    "semantic_hash": "5c13f032e1d4e5ab2e1d66db8c1a8f6f"
+    "mtime": 1787670614.8434448,
+    "ast_hash": "717bc4303cb5736bef0857d3b1c2d32a",
+    "semantic_hash": ""
   },
   "python/tests/unit/test_sqlite_zero_repository.py": {
     "mtime": 1785832022.0,
@@ -330,8 +330,8 @@
     "semantic_hash": "99c535ee75fad68ec695db4383bc99fd"
   },
   "python/tests/unit/test_telemetry_service.py": {
-    "mtime": 1787657041.9049222,
-    "ast_hash": "901db2b8d9c488e39ad6df506ebe50a4",
+    "mtime": 1787670614.9105206,
+    "ast_hash": "09b804f9488f6297af1c0b077380e530",
     "semantic_hash": ""
   },
   "python/tests/unit/test_zero_service.py": {
@@ -355,13 +355,13 @@
     "semantic_hash": "893f752020a989e6416458db34491f63"
   },
   "sketch/src/BridgeApi.cpp": {
-    "mtime": 1787572985.378043,
-    "ast_hash": "eca7f915019fe3b115a1b6d3d1045f3e",
+    "mtime": 1787742232.6999516,
+    "ast_hash": "fb1df14a9d077a735fd1f34aff88411e",
     "semantic_hash": ""
   },
   "sketch/src/BridgeApi.h": {
-    "mtime": 1787572985.4220462,
-    "ast_hash": "babb9843c6db6c0437aa5c8df7fe82fc",
+    "mtime": 1787742092.7151892,
+    "ast_hash": "5e6c25ead69556324d3fb087359c7f42",
     "semantic_hash": ""
   },
   "sketch/src/Config.h": {
@@ -390,14 +390,14 @@
     "semantic_hash": "adbfc7fc555bd721acc64bf83d7000ac"
   },
   "sketch/src/ServoController.cpp": {
-    "mtime": 1787572986.0380902,
-    "ast_hash": "1dfb3129a77ed3eeaa0d31f3b6170a12",
+    "mtime": 1787744209.2773728,
+    "ast_hash": "298d0236d4befc9bd6bef410a5b662aa",
     "semantic_hash": ""
   },
   "sketch/src/ServoController.h": {
-    "mtime": 1785849776.0,
-    "ast_hash": "db3ba0d8975941cb2662f0146d558431",
-    "semantic_hash": "db3ba0d8975941cb2662f0146d558431"
+    "mtime": 1787742069.8628433,
+    "ast_hash": "74979f14a658e151b79a8c28b4b5f783",
+    "semantic_hash": ""
   },
   "sketch/src/ServoRegisters.h": {
     "mtime": 1785849620.0,
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1787657039.7280195,
-    "ast_hash": "3d904cf05e41d89a78033e6f5d1049ef",
+    "mtime": 1787659724.7348607,
+    "ast_hash": "6b4876f50ec4719bf13df518ebcf3d54",
     "semantic_hash": ""
   },
   "app.yaml": {
@@ -469,14 +469,9 @@
     "ast_hash": "f85940ec655103ef6353ad7f9b019550",
     "semantic_hash": "f85940ec655103ef6353ad7f9b019550"
   },
-  "docs/FILE_REGISTRY.md": {
-    "mtime": 1786133661.8512769,
-    "ast_hash": "1680558f28bf32352cabbce952f68274",
-    "semantic_hash": "1680558f28bf32352cabbce952f68274"
-  },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1787658439.1659274,
-    "ast_hash": "f1786b797c75c0b6c202961e51240053",
+    "mtime": 1787746062.6376245,
+    "ast_hash": "21f40e7cd5cb1180a4a1fb29fcdaf71e",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -500,8 +495,8 @@
     "semantic_hash": ""
   },
   "python/static/index.html": {
-    "mtime": 1787573499.4318182,
-    "ast_hash": "d5dfe81817f31829f573315449dc5c82",
+    "mtime": 1787670613.501264,
+    "ast_hash": "33471775c04136b8dcc1f58d19c275be",
     "semantic_hash": ""
   },
   "python/wheelhouse/README.txt": {
@@ -530,8 +525,8 @@
     "semantic_hash": ""
   },
   "docs/BACKLOG.md": {
-    "mtime": 1787658287.0292428,
-    "ast_hash": "8c92aefba3fe34ed26f84d97f5386b94",
+    "mtime": 1787746025.5332117,
+    "ast_hash": "32d6d6c159c42beaa38a49d5c8d73ab8",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -570,13 +565,13 @@
     "semantic_hash": "bea0d98de4277553515e44516298ba3c"
   },
   "docs/adr/README.md": {
-    "mtime": 1786139543.3851886,
-    "ast_hash": "e43d2629bf6068f36fb0a2b43ecf2183",
+    "mtime": 1787670609.9812584,
+    "ast_hash": "6e83f2a6e2f4ef0ba50a9c935ce7eeb0",
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1787657040.569286,
-    "ast_hash": "67f81c68f9bb42f6e6092b0894e9dc4a",
+    "mtime": 1787746083.419902,
+    "ast_hash": "42c77f661c80d7c55b6d0c95fb892217",
     "semantic_hash": ""
   },
   "skills/Arduino-Agent/.eslintrc.js": {
@@ -2350,8 +2345,8 @@
     "semantic_hash": ""
   },
   "skills/uno-q-st3215/SKILL.md": {
-    "mtime": 1787572892.0066407,
-    "ast_hash": "63c4b7cd6beb454a0683c4d83879ae01",
+    "mtime": 1787746100.6500177,
+    "ast_hash": "5b0a7710e12818b4400755eab1e0d5ff",
     "semantic_hash": ""
   },
   "skills/superpowers/assets/app-icon.png": {
@@ -2365,7 +2360,7 @@
     "semantic_hash": ""
   },
   "docs/adr/0008-a-failed-read-is-reported-as-unknown.md": {
-    "mtime": 1787657644.0414677,
+    "mtime": 1787658746.723962,
     "ast_hash": "6b732a87e79cb94c37fbbe03f1a15864",
     "semantic_hash": ""
   },
@@ -2395,18 +2390,18 @@
     "semantic_hash": ""
   },
   "docs/OPEN_QUESTIONS.md": {
-    "mtime": 1787584709.1857321,
-    "ast_hash": "9afc9a6496cf4342c4c913d888e4b67e",
+    "mtime": 1787670609.599294,
+    "ast_hash": "f57f85b48c963389b00336b5e9291748",
     "semantic_hash": ""
   },
   "tools/check_client_behaviour.js": {
-    "mtime": 1787658210.3006916,
-    "ast_hash": "bc7d6410c7c5715aa7798ea2b11ffb93",
+    "mtime": 1787745498.043957,
+    "ast_hash": "a82887aaedd02e2357fdaaf3af850125",
     "semantic_hash": ""
   },
   "docs/CLOSED.md": {
-    "mtime": 1787658274.7676976,
-    "ast_hash": "bbca9b67364d6ef93d77c2f33213e592",
+    "mtime": 1787746008.4392397,
+    "ast_hash": "dc06bfdddf2ebf39449e904775bd5542",
     "semantic_hash": ""
   },
   "python/app/relay/mcu_log.py": {
@@ -2445,8 +2440,8 @@
     "semantic_hash": ""
   },
   "python/tests/integration/test_stream.py": {
-    "mtime": 1787573504.5999281,
-    "ast_hash": "0698f7ea1c3fa9927e801aee8409dfec",
+    "mtime": 1787670613.8218389,
+    "ast_hash": "a059ecab7b6376aed1b7883e07a31466",
     "semantic_hash": ""
   },
   "python/tests/unit/test_soak_report.py": {
@@ -2460,13 +2455,43 @@
     "semantic_hash": ""
   },
   "tools/verify_baseline.json": {
-    "mtime": 1787658266.3721,
-    "ast_hash": "7cd3d4e0a84ca370a6e35db31de2fb5e",
+    "mtime": 1787745593.424813,
+    "ast_hash": "b1dffa3feca3995dcc6e1f3ccca40a94",
     "semantic_hash": ""
   },
   "python/tests/unit/test_main.py": {
     "mtime": 1787657507.5743165,
     "ast_hash": "994b6d3db2e8e5ac01efc5c8884581dd",
+    "semantic_hash": ""
+  },
+  "python/app/repositories/abstract/app_state_repository.py": {
+    "mtime": 1787670611.0113087,
+    "ast_hash": "063bd54fafba870ddb295b4f29b76ce9",
+    "semantic_hash": ""
+  },
+  "python/app/repositories/concrete/sqlite_app_state_repository.py": {
+    "mtime": 1787670611.6446989,
+    "ast_hash": "b285a52631e9d4d66784e3d8096a2988",
+    "semantic_hash": ""
+  },
+  "python/app/services/isolation_service.py": {
+    "mtime": 1787744215.4788225,
+    "ast_hash": "472cdfdabf202eee2608fecc6efd5592",
+    "semantic_hash": ""
+  },
+  "python/tests/unit/test_isolation_service.py": {
+    "mtime": 1787744233.8995917,
+    "ast_hash": "9155d2ed2d851638d484e65fc82fef65",
+    "semantic_hash": ""
+  },
+  "python/tests/unit/test_sqlite_app_state_repository.py": {
+    "mtime": 1787670614.7156117,
+    "ast_hash": "5e32ad6bac1fc3785a046e01e35df0a0",
+    "semantic_hash": ""
+  },
+  "docs/adr/0010-motor-isolation-state-survives-a-reboot.md": {
+    "mtime": 1787670609.790403,
+    "ast_hash": "943798a5faf82c416c8a1ffa54219b4d",
     "semantic_hash": ""
   }
 }

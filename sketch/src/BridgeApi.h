@@ -12,6 +12,9 @@
 //   servo_set_deadband      "counts"                 -> "ok" | "err"
 //   servo_configure_range   "multiturn,amplification"-> "ok" | "err"
 //   servo_set_torque        "enabled"                -> "ok" | "err"  (R2)
+//   servo_read_torque       (no payload)             -> "0" | "1" | "err"
+//     Diagnostic only: reads register 0x28 back directly, independent of
+//     servo_set_torque's own write acknowledgement (R2 board verification).
 //   get_status              (no payload)             -> "ready" | "no-servo"
 //
 // Notifies (sketch -> Linux):

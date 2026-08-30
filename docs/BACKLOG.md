@@ -26,19 +26,19 @@ sessions actually spent, not the ones originally planned.
 |---|---|---|
 | **15** | **DONE, 27–30 Aug 2026.** The demo moved up unexpectedly, ahead of the originally-planned 15–19 sequence — ran anyway. Presenter walkthrough produced live (was 18's job). Hit and fixed a live-blocking bug (**D37**, now closed — part of 15's original triage job; the rest of that triage did not happen, see deferred list below). Client feedback gathered, decided into **R9**/**R10** with the team lead. Backlog reorganized and closed out — **D12**, **D19** also closed (superseded by R10's decision, not deferred). Full account: `docs/PROJECT_STATE.md`. | no |
 | **16** | **DONE, 30 Aug 2026.** **R9 closed** (speed → global, off the operator UI). **R10 closed** (calibration collapses into `app_state`; zeros replaced by full-CRUD saved positions, scope grown mid-session past the original design note). Opportunistic bonus: T6's exception hierarchy restructured (half-done, metadata population left). One new defect filed, D38 (dismissing a stale saved-position's advisory tag). D7's 768px collapse corroborated, not fixed. | no |
-| **17** | **In progress, 30 Aug 2026.** Soak tooling modernized (`synthetic_operator.py` profiles, step quantization, R10 CRUD, R2 isolation, binary export stress, stream metrics separation; `soak_report.py` combined reporting with R1 scorecard). Old logs cleaned. Runs 0 through 4 designed and ready to execute. | yes |
-| **18** | **Claude + operator.** Wipe DBs and logs to a clean state, after the session 17 soaks and before the rig day — everything up to now was experiments; closes that phase. | maybe |
+| **17** | **DONE, 30 Aug 2026.** Soak tooling modernized and executed across 5 structured runs (Run 0–4; >70m soak time, >20k samples). R1 software capacity target verified (3 remote + 1 local USB-C). Q9 proven true. D4 11s stall regression verified absent (0 stalls). T9 storage budget measured empirically and closed. Mechanical rig protocol documented in `docs/RIG_TESTING_PROTOCOL.md` ahead of T17. | yes |
+| **18** | **In progress / Next, 30 Aug 2026.** Wipe DBs and logs on the board to a clean state, after the session 17 soaks and before the rig day — closes experimental phase. | yes |
 
 **After session 18, a separate day — mechanical rig assembly and R2's
 hand-turn test (T17), operator/mechanical-team-led, Claude involvement
 light.** Not one of the numbered sessions above; T17's own entry
-(`docs/backlog/T.md`) tracks it.
+(`docs/backlog/T.md`) and protocol (`docs/RIG_TESTING_PROTOCOL.md`) track it.
 
 **Deferred to the triage after session 18 (joint, and separately with the
 team lead) — explicitly held, not dropped:** the rest of
 `docs/REVIEW_FINDINGS.md` (originally session 15's full job — only D37 was
-triaged out of it), **D17**, **T10**, **T11** (originally sessions 16/17's
-job), **T18**, T9, T2, R6, R7. The originally-planned "dry run before the
+triaged out of it), **T10**, **T11** (originally sessions 16/17's
+job), **T18**, T2, R7. The originally-planned "dry run before the
 demo" (old session 19) is moot — the demo already happened.
 
 ---
@@ -65,7 +65,6 @@ demo" (old session 19) is moot — the demo already happened.
 | D5 | Log output dominated by connect/disconnect noise, phrasing not useful | open · medium |
 | D6 | App load time is sometimes slow (chunk-size half closed) | open · medium |
 | D7 | UI not verified on small operator screens | open · medium |
-| D17 | Position bar can't show the negative half of travel | open · medium |
 | D28 | MCU boot-time `mcu_log` notify lost to a startup race | open · low |
 | D35 | Commanded vs. actual servo speed disagree ~1.5–2x | open · medium · not yet investigated |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
@@ -80,22 +79,18 @@ demo" (old session 19) is moot — the demo already happened.
 | T5 | Add `design_diagrams/` with PlantUML | open |
 | T6 | Restructure the exception hierarchy | open · half-done · structure built Session 16, metadata population left |
 | T7 | Add the database abstraction | open |
-| T9 | Put a measured storage budget in writing | open |
 | T10 | Write the recovery runbook, in two halves | open · high |
 | T11 | Write the operations manual | open · high |
 | T13 | Distil the remaining documents | open · opportunistic |
-| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · scheduled after the DB/log cleanup |
+| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · protocol ready in RIG_TESTING_PROTOCOL.md · scheduled after DB/log cleanup |
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
 
 **R-items** (full entries: `docs/backlog/R.md`)
 
 | | | Status |
 |---|---|---|
-| R1 | Determine the real concurrent-operator ceiling | open · unmeasured since SSE migration |
-| R3 | Confirm whether the Bridge could carry a frontend framework | open |
+| R1 | Determine the real concurrent-operator ceiling | open · software target met Session 17 · final sign-off Rig Day |
 | R4 | Post-MVP: mechanical restraint servos, unified under Lock | post-MVP |
-| R5 | Metrics export and benchmarking output | mechanism shipped · one gap open |
-| R6 | Define "stable" by benchmark, not by adjective | open · blocked on R5 |
 | R7 | Handover logistics depend on adapter delivery | delivery-shaping constraint |
 | R8 | Emergency stop | post-MVP · can wait |
 
@@ -120,6 +115,7 @@ demo" (old session 19) is moot — the demo already happened.
 | **D27** | `synthetic_operator.py` does not reproduce `app.js`'s concurrent poll timers | 8 August 2026 · Batch 2 |
 | **D13** | Requests arriving faster than slots free up are refused | 8 August 2026 · ADR-0009 |
 | **D4** | Connection drops after a few commands; requires a page refresh | 11 August 2026 · Session 3 (SSE) — full two-session soak saga kept whole in `CLOSED.md` |
+| **D17** | Position bar can't show the negative half of travel | 23 August 2026 · Session 5 · dynamic range scaling in app.js |
 | **D18** | A failed CSV export navigates the operator out of the application | 11 August 2026 |
 | **D22** | The only export control is fixed at 24 hours | 11 August 2026 · R5's delivery path |
 | **D31** | Telemetry export drops instantly with "controller busy" | 23 August 2026 · real cause was a client-side `ReferenceError`, not the Pydantic hypothesis — see `CLOSED.md` |
@@ -146,3 +142,7 @@ demo" (old session 19) is moot — the demo already happened.
 | **D19** | Saved positions listed against a baseline of 0 when no zero is active | 30 August 2026 · superseded by R10's decision, not fixed in place |
 | **R9** | Speed becomes a global parameter, removed from operator control | 30 August 2026 · Session 16 |
 | **R10** | Zeros replaced by a single datum and full-CRUD saved positions | 30 August 2026 · Session 16 · scope grew mid-session to full CRUD |
+| **T9** | Put a measured storage budget in writing | 30 August 2026 · Session 17 (Software Soak) · ~590 MB 30-day footprint against 2.6 GB disk |
+| **R3** | Confirm whether Bridge could carry a frontend framework | 30 August 2026 · Session 17 · decided/moot; air-gap rules out build pipeline; vanilla JS LCARS accepted |
+| **R5** | Metrics export and benchmarking output | 23 August 2026 · Session 5 · full XLSX client export with native charts, verified under load in Session 17 |
+| **R6** | Define "stable" by benchmark, not by adjective | 30 August 2026 · Session 17 · codified via `tools/soak_report.py` scorecard |

@@ -219,30 +219,6 @@ positions panel specifically.
 
 ---
 
-
-
----
-
-### D17 — The position bar cannot show the negative half of travel
-**Status:** open · **Severity:** medium · **Found by:** operator lens, 8 August 2026
-
-`app.js:283` computes the bar as `(deg / 360) * 100`, clamped to 0–100.
-
-Travel is **±90 output degrees** (ADR-0003). So the whole positive half of travel
-occupies the first **25%** of the bar, and every negative angle clamps to **0%** —
-an operator at −45°, at −90° and at 0° sees an identical empty bar. Half the
-travel window is invisible on the only spatial indicator in the UI.
-
-The numeric readout is correct; this is the picture beside it disagreeing with
-it. Given D9 — where the operator commanded a move from a readout they trusted —
-an indicator that silently agrees with itself across a third of the range is
-worth fixing before the demo.
-
-**Acceptance:** the bar maps the configured travel window, `output_min_deg` to
-`output_max_deg`, with the datum visible as a marked centre.
-
----
-
 ### D38 — A saved position's "earlier reference" tag has no way to dismiss it
 **Status:** open · **Severity:** low · **Found by:** operator, session 16
 (R10's build)

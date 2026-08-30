@@ -325,7 +325,7 @@ class SyntheticOperator:
             Optional[Any]: Parsed JSON response or True on drained stream, None on error.
         """
         data: Optional[bytes] = None
-        headers: dict[str, str] = {}
+        headers: dict[str, str] = {"Connection": "keep-alive"}
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -334,43 +334,47 @@ class SyntheticOperator:
         request = urllib.request.Request(url, data=data, headers=headers,
                                          method=method)
         started = time.monotonic()
-        try:
-            with urllib.request.urlopen(request, timeout=25) as response:
-                if drain_stream:
-                    total_bytes = 0
-                    while True:
-                        chunk = response.read(65536)
-                        if not chunk:
-                            break
-                        total_bytes += len(chunk)
-                    self._metrics.record_request_success(action, time.monotonic() - started)
-                    return total_bytes
-
-                body = response.read()
-                self._metrics.record_request_success(action, time.monotonic() - started)
-                if not body:
-                    return {}
-                return json.loads(body.decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            reason = str(error.code)
+        for attempt in range(2):
             try:
-                err_body = error.read().decode("utf-8")
-                err_json = json.loads(err_body)
-                if "reason" in err_json:
-                    reason = str(err_json["reason"])
-                elif "detail" in err_json:
-                    reason = str(err_json["detail"])
-            except Exception:
-                pass
+                with urllib.request.urlopen(request, timeout=25) as response:
+                    if drain_stream:
+                        total_bytes = 0
+                        while True:
+                            chunk = response.read(65536)
+                            if not chunk:
+                                break
+                            total_bytes += len(chunk)
+                        self._metrics.record_request_success(action, time.monotonic() - started)
+                        return total_bytes
 
-            if 400 <= error.code < 500:
-                self._metrics.record_request_rejection(action, reason)
-            else:
+                    body = response.read()
+                    self._metrics.record_request_success(action, time.monotonic() - started)
+                    if not body:
+                        return {}
+                    return json.loads(body.decode("utf-8"))
+            except urllib.error.HTTPError as error:
+                reason = str(error.code)
+                try:
+                    err_body = error.read().decode("utf-8")
+                    err_json = json.loads(err_body)
+                    if "reason" in err_json:
+                        reason = str(err_json["reason"])
+                    elif "detail" in err_json:
+                        reason = str(err_json["detail"])
+                except Exception:
+                    pass
+
+                if 400 <= error.code < 500:
+                    self._metrics.record_request_rejection(action, reason)
+                else:
+                    self._metrics.record_request_failure(action)
+                return None
+            except Exception:
+                if attempt == 0:
+                    time.sleep(0.25)
+                    continue
                 self._metrics.record_request_failure(action)
-            return None
-        except Exception:
-            self._metrics.record_request_failure(action)
-            return None
+                return None
 
     def stream_forever(self) -> None:
         """Reads the persistent SSE stream until deadline or stop."""
@@ -530,13 +534,15 @@ class SyntheticOperator:
 
         if roll < 0.90:
             pos_id = self._random.choice(self._created_position_ids)
-            deg = quantize_deg(self._random.uniform(TARGET_DEG_MIN, TARGET_DEG_MAX),
-                               self._step_deg)
-            self._request(
-                "position_update", f"/positions/{pos_id}", method="PATCH",
-                payload={"name": f"upd-{pos_id}", "description": "updated soak point",
-                         "target_deg": deg},
-            )
+            pos_data = self._request("position_get", f"/positions/{pos_id}")
+            if pos_data and isinstance(pos_data, dict) and "updated_at" in pos_data:
+                deg = quantize_deg(self._random.uniform(TARGET_DEG_MIN, TARGET_DEG_MAX),
+                                   self._step_deg)
+                self._request(
+                    "position_update", f"/positions/{pos_id}", method="PATCH",
+                    payload={"name": f"upd-{pos_id}", "description": "updated soak point",
+                             "target_deg": deg, "updated_at": pos_data["updated_at"]},
+                )
             return
 
         pos_id = self._created_position_ids.pop(0)
@@ -632,13 +638,16 @@ def run_preflight(host: str, port: int) -> bool:
     """
     print(f"pre-flight: probing http://{host}:{port}...")
     base = f"http://{host}:{port}/api/v1"
+    headers = {"Connection": "keep-alive"}
     try:
-        req = urllib.request.Request(f"{base}/system/health")
-        with urllib.request.urlopen(req, timeout=5) as r:
+        req = urllib.request.Request(f"{base}/system/health", headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as r:
             health = json.loads(r.read().decode("utf-8"))
 
-        req = urllib.request.Request(f"{base}/servo/state")
-        with urllib.request.urlopen(req, timeout=5) as r:
+        time.sleep(0.5)
+
+        req = urllib.request.Request(f"{base}/servo/state", headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as r:
             state = json.loads(r.read().decode("utf-8"))
 
         print("---- pre-flight check ----")

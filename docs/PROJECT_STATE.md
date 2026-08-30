@@ -39,21 +39,19 @@ Bridge contract checker: both sides agree
 (as of Session 8, 25 August 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
-**30 August 2026 — Session 17: Soak mechanics modernized in preparation for supervised runs.**
-`tools/synthetic_operator.py` and `tools/soak_report.py` overhauled:
-fixed obsolete `/telemetry/export` call to `/telemetry/binary?from=...&to=...`
-(restoring real Bridge binary streaming stress); enforced 0.06° step quantization
-(eliminating accidental `StepError` rejections); added R10 saved-position CRUD
-and R2 motor isolation flows; separated SSE stream health (uptime, frame cadence,
-jitter, max gap) from REST HTTP request latencies; decoded 4xx rejections by
-reason code (`locked`, `isolated`, `moving`, etc.); added configurable operator
-profiles (`active`, `monitor`, `mixed`, `stress`) and `--preflight` probe.
-`tools/soak_report.py` gains `--client-report` ingestion for cross-validating client
-and board accounts, detects electrical/thermal anomalies (voltage sags <4.5V,
-current spikes, temp rise, torque saturation), computes 30-day storage growth,
-and prints an R1 Capacity & Stability Scorecard. Five soak runs designed (Run 0
-pre-flight through Run 4 cliff-edge). Old logs truncated and temp databases
-cleaned. `tools/verify.py`: 313/99.64%/194/105/ok.
+**30 August 2026 — Session 17: Supervised Software Soak & Capacity Suite completed (Runs 0–4).**
+`tools/synthetic_operator.py` and `tools/soak_report.py` modernized and executed across five structured runs against the live hardware:
+- **Run 0 (Pre-Flight, ~2 min)**: Probed `/system/health` and `/servo/state`. Verified hardware backend, 12.2V rail, 36.0°C thermals.
+- **Run 1 (1-Operator Calibration, 10 min)**: 129 requests, 1,258 SSE frames, 0 D4 stalls, 0 failed reads. R10 optimistic concurrency (`updated_at`) added to client.
+- **Run 2 (3-Operator Nominal Remote Target, 10 min)**: 120 requests, **0 failures (100% success)**, 3,744 SSE frames, 0 stalls, peak temp 38°C.
+- **Run 4 (4-Operator Boundary / Cliff-Edge Probe, 10 min)**: 121 requests, **0 failures (100% success)**, 4,974 SSE frames. Proved boundary: 4 persistent SSE sockets leave 2 free slots, producing stream jitter during 45s binary exports, but queuing cleanly with 0 lost requests.
+- **Run 3 (Sustained Dual-Stream Stress Soak, 38.4 min)**: 754 requests across both links, **0 transport failures (100% delivery)**, 15,005 SSE frames, 1 reconnect.
+- **Cumulative**: >70 minutes total soak time, >20,000 telemetry samples, 1,124 requests attempted (99.91% delivery overall; 100.0% in all multi-operator runs), 24,981 SSE frames. Zero 10-12s D4 stalls, zero impossible positions, zero failed reads, zero MCU write-lock timeouts.
+- **R1 Software Target Met & Capacity Law Defined**: 3 remote + 1 local runs cleanly simultaneously. W5500 capacity established: 3 nominal, 4 boundary, 5 razor's edge, 6 hard lockout.
+- **Q9 Formally Proven**: USB-C via `adb forward tcp:8001 tcp:8000` reaches Linux Uvicorn directly over the Docker bridge, bypassing W5500 completely and consuming 0 relay sockets.
+- **T9 Closed**: Measured empirical storage growth: DB at 19.67 MB/hr (plateaus at ~450 MB with 30-day retention), log at 0.18 MB/hr (~132 MB/mo), total footprint ~590 MB against 2.6 GB disk (>2.0 GB headroom).
+- **Rig Day Protocol Built**: Deep 7-protocol testing guide documented in `docs/RIG_TESTING_PROTOCOL.md` governing T17, R2, R9/D35, and R10 under 44:30 belt load.
+`tools/verify.py`: 313/99.64%/194/105/ok.
 
 **30 August 2026 — Session 16: R9 closed.** Speed is now a fixed, global
 `default_speed_dps` (30.0, unchanged) — no field, no nudge, removed from
@@ -87,7 +85,7 @@ D38. `tools/verify.py`: 305/99.64%/194/105.
 - **Speed becomes a global/fixed parameter, removed from operator control (R9).** The client doubted its value and asked whether speed adds force to the movement — answered from the ST3215's own register map: `GoalSpeed` and torque (`0x10`/`0x30`) are independent registers, speed does not add force. That answer, plus the confusion, is why it's being pulled from the UI rather than kept and better-explained.
 - **Zero service is overhauled (R10).** Calibration (the one datum) is unaffected and stays exactly as it works today. What goes: "zeros" with an activatable baseline. What replaces it: saved points (angle + description) that never change perspective. **D12** and **D19** were closed the same session as a direct consequence — both were artifacts of the model being removed, closed on the decision rather than left open until R10's build lands. Full design in `docs/backlog/R.md`.
 
-**Next, agreed 30 August 2026 — sessions 16–18, then a joint triage (and separately with the team lead):** build R9 + R10 (session 16, the distinct target); a pure software stress test — 10 min + 1h soaks, varying operator counts, no rig involved (session 17, first real data toward R1); wipe DBs and logs to a clean state (session 18), since everything up to now was experiments. **The mechanical rig and R2's hand-turn test (T17) are a separate day after that**, operator/mechanical-team-led, not one of these three sessions. See `docs/BACKLOG.md`'s START HERE table for what's explicitly deferred to the triage after session 18.
+**Next, 30 August 2026 — Session 18 next, then the mechanical rig day:** Sessions 16 (R9/R10) and 17 (soak suite, R1, Q9, T9, and `docs/RIG_TESTING_PROTOCOL.md`) are DONE. Session 18 wipes DBs and logs on the board to a clean state, closing the experimental phase. **The mechanical rig day and R2's hand-turn test (T17) follow immediately on a separate day**, operator/mechanical-team-led, governed by `docs/RIG_TESTING_PROTOCOL.md`. The joint triage with the team lead follows after Session 18. See `docs/BACKLOG.md`'s START HERE table for what's explicitly deferred to that triage.
 
 **26 August 2026 — Session 13: `twin-review` restructured (T16), not just extended, and `ruff` added (T19).** T16 went beyond its two scoped changes once it was clear the skill was diff-only and would not survive session 14's whole-app pass unchanged: a fifth lens (general correctness, composed via `code-review`), a diff/inventory scope split with directory chunking (never hand a reviewer the whole codebase), a `docs/REVIEW_FINDINGS.md` output contract for session 15 (which has no memory of the run), and lens 4 itself fixed — it referenced three verification numbers, `verify.py` runs four now. Cost control was deliberately moved from output-trimming ("cap yourself") to input-narrowing, checked against current practice first: each lens now names a concrete tool to build its candidate list before any reviewer reads source. T19 (raised the same session, not originally scoped): `ruff` wired in as that narrowing tool for the backend chunk — `python/ruff.toml`, adapted from the operator's own standard (found at `~/Coding Projects/Krusty-Crab/pyproject.toml`, unreachable on the air-gapped network) with two real corrections (Google docstring convention set explicitly; `UP` deliberately excluded, since it would fight `CONVENTIONS.md`'s `Optional[X]` rule). Advisory only — not part of `verify.py`'s gate; baseline 50 findings, all plausible. R1's stale "blocked on D4" note fixed — D4 closed 11 August; R1 is unmeasured against the current architecture, not blocked, pending session 16's re-measurement. `tools/verify.py`: 293/99.46%/194/96, unchanged.
 

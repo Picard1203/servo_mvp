@@ -75,64 +75,7 @@ pure software stress test, no rig involved). Rig assembly and the actual
 hand-turn test happen on a separate day, operator/mechanical-team-led,
 after the soak session and the DB/log cleanup close out. Close T17 once
 the hand-turn scenario is actually tested, not just once the rig exists.
-
----
-
-### T9 — Put a measured storage budget in writing
-**Status:** open · **Raised by:** the operator, planning a one-to-two month test
-
-The question is simple and nobody could answer it: *run this for two months —
-does it fit?* Measured on the board on 7 August 2026, at the original 1 row/s:
-
-| | rate | one month | two months |
-|---|---|---|---|
-| Telemetry database | ~80 bytes/row at 1 row/s → ~6.9 MB/day | ~208 MB | ~416 MB |
-| Log at DEBUG | ~180 bytes/line, ~24 lines/min/operator → ~6.3 MB/day | ~188 MB | ~376 MB |
-
-Free space on the board: **2.6 GB**. So a two-month run at DEBUG lands near
-800 MB — it fits, but nothing enforces it and nobody had written it down.
-
-**Recomputed, 23 August 2026 — `sampler_interval_seconds` is now 0.5, not
-1.0.** The telemetry-database row doubles with it (log row is operator-poll
-driven, not sampler-driven, unaffected): ~160 bytes/s → **~13.8 MB/day**.
-`telemetry_retention_days` also dropped 60 → 30 the same session, so the
-database no longer grows past that window — it plateaus at roughly
-**13.8 MB/day × 30 days ≈ 414 MB**, not the ~416 MB two-month figure above,
-which was for the old rate and window and no longer applies. Not
-re-measured on the board at the new rate — this is arithmetic from the
-7 August figures, flagged as such.
-
-**Retention, corrected.** Telemetry purges at 60 days
-(`telemetry_retention_days`), so the database plateaus rather than growing
-without limit. The **real Logger461 rotates**, so production logging is bounded
-too. What is *not* bounded is the **stand-in** in `main.py`, which is what runs
-on any board without the wheel installed — including this one. It opens the file
-and appends forever.
-
-**Provisional numbers from Session 2's soak, 8 August 2026 — treat with
-caution, both runs were abnormal (D4 reopened):** 3-operator run (~22 min,
-`LOG_LEVEL` was inert at the time (D29, since closed 25 August 2026 — the
-stand-in now actually filters), so this measured the DEBUG rate regardless
-of the configured setting; a board on INFO from here on should log less
-than this, not re-measured): db 0.27 MB/hr → 196 MB/month, log 0.19 MB/hr →
-137 MB/month, mcu log 0.10 MB/hr → 75 MB/month. Broadly in the range this
-table already expected, but a run dominated by connection-rejection churn
-is not a clean
-baseline — re-measure once D4 is actually closed.
-
-Still to do:
-
-- Confirm the telemetry purge actually plateaus the file. SQLite reuses freed
-  pages rather than shrinking, so the size should level off, not fall — verify
-  rather than assume.
-- Measure the message rate with several operators, not one.
-- **Size any MCU-side logging against this budget before adding it** (D3). Debug
-  chatter from the relay is the highest-rate traffic in the system, and if it
-  crosses the Bridge into the same log file it spends from the same allowance.
-  If the stand-in is what will be running, give it rotation first.
-
-**Acceptance:** a table like the one above, verified over a multi-hour run, with
-a stated maximum footprint the board cannot exceed.
+Full testing protocol prepared: `../RIG_TESTING_PROTOCOL.md`.
 
 ---
 

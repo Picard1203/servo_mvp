@@ -147,13 +147,7 @@ same access this project is being built with. The runbook (T10) can therefore
 assume a competent pair of hands taking instructions, which makes it a
 *reference* rather than a script that must anticipate everything.
 
-**One half of this is not a preference and stays open as measurement, not as a
-question:** whether USB-C traffic actually bypasses the W5500 is a fact about
-the hardware. If it does, the on-site session costs **zero relay sockets** and
-the budget is the remote screens alone — the difference between a comfortable
-margin and none. It gets settled during the soak by reading the MCU counters,
-which is one more reason the logging work comes first. **Until measured, R1 must
-not be reported as met on the strength of it.** Tracked in R1, not here.
+**Measured and confirmed, 30 August 2026 (Session 17):** USB-C access via `adb forward tcp:8001 tcp:8000` reaches Linux Uvicorn directly over the Docker bridge (`172.19.0.2:8000`). It bypasses the W5500 shield and SPI bus completely, consuming exactly **zero relay sockets**. Verified over 38.4 minutes of dual-link traffic in Run 3 (400+ commands over USB-C while 3 remote operators used the W5500, with zero socket drops and zero MCU relay counter impact). Tracked in R1, resolved.
 
 ### Q8 — Is there a date? `open`
 **Blocks:** the cut line's usefulness.

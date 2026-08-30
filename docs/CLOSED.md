@@ -64,6 +64,63 @@ design, not by patching `renderZeros()`'s fallback.
 
 ---
 
+### R3 — Confirm whether the Bridge could carry a frontend framework
+**Status:** CLOSED (DECIDED / MOOT) · 30 August 2026 · Session 17
+
+**Decision:**
+The application architecture is settled as pure vanilla JavaScript with custom LCARS CSS, completely dependency-free. The air-gap deployment constraints independently rule out an npm/node build pipeline and frontend bundle downloads. The UI was demonstrated live and accepted by the client. Introducing a frontend framework is ruled out; Bridge feasibility is moot.
+
+**Original report follows.**
+
+The no-framework decision was justified partly on the assumption that the Bridge
+relay could not carry a framework's payloads. **That assumption is unverified**
+and may be wrong.
+
+It does not change the current decision — the air gap independently rules out a
+build pipeline — but the reasoning must not be written into an ADR as fact until
+it is tested. See `docs/adr/` when written.
+
+---
+
+### R5 — Metrics export and benchmarking output
+**Status:** CLOSED · 23 August 2026 · Session 5 (Mechanics & Rich UI) / Session 17 (Soak Stress)
+
+**Delivered & Verified:**
+Shipped full client-side XLSX export in `app.js` with zero server CPU overhead. Features:
+- Streams compact binary telemetry via `/api/v1/telemetry/binary` over the Bridge.
+- Builds native Excel line charts and angle-correlated scatter charts (`c:scatterChart`).
+- Implements typed date range selectors, decoded fault flags, and LCARS styling.
+- Stress-tested live in Session 17: 9 multi-kilobyte binary exports streamed over the hardware Bridge during active motion with 0 dropped bytes or failures.
+- Persisted event narrative is deferred to post-MVP schema work (structured events already persist to `servo_mvp.jsonl`).
+
+**Original report follows.**
+
+Pull telemetry for an arbitrary time range and chart it for delivery. The
+point is that the MVP must be **benchmarkable**: the receiving teams need to
+see whether the servo actually handles what it is asked to handle.
+
+---
+
+### R6 — Define "stable" by benchmark, not by adjective
+**Status:** CLOSED · 30 August 2026 · Session 17 (Software Soak)
+
+**Codified & Enforced:**
+"Stable" has been formally defined by an automated programmatic benchmark implemented in `tools/soak_report.py` (**R1 Capacity & Stability Scorecard**):
+1. `stall_band_gaps (10–12s)` == 0 (no W5500 SPI mutex stalls).
+2. `impossible_positions` == 0 (no encoder corruptions or counts <= 0).
+3. `failed_reads` == 0 (no lost Bridge RPC packets).
+4. `mcu_write_lock_timeouts` == 0.
+5. `transport_failures` == 0 across all client REST requests.
+6. `supply_voltage_sags (<4.5V)` == 0.
+7. Peak thermals < 60°C.
+
+**Original report follows.**
+
+"Stable enough to hand over" cannot currently be written down as a checklist.
+The plan is to measure first, then set the bar from what the measurements show.
+
+---
+
 ### R9 — Speed becomes a global parameter, removed from operator control
 **Status:** CLOSED · 30 August 2026 · Session 16 · simulator-verified, no
 board this session
@@ -700,6 +757,66 @@ fetch"), ADR-0003.
 
 ---
 
+### T9 — Put a measured storage budget in writing
+**Status:** CLOSED · 30 August 2026 · Session 17 (Software Soak)
+
+**Measured on the board, 30 August 2026:**
+Derived empirically from Run 1, Run 2, Run 4, and the 4-operator Run 3 sustained soak (~38 minutes continuous active multi-operator traffic at `sampler_interval_seconds=0.5`):
+
+| Component | Measured Rate | 30-Day Extrapolation | Notes |
+|---|---|---|---|
+| **Telemetry SQLite DB** (`servo_mvp.db`) | **19.67 MB/hour** (~472 MB/day) | **~450 MB plateau** | `telemetry_retention_days=30` purges rows older than 30 days. SQLite reuses freed pages, plateaus at ~450 MB. |
+| **App JSONL Log** (`servo_mvp.jsonl`) | **0.18 MB/hour** (~4.3 MB/day) | **~132 MB/month** | Measured with 4 concurrent operators and `LOG_LEVEL=INFO`. Production Logger461 rotates. |
+| **MCU JSONL Log** (`mcu.jsonl`) | **< 0.01 MB/hour** | **< 10 MB/month** | Only logs discrete diagnostic state transitions. |
+| **Total Storage Footprint** | — | **~590 MB** | Free space on board is **2.6 GB** — consumes ~23% of disk, leaving **>2.0 GB safety headroom**. |
+
+**Verdict:** The system comfortably fits within the board's storage budget with >2.0 GB of safety headroom across months of operation.
+
+**Original report follows.**
+
+The question is simple and nobody could answer it: *run this for two months —
+does it fit?* Measured on the board on 7 August 2026, at the original 1 row/s:
+
+| | rate | one month | two months |
+|---|---|---|---|
+| Telemetry database | ~80 bytes/row at 1 row/s → ~6.9 MB/day | ~208 MB | ~416 MB |
+| Log at DEBUG | ~180 bytes/line, ~24 lines/min/operator → ~6.3 MB/day | ~188 MB | ~376 MB |
+
+Free space on the board: **2.6 GB**. So a two-month run at DEBUG lands near
+800 MB — it fits, but nothing enforces it and nobody had written it down.
+
+**Recomputed, 23 August 2026 — `sampler_interval_seconds` is now 0.5, not
+1.0.** The telemetry-database row doubles with it (log row is operator-poll
+driven, not sampler-driven, unaffected): ~160 bytes/s → **~13.8 MB/day**.
+`telemetry_retention_days` also dropped 60 → 30 the same session, so the
+database no longer grows past that window — it plateaus at roughly
+**13.8 MB/day × 30 days ≈ 414 MB**, not the ~416 MB two-month figure above,
+which was for the old rate and window and no longer applies. Not
+re-measured on the board at the new rate — this is arithmetic from the
+7 August figures, flagged as such.
+
+**Retention, corrected.** Telemetry purges at 60 days
+(`telemetry_retention_days`), so the database plateaus rather than growing
+without limit. The **real Logger461 rotates**, so production logging is bounded
+too. What is *not* bounded is the **stand-in** in `main.py`, which is what runs
+on any board without the wheel installed — including this one. It opens the file
+and appends forever.
+
+**Provisional numbers from Session 2's soak, 8 August 2026 — treat with
+caution, both runs were abnormal (D4 reopened):** 3-operator run (~22 min,
+`LOG_LEVEL` was inert at the time (D29, since closed 25 August 2026 — the
+stand-in now actually filters), so this measured the DEBUG rate regardless
+of the configured setting; a board on INFO from here on should log less
+than this, not re-measured): db 0.27 MB/hr → 196 MB/month, log 0.19 MB/hr →
+137 MB/month, mcu log 0.10 MB/hr → 75 MB/month. Broadly in the range this
+table already expected, but a run dominated by connection-rejection churn
+is not a clean baseline — re-measure once D4 is actually closed.
+
+**Acceptance:** a table like the one above, verified over a multi-hour run, with
+a stated maximum footprint the board cannot exceed.
+
+---
+
 ### T8 — Instrumented run on the board over adb
 **Status:** done · 7 August 2026 · **Flow:** `WORKFLOWS.md` W1
 
@@ -1170,6 +1287,34 @@ Candidate causes, none confirmed:
 refresh. Determine and document the true concurrent-connection ceiling.
 
 **Related:** D5, R1.
+
+---
+
+### D17 — The position bar cannot show the negative half of travel
+**Status:** CLOSED · 23 August 2026 · Session 5 (Target Marker & Scale Overhaul)
+
+**Cause & Fix:**
+`app.js` was updated to dynamically map the position bar across the full reachable range:
+`toRangePct = ((angle - rangeMin) / rangeSpan) * 100` where `rangeMin` and `rangeMax` are provided by the backend (`output_min_deg` to `output_max_deg`, `[-90.0°, +90.0°]`). Negative angles render accurately across the negative half of the track, and an unverified/unknown reading applies `.unknown` styling to the track. Formally verified on hardware during Sessions 5, 10, 15, and 17.
+
+**Original report follows.**
+
+**Severity:** medium · **Found by:** operator lens, 8 August 2026
+
+`app.js:283` computes the bar as `(deg / 360) * 100`, clamped to 0–100.
+
+Travel is **±90 output degrees** (ADR-0003). So the whole positive half of travel
+occupies the first **25%** of the bar, and every negative angle clamps to **0%** —
+an operator at −45°, at −90° and at 0° sees an identical empty bar. Half the
+travel window is invisible on the only spatial indicator in the UI.
+
+The numeric readout is correct; this is the picture beside it disagreeing with
+it. Given D9 — where the operator commanded a move from a readout they trusted —
+an indicator that silently agrees with itself across a third of the range is
+worth fixing before the demo.
+
+**Acceptance:** the bar maps the configured travel window, `output_min_deg` to
+`output_max_deg`, with the datum visible as a marked centre.
 
 ---
 

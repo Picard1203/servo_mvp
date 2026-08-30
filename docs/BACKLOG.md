@@ -17,35 +17,29 @@ full session-by-session record of the MVP build, sessions 1–10) and
 
 # START HERE — the session plan
 
-**Agreed with the operator, 26 August 2026.** Sessions 1–10 (the MVP feature
-build, through R2's close) are done — the full record is in `docs/CLOSED.md`.
-This table is the path from there to the **first client demo** — not MVP
-delivery, a narrower earlier milestone. **"Session" means a Claude Code chat
-session** (context-reset unit), not a calendar day.
+**Path-to-first-demo milestone (sessions 11–14) closed 26 August 2026** — full
+record in `docs/CLOSED.md`. **"Session" means a Claude Code chat session**
+(context-reset unit), not a calendar day — the numbering below reflects
+sessions actually spent, not the ones originally planned.
 
 | # | Session | Board? |
 |---|---|---|
-| **11** | **DONE, 26 Aug 2026.** T15a: prose strip on `python/app/`, plus T1 in full. Run by Antigravity; corrected by hand the same session after a full diff review found real content silently dropped — see T15's entry. `python/static/*.js` was descoped and reverted whole (no JS conventions exist yet — T18). | no |
-| **12** | **DONE, 26 Aug 2026.** T15b: same rule on `sketch/src/`. Held up far better than session 11 — most of what it removed was already in `skills/uno-q-st3215/SKILL.md`/`RELAY_NOTES.md`; five deleted doc-comment summaries and a few minor facts (payload-format table, register provenance) restored. T15 fully closed — see `CLOSED.md`. | no |
-| **13** | **DONE, 26 Aug 2026.** T16 closed — went further than scoped (see `CLOSED.md`): fifth lens, diff/inventory scope modes with chunking, tool-narrowed candidate-finding per lens (not output-trimming — checked against current industry practice for LLM review token cost first), `REVIEW_FINDINGS.md` output contract. R1's stale blocked-on-D4 note fixed (D4 closed 11 Aug; R1 is now unmeasured against the current architecture, not blocked). | no |
-| **14** | **DONE, 26 Aug 2026.** Enhanced `/twin-review`, whole-app, first time — 5 lenses × 4 chunks (backend/firmware/frontend/docs), ~65 findings → `docs/REVIEW_FINDINGS.md`. Headline: a real build-breaking brace mismatch in `NetworkRelay.cpp` that no existing check catches (native suite doesn't compile that file). | no |
-| **15** | **Claude.** Triage those findings; fix what matters before the demo; backlog the rest with a reason. | maybe |
-| **16** | **Claude, board.** R1 re-measured (synthetic, one SSE stream/operator — no real multi-machine test exists yet). Soak sharpened for auto-isolate. Feature pass via `/operator-lens`. Fix live: **D17**, **D12**, **D19**. | yes |
-| **17** | **Claude, desk.** **T10** (recovery runbook) and **T11** (operations manual), after 16 lands. | no |
-| **18** | **Claude, desk.** Client walkthrough guide — a short UI script for the presenter, this meeting. | no |
-| **19** | **Claude.** Dry run on the real presentation device. Final verify. Go/no-go. | depends |
+| **15** | **DONE, 27–30 Aug 2026.** The demo moved up unexpectedly, ahead of the originally-planned 15–19 sequence — ran anyway. Presenter walkthrough produced live (was 18's job). Hit and fixed a live-blocking bug (**D37**, now closed — part of 15's original triage job; the rest of that triage did not happen, see deferred list below). Client feedback gathered, decided into **R9**/**R10** with the team lead. Backlog reorganized and closed out — **D12**, **D19** also closed (superseded by R10's decision, not deferred). Full account: `docs/PROJECT_STATE.md`. | no |
+| **16** | **Claude.** Build **R9** (speed → global, off the operator UI) and **R10** (zero service overhaul: calibration collapses into `app_state`, saved points replace "zeros"). **The distinct target for today.** | no |
+| **17** | **Claude + operator, no rig.** Pure software stress test — 10 min and 1 h soaks, varying operator counts — exercises connection/SSE/DB stability under load. **Not related to the mechanical rig.** First real measurement toward **R1**, replacing the synthetic remeasure originally planned here. | yes |
+| **18** | **Claude + operator.** Wipe DBs and logs to a clean state, after the session 17 soaks and before the rig day — everything up to now was experiments; closes that phase. | maybe |
 
-**Not on this path:** T2, T9, R6's full bar, R7 (MVP-delivery arc). D5, D28
-(low severity, unscheduled). D35 (live-demo talking risk). **T18** (front-end
-conventions + `app.js` split, after the demo). **T17** (mechanical rig,
-independent track near Monday's mechanical session — does not gate the demo).
+**After session 18, a separate day — mechanical rig assembly and R2's
+hand-turn test (T17), operator/mechanical-team-led, Claude involvement
+light.** Not one of the numbered sessions above; T17's own entry
+(`docs/backlog/T.md`) tracks it.
 
-**D7** is unblocked (Q1 answered 26 Aug — responsive range, not an exact
-device) but still not on this path; it can be picked up whenever, independent
-of the demo sessions.
-
-Full reasoning for this sequence: see the plan this table was built from,
-or ask — it is not re-derived here to keep this table short.
+**Deferred to the triage after session 18 (joint, and separately with the
+team lead) — explicitly held, not dropped:** the rest of
+`docs/REVIEW_FINDINGS.md` (originally session 15's full job — only D37 was
+triaged out of it), **D17**, **T10**, **T11** (originally sessions 16/17's
+job), **T18**, T9, T2, R6, R7. The originally-planned "dry run before the
+demo" (old session 19) is moot — the demo already happened.
 
 ---
 
@@ -71,9 +65,7 @@ or ask — it is not re-derived here to keep this table short.
 | D5 | Log output dominated by connect/disconnect noise, phrasing not useful | open · medium |
 | D6 | App load time is sometimes slow (chunk-size half closed) | open · medium |
 | D7 | UI not verified on small operator screens | open · medium |
-| D12 | No way to return to the datum after activating a saved zero | open · medium |
 | D17 | Position bar can't show the negative half of travel | open · medium |
-| D19 | Saved positions listed against a baseline of 0 when no zero is active | open · medium · needs confirmation |
 | D28 | MCU boot-time `mcu_log` notify lost to a startup race | open · low |
 | D35 | Commanded vs. actual servo speed disagree ~1.5–2x | open · medium · not yet investigated |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
@@ -91,7 +83,7 @@ or ask — it is not re-derived here to keep this table short.
 | T10 | Write the recovery runbook, in two halves | open · high |
 | T11 | Write the operations manual | open · high |
 | T13 | Distil the remaining documents | open · opportunistic |
-| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · independent track |
+| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · scheduled after the DB/log cleanup |
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
 
 **R-items** (full entries: `docs/backlog/R.md`)
@@ -105,6 +97,8 @@ or ask — it is not re-derived here to keep this table short.
 | R6 | Define "stable" by benchmark, not by adjective | open · blocked on R5 |
 | R7 | Handover logistics depend on adapter delivery | delivery-shaping constraint |
 | R8 | Emergency stop | post-MVP · can wait |
+| R9 | Speed becomes a global parameter, off the operator UI | open · today's target |
+| R10 | Zero service overhaul: calibration only, saved points replace "zeros" | open · today's target |
 
 ---
 
@@ -148,3 +142,6 @@ or ask — it is not re-derived here to keep this table short.
 | **T15** | Code-level documentation strip, both halves (T15a Python, T15b firmware) — Antigravity, hand-verified against the diff both times | 26 August 2026 · T15a needed real correction, T15b held up well |
 | **T16** | `twin-review` restructured for a whole-app pass: fifth lens, scope modes, tool-narrowed dispatch, `REVIEW_FINDINGS.md` output | 26 August 2026 · running it (session 14) still open |
 | **T19** | `ruff` added as an advisory Python lint pass (`python/ruff.toml`), wired into `twin-review`'s backend-chunk lenses | 26 August 2026 · not part of `verify.py`'s gate; baseline 50 findings |
+| **D37** | `NetworkRelay.cpp` stray unmatched closing brace, build-breaking — found by Session 14's review, hit live blocking the client demo | 30 August 2026 · fixed and committed same session |
+| **D12** | No way to return to the datum after activating a saved zero | 30 August 2026 · superseded by R10's decision, not fixed in place |
+| **D19** | Saved positions listed against a baseline of 0 when no zero is active | 30 August 2026 · superseded by R10's decision, not fixed in place |

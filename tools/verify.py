@@ -1,4 +1,4 @@
-"""Runs the four verification checks once and prints one summary block.
+"""Runs the five verification checks once and prints one summary block.
 
     python3 tools/verify.py                  # run everything, compare to baseline
     python3 tools/verify.py --update-baseline # accept the current counts as new
@@ -206,6 +206,18 @@ def run_client_behaviour() -> dict:
     return {"exit_code": code, "ok": ok, "fail": fail, "raw": output}
 
 
+def run_brace_balance() -> dict:
+    """Runs the brace-balance check (D37: catches what the native suite
+    can't, since it never compiles sketch/src/ files needing Arduino.h).
+
+    Returns:
+        Findings: whether every checked file balances.
+    """
+    code, output = _run([sys.executable, "tools/check_brace_balance.py"],
+                        REPO_ROOT)
+    return {"exit_code": code, "ok": code == 0, "raw": output}
+
+
 def _load_baseline() -> dict:
     if BASELINE_PATH.exists():
         return json.loads(BASELINE_PATH.read_text())
@@ -232,12 +244,14 @@ def main() -> int:
     native_r = run_native_checks()
     bridge_r = run_bridge_contract()
     client_r = run_client_behaviour()
+    brace_r = run_brace_balance()
 
     all_green = (
         python_r["exit_code"] == 0
         and native_r["exit_code"] == 0
         and bridge_r["agrees"]
         and client_r["exit_code"] == 0
+        and brace_r["ok"]
     )
 
     print("---- verify ----")
@@ -253,6 +267,7 @@ def main() -> int:
     print(_delta("native checks    ", native_r["checks"], baseline.get("native")))
     print(f"bridge contract   {'both sides agree' if bridge_r['agrees'] else 'DISAGREE'}")
     print(_delta("client behaviour ", client_r["ok"], baseline.get("client")))
+    print(f"brace balance     {'ok' if brace_r['ok'] else 'UNBALANCED'}")
     print()
 
     if python_r["failed_names"]:
@@ -286,6 +301,11 @@ def main() -> int:
         for line in client_r["raw"].splitlines():
             if CLIENT_FAIL_RE.match(line):
                 print(f"  {line.strip()}")
+        print()
+
+    if not brace_r["ok"]:
+        print("BRACE BALANCE FAILURES:")
+        print(brace_r["raw"])
         print()
 
     if args.update_baseline:

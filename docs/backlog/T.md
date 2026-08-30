@@ -69,6 +69,13 @@ output arm attached? enough of R4's mechanical assembly to have a real lever?)
 and when it's realistically available, before spending more bench time on a
 test the current setup cannot support.
 
+**Update, 30 August 2026:** distinct from the software soak session
+(unrelated to this item — see `docs/BACKLOG.md`'s session table; that's a
+pure software stress test, no rig involved). Rig assembly and the actual
+hand-turn test happen on a separate day, operator/mechanical-team-led,
+after the soak session and the DB/log cleanup close out. Close T17 once
+the hand-turn scenario is actually tested, not just once the rig exists.
+
 ---
 
 ### T9 — Put a measured storage budget in writing

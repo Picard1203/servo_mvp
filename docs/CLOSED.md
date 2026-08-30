@@ -12,6 +12,58 @@ file every session has to read.
 
 ---
 
+### D37 — `NetworkRelay.cpp` had a stray unmatched closing brace, build-breaking
+**Status:** done · 30 August 2026 · found by Session 14's `/twin-review`,
+hit live blocking the client demo
+
+`sketch/src/NetworkRelay.cpp:170` had a bare `}` immediately before the
+real `}  // namespace net` closer, with nothing left to close — a real
+compiler rejects the file. Session 14's whole-app review found and flagged
+this HIGH/build-breaking (`docs/REVIEW_FINDINGS.md`, firmware #1); it went
+untriaged into the client demo, which hit it live — `arduino-app-cli app
+start` failed with the exact compile error. Neither `tools/verify.py`
+check catches this class of bug: the native suite never compiles this
+file (needs `Arduino.h`/`Ethernet.h`), and the bridge contract checker
+reads source text, not a build. Fixed by deleting the stray line;
+confirmed by restarting the app clean.
+
+**Prevention added the same session, not deferred:**
+`tools/check_brace_balance.py` — a small standalone script checking brace
+balance (comments/string literals stripped) across every
+`sketch/src/*.cpp`/`*.h` file the native suite can't compile — wired into
+`tools/verify.py`'s gate as its 5th check the same session, not left as a
+manual-only script or a separate backlog item.
+
+**Related:** `docs/REVIEW_FINDINGS.md` firmware #1.
+
+---
+
+### D12 — No way to return to the datum after activating a saved zero
+**Status:** closed, 30 August 2026 · superseded, not fixed in place
+
+The activate/baseline model this defect depends on is being removed
+entirely by **R10** (zero service overhaul, decided the same day). Once
+"activating a zero" no longer exists, there is nothing to need a way back
+from. Closed on the decision, not deferred until R10's build lands — the
+old model was never going to get a "return to datum" button written for
+it.
+
+**Related:** R10.
+
+---
+
+### D19 — Saved positions are listed against a baseline of 0 when no zero is active
+**Status:** closed, 30 August 2026 · superseded, not fixed in place
+
+Same reasoning as D12: **R10** removes the baseline concept entirely, so a
+saved point is always shown against the one datum, never a possibly-absent
+active zero. The state this defect describes stops being reachable, by
+design, not by patching `renderZeros()`'s fallback.
+
+**Related:** D9, D12, R10.
+
+---
+
 ### D1 — A move to a negative angle stops at 0
 **Status:** done · 7 August 2026 · **Confirmed on hardware, both halves**
 

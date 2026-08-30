@@ -43,9 +43,10 @@ Two things changed since: D4 closed (cause and fix in `docs/CLOSED.md`), and
 the SSE migration collapsed those 3 poll streams/operator to 1 stream/operator,
 so "9 concurrent streams for 3 operators" no longer describes what `app.js`
 opens. **R1 is not blocked on D4 any more; it is simply unmeasured against
-the current architecture.** Re-measurement (synthetic, 1 SSE stream/operator)
-is scheduled for session 16 (`../BACKLOG.md`), not repeated here. Still
-unverified regardless: the USB-C/Q9 question above.
+the current architecture.** Re-measurement is scheduled as a real (not
+synthetic) software stress test, varying operator counts, no rig involved
+— session 17 in `../BACKLOG.md`'s current plan. Still unverified
+regardless: the USB-C/Q9 question above.
 
 ---
 
@@ -341,3 +342,103 @@ air-gapped path stays untested (T2).
 - **If they do not:** hand over with the single existing coloured adapter.
 
 This is a delivery-shaping constraint, not a task.
+
+---
+
+### R9 — Speed becomes a global parameter, removed from operator control
+**Status:** open · **Raised by:** client demo feedback, 27 August 2026,
+decided with the team lead, 30 August 2026
+
+The client didn't see the value in per-move speed control and asked whether
+speed gives the movement more force. It doesn't: the ST3215's `GoalSpeed`
+register and its torque registers (`0x10` max torque, `0x30` torque limit)
+are independent — confirmed against Waveshare's own register map
+(`skills/uno-q-st3215/SKILL.md`). Speed only changes how fast the servo
+reaches a target, never how hard.
+
+**Decision:** speed becomes a fixed, global setting (config-level, not
+operator-facing) instead of a per-move value the operator chooses. Removes
+the speed field/nudge from the UI and `speed_dps` from the operator-facing
+move flow.
+
+**Open before building:** what the fixed value should be. D35 (open,
+unresolved) found commanded and actual speed disagree ~1.5–2.3x — pick the
+global value with that uncertainty in mind, or resolve D35 first if time
+allows; don't hardcode a value D35 would immediately contradict.
+
+**Related:** D32, D35 — both about the speed-step/speed-accuracy this
+decision removes from the operator, not from the system.
+
+---
+
+### R10 — Zero service overhaul: calibration stays, "zeros" become saved points
+**Status:** open · **Raised by:** client demo feedback, 27 August 2026,
+decided with the team lead, 30 August 2026 · **Design worked out in full
+this session**
+
+The client doesn't want "zeros" — a saved position that, when selected,
+reassigns the baseline (what 0° means). They want to keep working in one
+fixed perspective and just save labelled points within it. **Calibration
+(the one datum, ADR-0003's mid-travel reference) is unaffected and stays
+exactly as it works today.**
+
+**Two separate, smaller pieces replace today's `ZeroService`:**
+
+1. **Calibration collapses into `app_state`, no dedicated table.**
+   `calibrate()` is the only method of today's `ZeroService` anything else
+   depends on (`servo_state.py:187,248` only ever call `get_active()`,
+   which is always the datum once nothing else can activate a baseline).
+   `capture()`, `activate()`, `delete()`, `list_all()` and their guard
+   exceptions (`ActiveZeroError`, `DatumZeroError`) are all dead once
+   nothing calls them — delete them, don't keep them as compatibility
+   shims. Store the datum as two keys (`datum_raw_counts`,
+   `datum_captured_at`) on the existing `app_state` key-value table
+   (`isolation_service.py`'s `_ISOLATED_INTENT_KEY` is the pattern to
+   copy) instead of a `zeros` table that only ever holds one row. Deletes
+   the `zeros` table, `ZeroReference`, `ZeroRepository`/
+   `SqliteZeroRepository` entirely. Rename `ZeroService` →
+   `CalibrationService`, `routers/zeros.py` → a one-endpoint calibration
+   router. `CONTEXT.md`'s *Zero reference*/*Baseline* glossary entries
+   retire or fold into *Datum* — there's no longer a distinguishable
+   genus.
+
+2. **New saved-points feature, genuinely separate storage.** Angle
+   (within ±90°) + operator description, many rows, grows over time — a
+   real table (not `app_state`, which is for small flags, not a growing
+   list of named records). **Must store `raw_counts`, never a degree
+   value** — output degrees are computed relative to the datum
+   (`servo_state.py:347`), so a point stored as degrees silently points
+   to a different physical position after any future recalibration; a
+   point stored as `raw_counts` is the servo's absolute hardware reading
+   and stays correct regardless of the datum. Display still shows a live
+   angle computed from `raw_counts` + the current datum. No activation,
+   no baseline concept at all — moving to a saved point is just a normal
+   move-to-angle call.
+
+**Why not use the servo's own re-centre (`0x28 = 128`) instead of a
+software datum:** considered and rejected. It's a live, irreversible
+mutation of the servo's own encoder reference (no undo, no history, wrong
+if the shaft isn't exactly at the physical reference when it's sent), and
+it entangles calibration with one servo's register quirk, breaking the
+hardware abstraction (ADR-0004) that lets calibration logic run against
+the simulated backend. The project has direct scar tissue here already —
+R2's board verification found `ServoController.cpp` checking the wrong ack
+sentinel on writes to this same register family.
+
+**Closes D12 and D19 by construction** — both are artifacts of the
+activate/baseline model being removed (D12: "no way back to the datum
+after activating a zero" — nothing to activate any more; D19: "saved
+positions listed against baseline 0 when no zero active" — points are
+always shown against the one datum, never a possibly-absent baseline).
+Close both explicitly once R10 ships, don't leave them open.
+
+**Stale once this ships, needs a pass:** T11 (operations manual, not yet
+written) currently describes the old model ("what activating [a zero]
+changes... get back to the datum (D12)") — write T11 against R10's model,
+not today's.
+
+**An ADR should formalize this on build** — not written yet since the
+design isn't built; write it as part of implementing R10, not before.
+
+**Related:** ADR-0003 (datum, mid-travel), ADR-0004 (repository
+abstraction), D12, D19, T11.

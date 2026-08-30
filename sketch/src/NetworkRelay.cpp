@@ -167,6 +167,4 @@ void NetworkRelay::Poll() {
   }
 }
 
-}
-
 }  // namespace net

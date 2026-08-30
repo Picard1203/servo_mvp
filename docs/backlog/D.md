@@ -5,6 +5,8 @@ Full entries for every open `D`-numbered item. Indexed one line each in
 
 ---
 
+---
+
 ### D36 — Several tests construct their own `Database` and never close it
 **Status:** open · **Severity:** low · **Found:** 25 August 2026, chasing D26
 
@@ -207,17 +209,6 @@ breaks rather than degrades.
 
 
 
-### D12 — No way to return to the datum after activating a saved zero
-**Status:** open · **Severity:** medium · **Reported:** operator, on hardware
-
-Activating a saved zero replaces the active baseline, and there is then no
-control that means "go back to the datum". The datum is a row in `zeros` like
-any other and is flagged `is_datum`, so the information exists — the operator
-route to it does not.
-
-**Acceptance:** from any activated zero, one action returns the active baseline
-to the datum, and it is obvious which one it is.
-
 ---
 
 ### D17 — The position bar cannot show the negative half of travel
@@ -239,32 +230,5 @@ worth fixing before the demo.
 `output_max_deg`, with the datum visible as a marked centre.
 
 ---
-
-### D19 — Saved positions are listed against a baseline of 0 when no zero is active
-**Status:** open · **Severity:** medium · **Needs confirmation on hardware**
-· **Found by:** operator lens, 8 August 2026
-
-`renderZeros()` (`app.js:367`):
-
-```js
-const base = active ? active.raw_counts : 0;
-```
-
-Every saved position's displayed angle is `(raw_counts - base) / counts_per_deg`.
-**With no active zero, `base` is 0** — so a position stored at count 2049 lists
-as ≈150°, not 0°, and the list becomes a set of plausible-looking wrong numbers.
-
-**This is D9's exact line of code, in a third location.** D9 was a display
-baseline of 0 where motion used mid-travel; `_baseline_counts()` is now the
-single definition on the Python side — and this client-side copy did not learn.
-It is the twin-path pattern again, across the API boundary this time.
-
-Marked *needs confirmation* rather than confirmed: it requires a state with saved
-zeros and none active, which may not be reachable if the datum is always active.
-**Determine whether that state is reachable before deciding the fix** — if it is
-not reachable, the defect is that a fallback exists at all for a state that
-cannot happen, and it should be an error rather than a silent 0.
-
-**Related:** D9, D12.
 
 ---

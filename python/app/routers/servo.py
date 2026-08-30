@@ -59,14 +59,13 @@ def post_move(request: MoveRequest,
     """Starts a move toward the requested target angle.
 
     Args:
-        request (MoveRequest): Target angle, speed, and acceleration.
+        request (MoveRequest): Target angle and acceleration.
         motion (MotionService): Injected motion service.
 
     Returns:
         MoveAcceptedResponse: Acknowledgement with accepted target angle.
     """
-    motion.move_to(request.target_deg, request.speed_dps,
-                   request.acceleration)
+    motion.move_to(request.target_deg, request.acceleration)
     return MoveAcceptedResponse(accepted=True, target_deg=request.target_deg)
 
 

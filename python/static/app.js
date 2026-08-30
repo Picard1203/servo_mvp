@@ -744,8 +744,7 @@ function renderEvents(data) {
 async function doMove() {
   clearNotice();
   const target = parseFloat($("inAngle").value);
-  const speed = parseFloat($("inSpeed").value);
-  if (!isFinite(target) || !isFinite(speed)) { say("enter a valid angle and speed", true); return; }
+  if (!isFinite(target)) { say("enter a valid angle", true); return; }
   if (target < ANGLE_MIN || target > ANGLE_MAX) {
     say("angle must be between " + ANGLE_MIN.toFixed(0) + "\u00b0 and +" +
         ANGLE_MAX.toFixed(0) + "\u00b0", true);
@@ -757,7 +756,6 @@ async function doMove() {
        the correction from the operator instead of explaining it. */
     await apiPost("/servo/move", {
       target_deg: target,
-      speed_dps: speed,
       acceleration: state.acceleration,
     });
     /* success: no notice */
@@ -2068,8 +2066,7 @@ async function doExport() {
 }
 
 function nudge(inputId, delta) {
-  /* Angle snaps to the servo's own step grid (D32) - speed has no such
-     grid, so it just takes the delta as asked. */
+  /* Angle snaps to the servo's own step grid (D32). */
   const input = $(inputId);
   const value = parseFloat(input.value) || 0;
   const next = inputId === "inAngle"

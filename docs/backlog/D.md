@@ -109,7 +109,10 @@ The official Feetech memory-table PDF (`feetechrc.com`, password-gated) would
 settle this outright if it can be obtained. **Blocks:** the speed-step half
 of D32's enforcement.
 
-**Related:** D32 (the postponed enforcement this measurement blocks).
+**Related:** D32 (the postponed enforcement this measurement blocks), R9
+(closed 30 August 2026 — the global move speed it fixed at 30 deg/s
+commanded depends on this measurement; resolving D35 may show that figure
+needs revisiting).
 
 ---
 

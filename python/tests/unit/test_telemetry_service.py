@@ -121,7 +121,7 @@ class TestExport:
         from app.deps import get_motion_service
         from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
         service._sample_once()  # no move commanded yet
-        get_motion_service().move_to(30.0, 100.0)
+        get_motion_service().move_to(30.0)
         service._sample_once()
         stream = b"".join(service.export_binary_stream(0, time.time() + 1))
         offset = HEADER_STRUCT.size
@@ -156,7 +156,7 @@ class TestExport:
         recoverable, not just both happen to be set together."""
         from app.deps import get_isolation_service, get_motion_service
         from app.services.telemetry_service import HEADER_STRUCT, SAMPLE_STRUCT
-        get_motion_service().move_to(30.0, 100.0)  # target_valid -> 1
+        get_motion_service().move_to(30.0)  # target_valid -> 1
         get_isolation_service().set_isolated(True)  # isolated -> 1
         service._sample_once()
         stream = b"".join(service.export_binary_stream(0, time.time() + 1))

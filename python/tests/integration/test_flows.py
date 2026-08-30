@@ -16,14 +16,14 @@ class TestZeroLifecycleAcrossServices:
         zeros = get_zero_service()
 
         sim.set_deadband(1)
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
         zero = zeros.capture("at30")
         zeros.activate(zero.id)
         # display rebaselined: same physical spot now reads ~0
         assert abs(store.current_output_deg()) < 0.1
         # a move to 10 deg under the new baseline lands 40 deg physical
-        motion.move_to(12.0, 60.0)
+        motion.move_to(12.0)
         assert wait_until(
             lambda: abs(store.current_output_deg() - 12.0) < 0.8, timeout=6)
 
@@ -51,7 +51,7 @@ class TestSamplerObservesMotion:
         motion = get_motion_service()
         sim.set_deadband(1)
         service.start_sampler()          # 0.2s interval (conftest env)
-        motion.move_to(42.0, 60.0)       # ~1s of motion
+        motion.move_to(42.0)       # ~1s of motion
         time.sleep(1.6)
         rows = list(get_telemetry_repository().query(0, time.time() + 1, 100))
         assert len(rows) >= 4

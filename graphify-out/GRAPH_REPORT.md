@@ -1,7 +1,7 @@
 # Graph Report - servo_mvp  (2026-08-30)
 
 ## Corpus Check
-- 145 files · ~122,936 words
+- 145 files · ~123,056 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1149793e`
+- Built from commit: `87a890d9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -174,7 +174,7 @@
 3. `TelemetrySnapshot` - 54 edges
 4. `wait_until()` - 49 edges
 5. `Database` - 40 edges
-6. `Closed items` - 38 edges
+6. `Closed items` - 39 edges
 7. `ZeroReference` - 37 edges
 8. `TEST()` - 37 edges
 9. `get_isolation_service()` - 36 edges
@@ -321,7 +321,7 @@ Nodes (19): Baseline, Count, Datum, Output degree, Travel window, Zero reference
 
 ### Community 29 - "Closed items"
 Cohesion: 0.05
-Nodes (38): Closed items, D10 — `logger.exception` swallows the exception; the sampler's real fault was a thread-safety bug in the SQLite layer, D11 — A single failed poll is presented as a disconnection, D12 — No way to return to the datum after activating a saved zero, D13 — Requests arriving faster than slots free up are refused, D14 — The most likely error in the system shows the operator "Failed to fetch", D15 — A command in flight looks identical to a command that did nothing, D16 — On a failed read the operator is shown 0.0 V, 0.0 A, 0.0 °C as if measured (+30 more)
+Nodes (39): Closed items, D10 — `logger.exception` swallows the exception; the sampler's real fault was a thread-safety bug in the SQLite layer, D11 — A single failed poll is presented as a disconnection, D12 — No way to return to the datum after activating a saved zero, D13 — Requests arriving faster than slots free up are refused, D14 — The most likely error in the system shows the operator "Failed to fetch", D15 — A command in flight looks identical to a command that did nothing, D16 — On a failed read the operator is shown 0.0 V, 0.0 A, 0.0 °C as if measured (+31 more)
 
 ### Community 30 - "Design Notes"
 Cohesion: 0.06
@@ -472,8 +472,8 @@ Cohesion: 0.25
 Nodes (13): ServoBus, Ping, ReadByte, ReadWord, Refresh, retries_, ServoBus::ServoBus(), WriteByte (+5 more)
 
 ### Community 67 - "R-items — detail"
-Cohesion: 0.17
-Nodes (11): R10 — Zero service overhaul: calibration stays, "zeros" become saved points, R1 — Determine the real concurrent-operator ceiling, R3 — Confirm whether the Bridge could carry a frontend framework, R4 — Post-MVP: mechanical restraint servos, unified under one Lock, R5 — Metrics export and benchmarking output, R6 — Define "stable" by benchmark, not by adjective, R7 — Handover logistics depend on adapter delivery, R8 — Emergency stop (+3 more)
+Cohesion: 0.18
+Nodes (10): R10 — Zero service overhaul: calibration stays, "zeros" become saved points, R1 — Determine the real concurrent-operator ceiling, R3 — Confirm whether the Bridge could carry a frontend framework, R4 — Post-MVP: mechanical restraint servos, unified under one Lock, R5 — Metrics export and benchmarking output, R6 — Define "stable" by benchmark, not by adjective, R7 — Handover logistics depend on adapter delivery, R8 — Emergency stop (+2 more)
 
 ### Community 68 - "Ordering, rewritten 8 August 2026 — by session, with sizes"
 Cohesion: 0.17

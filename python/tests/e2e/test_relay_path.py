@@ -85,8 +85,7 @@ class TestRelayEndToEnd:
         relay = live_backend.relay
         relay._on_open(1, "192.168.10.21")
         request = _http_request("/api/v1/servo/move", method="POST",
-                                body=json.dumps({"target_deg": 15.0,
-                                                 "speed_dps": 60}))
+                                body=json.dumps({"target_deg": 15.0}))
         relay._on_rx(1, request)
         assert wait_until(
             lambda: ("net_shutdown", (1,)) in BridgeStub.calls, timeout=5)

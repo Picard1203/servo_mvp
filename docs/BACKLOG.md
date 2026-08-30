@@ -25,7 +25,7 @@ sessions actually spent, not the ones originally planned.
 | # | Session | Board? |
 |---|---|---|
 | **15** | **DONE, 27–30 Aug 2026.** The demo moved up unexpectedly, ahead of the originally-planned 15–19 sequence — ran anyway. Presenter walkthrough produced live (was 18's job). Hit and fixed a live-blocking bug (**D37**, now closed — part of 15's original triage job; the rest of that triage did not happen, see deferred list below). Client feedback gathered, decided into **R9**/**R10** with the team lead. Backlog reorganized and closed out — **D12**, **D19** also closed (superseded by R10's decision, not deferred). Full account: `docs/PROJECT_STATE.md`. | no |
-| **16** | **Claude.** Build **R9** (speed → global, off the operator UI) and **R10** (zero service overhaul: calibration collapses into `app_state`, saved points replace "zeros"). **The distinct target for today.** | no |
+| **16** | **Claude.** **R9 closed** (speed → global, off the operator UI). **R10** (zero service overhaul: calibration collapses into `app_state`, saved points replace "zeros", full CRUD added to scope) in progress — the distinct remaining target for today. | no |
 | **17** | **Claude + operator, no rig.** Pure software stress test — 10 min and 1 h soaks, varying operator counts — exercises connection/SSE/DB stability under load. **Not related to the mechanical rig.** First real measurement toward **R1**, replacing the synthetic remeasure originally planned here. | yes |
 | **18** | **Claude + operator.** Wipe DBs and logs to a clean state, after the session 17 soaks and before the rig day — everything up to now was experiments; closes that phase. | maybe |
 
@@ -97,7 +97,6 @@ demo" (old session 19) is moot — the demo already happened.
 | R6 | Define "stable" by benchmark, not by adjective | open · blocked on R5 |
 | R7 | Handover logistics depend on adapter delivery | delivery-shaping constraint |
 | R8 | Emergency stop | post-MVP · can wait |
-| R9 | Speed becomes a global parameter, off the operator UI | open · today's target |
 | R10 | Zero service overhaul: calibration only, saved points replace "zeros" | open · today's target |
 
 ---
@@ -145,3 +144,4 @@ demo" (old session 19) is moot — the demo already happened.
 | **D37** | `NetworkRelay.cpp` stray unmatched closing brace, build-breaking — found by Session 14's review, hit live blocking the client demo | 30 August 2026 · fixed and committed same session |
 | **D12** | No way to return to the datum after activating a saved zero | 30 August 2026 · superseded by R10's decision, not fixed in place |
 | **D19** | Saved positions listed against a baseline of 0 when no zero is active | 30 August 2026 · superseded by R10's decision, not fixed in place |
+| **R9** | Speed becomes a global parameter, removed from operator control | 30 August 2026 · Session 16 |

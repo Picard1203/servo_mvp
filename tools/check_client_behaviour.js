@@ -480,7 +480,6 @@ console.log("\nD14 - a refused connection reads as something to act on");
   console.log("\nD15 - Enter in the angle field obeys the same guard");
   ctx.initUi();
   $("inAngle").value = "12";
-  $("inSpeed").value = "60";
   let moves = 0;
   const realPost = ctx.apiPost;
   ctx.apiPost = async () => { moves += 1; return {}; };
@@ -532,16 +531,12 @@ console.log("\nD14 - a refused connection reads as something to act on");
   check("a missing timestamp does not throw",
         ctx.eventTime({}) === "");
 
-  /* ---------- D32: nudge() steps each field by its own unit ---------- */
-  console.log("\nD32 - the speed field does not snap to the angle's grid");
+  /* ---------- D32: nudge() steps the angle field by its own unit ---------- */
+  console.log("\nD32 - the angle field snaps to the servo's step grid");
   $("inAngle").value = "90";
   ctx.nudge("inAngle", -0.06);
   check("angle still snaps to the servo's step grid",
         $("inAngle").value === "89.94", $("inAngle").value);
-  $("inSpeed").value = "30";
-  ctx.nudge("inSpeed", 5);
-  check("speed moves by its own delta, not the angle's 0.06 grid",
-        $("inSpeed").value === "35.00", $("inSpeed").value);
 
   /* ---------- D32: doMove sends exactly what was typed ---------- */
   console.log("\nD32 - a typed angle reaches the backend unmodified");
@@ -556,7 +551,6 @@ console.log("\nD14 - a refused connection reads as something to act on");
   };
   toasts.length = 0;
   $("inAngle").value = "0.08";
-  $("inSpeed").value = "30";
   await ctx.doMove();
   check("the client no longer pre-snaps the typed value",
         sentBody && sentBody.target_deg === 0.08, sentBody);

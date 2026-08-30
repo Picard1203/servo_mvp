@@ -37,13 +37,12 @@ class MotionService:
         self._events: EventService = events
         self._settings: Settings = settings
 
-    def move_to(self, target_deg: float, speed_dps: float,
+    def move_to(self, target_deg: float,
                 acceleration: Optional[int] = None) -> None:
         """Moves to an output angle relative to the active zero.
 
         Args:
             target_deg (float): Target output angle in degrees.
-            speed_dps (float): Output speed in degrees per second.
             acceleration (Optional[int]): Acceleration parameter (0-254).
 
         Raises:
@@ -91,7 +90,8 @@ class MotionService:
 
         start_deg = self._state.current_output_deg()
         target_counts = self._state.counts_from_output_deg(target_deg)
-        speed_counts = self._state.counts_speed_from_output_speed(speed_dps)
+        speed_counts = self._state.counts_speed_from_output_speed(
+            self._settings.default_speed_dps)
 
         self._state.set_target(target_deg)
 
@@ -112,7 +112,8 @@ class MotionService:
         logger.info("move accepted",
                     metadata={"event": "servo.move.accepted",
                               "from_deg": from_deg},
-                    extra={"to_deg": target_deg, "speed_dps": speed_dps,
+                    extra={"to_deg": target_deg,
+                           "speed_dps": self._settings.default_speed_dps,
                            "acceleration": acceleration})
 
     def stop(self) -> None:

@@ -15,14 +15,11 @@ class MoveRequest(BaseModel):
 
     Attributes:
         target_deg (float): Target output angle in degrees.
-        speed_dps (float): Output speed in degrees per second.
         acceleration (int): Servo acceleration parameter (0-254).
     """
 
     target_deg: float = Field(ge=_settings.output_min_deg,
                               le=_settings.output_max_deg)
-    speed_dps: float = Field(default=_settings.default_speed_dps, gt=0.0,
-                             le=_settings.max_speed_dps)
     acceleration: int = Field(default=_settings.default_acceleration, ge=0,
                               le=_settings.max_acceleration)
 

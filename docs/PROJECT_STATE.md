@@ -39,6 +39,9 @@ Bridge contract checker: both sides agree
 (as of Session 8, 25 August 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
+**30 August 2026 — Session 18: Clean board wipe completed, closing the experimental phase ahead of Rig Day.**
+All old soak reports, test databases, and logs archived into `archive/soaks/session17`. Board state reset cleanly via ADB: `servo_mvp.jsonl` and `mcu.jsonl` truncated to 0 bytes; `servo_mvp.db` wiped and cleanly re-initialized to an empty 32KB schema (0 telemetry rows, 0 saved positions). App restarted on board via `arduino-app-cli app restart user:servo_mvp` and confirmed in running state. Preflight probe verified clean hardware boot (`servo_reading: VALID`, 12.2V, unverified datum ready for fresh Rig Day calibration). Development and software soak phase is officially closed; ready for mechanical rig assembly (T17).
+
 **30 August 2026 — Session 17: Supervised Software Soak & Capacity Suite completed (Runs 0–4).**
 `tools/synthetic_operator.py` and `tools/soak_report.py` modernized and executed across five structured runs against the live hardware:
 - **Run 0 (Pre-Flight, ~2 min)**: Probed `/system/health` and `/servo/state`. Verified hardware backend, 12.2V rail, 36.0°C thermals.

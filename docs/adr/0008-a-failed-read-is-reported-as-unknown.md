@@ -57,8 +57,8 @@ The API contract stays honest underneath it.
   means. Guarding a call site fixes today; deleting the method fixes every call
   site that will ever exist.
 - Callers that genuinely need a number and cannot proceed without one raise
-  `InvalidReadingError`: `ZeroService.capture()`, `ZeroService.calibrate()`,
-  `MotionService.recover()`.
+  `InvalidReadingError`: `CalibrationService.calibrate()`,
+  `ServoStateStore.read_counts()` (and, through it, `MotionService.recover()`).
 - Telemetry leaves a **gap** rather than a fabricated row. A gap is honest and
   visible in a time series; a zero is neither.
 - Every failed read logs `servo.read.failed`, at the point where the position

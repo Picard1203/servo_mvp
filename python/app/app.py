@@ -6,21 +6,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from Logger461 import logger
 
 from app.core.config import get_settings
-from app.core.exceptions import (
-    ActiveZeroError,
-    DatumZeroError,
-    InvalidReadingError,
-    IsolatedError,
-    LockedAndIsolatedError,
-    LockedError,
-    MovingError,
-    NotFoundError,
-    OutOfTravelError,
-    StepError,
-)
-from app.routers import servo, stream, system, telemetry, zeros
+from app.core.exceptions import ServoAppException
+from app.routers import saved_positions, servo, stream, system, telemetry
 
 
 def create_app() -> FastAPI:
@@ -34,7 +24,7 @@ def create_app() -> FastAPI:
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.include_router(servo.router)
     app.include_router(stream.router)
-    app.include_router(zeros.router)
+    app.include_router(saved_positions.router)
     app.include_router(telemetry.router)
     app.include_router(system.router)
     _register_error_handlers(app)
@@ -48,66 +38,29 @@ def create_app() -> FastAPI:
 
 
 def _register_error_handlers(app: FastAPI) -> None:
-    """Maps domain exceptions to HTTP responses.
+    """Maps every domain exception to its HTTP response and log line.
 
     Args:
         app (FastAPI): The FastAPI application.
     """
 
-    def error(status: int, detail: str, **extra: object) -> JSONResponse:
-        """Builds a JSON error body.
+    @app.exception_handler(ServoAppException)
+    async def _domain_error(request: Request,
+                           exc: ServoAppException) -> JSONResponse:
+        """Builds the JSON error body and logs from the exception itself.
 
         Args:
-            status (int): HTTP status code.
-            detail (str): Error description.
-            **extra (object): Additional response fields.
+            request (Request): The incoming HTTP request.
+            exc (ServoAppException): The raised domain exception.
 
         Returns:
             JSONResponse: The JSON response.
         """
-        return JSONResponse(status_code=status,
-                            content={"detail": detail, **extra})
-
-    @app.exception_handler(LockedError)
-    async def _locked(request: Request, exc: LockedError) -> JSONResponse:
-        return error(409, str(exc), reason="locked")
-
-    @app.exception_handler(MovingError)
-    async def _moving(request: Request, exc: MovingError) -> JSONResponse:
-        return error(409, str(exc), reason="moving")
-
-    @app.exception_handler(IsolatedError)
-    async def _isolated(request: Request,
-                        exc: IsolatedError) -> JSONResponse:
-        return error(409, str(exc), reason="isolated")
-
-    @app.exception_handler(LockedAndIsolatedError)
-    async def _locked_isolated(
-            request: Request, exc: LockedAndIsolatedError) -> JSONResponse:
-        return error(409, str(exc), reason="locked_isolated")
-
-    @app.exception_handler(NotFoundError)
-    async def _missing(request: Request, exc: NotFoundError) -> JSONResponse:
-        return error(404, str(exc))
-
-    @app.exception_handler(ActiveZeroError)
-    async def _active(request: Request, exc: ActiveZeroError) -> JSONResponse:
-        return error(409, str(exc), reason="active_zero")
-
-    @app.exception_handler(DatumZeroError)
-    async def _datum(request: Request, exc: DatumZeroError) -> JSONResponse:
-        return error(409, str(exc), reason="datum_zero")
-
-    @app.exception_handler(OutOfTravelError)
-    async def _travel(request: Request,
-                      exc: OutOfTravelError) -> JSONResponse:
-        return error(422, str(exc), reason="out_of_travel")
-
-    @app.exception_handler(InvalidReadingError)
-    async def _reading(request: Request,
-                       exc: InvalidReadingError) -> JSONResponse:
-        return error(409, str(exc), reason="invalid_reading")
-
-    @app.exception_handler(StepError)
-    async def _step(request: Request, exc: StepError) -> JSONResponse:
-        return error(422, str(exc), reason="step")
+        logger.warning(exc.message,
+                       metadata={"event": "domain_error",
+                                 "error_code": exc.error_code,
+                                 "reason": exc.reason},
+                       extra=exc.metadata)
+        return JSONResponse(status_code=exc.status_code,
+                            content={"detail": exc.message,
+                                     "reason": exc.reason})

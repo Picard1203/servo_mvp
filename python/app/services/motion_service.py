@@ -39,7 +39,7 @@ class MotionService:
 
     def move_to(self, target_deg: float,
                 acceleration: Optional[int] = None) -> None:
-        """Moves to an output angle relative to the active zero.
+        """Moves to an output angle relative to the datum.
 
         Args:
             target_deg (float): Target output angle in degrees.
@@ -53,6 +53,39 @@ class MotionService:
         """
         self._validate_step(target_deg)
         self._validate_reachable(target_deg)
+        target_counts = self._state.counts_from_output_deg(target_deg)
+        self._command(target_deg, target_counts, acceleration)
+
+    def move_to_counts(self, target_counts: int,
+                       acceleration: Optional[int] = None) -> None:
+        """Moves directly to an absolute encoder position.
+
+        Args:
+            target_counts (int): Absolute encoder counts to move to.
+            acceleration (Optional[int]): Acceleration parameter (0-254).
+
+        Raises:
+            LockedAndIsolatedError: If lock and isolation are both active.
+            LockedError: If the digital lock is engaged.
+            IsolatedError: If the motor is isolated.
+        """
+        target_deg = self._state.output_deg_from_counts(target_counts)
+        self._command(target_deg, target_counts, acceleration)
+
+    def _command(self, target_deg: float, target_counts: int,
+                acceleration: Optional[int]) -> None:
+        """Gates, settle-waits, and dispatches a move shared by both entry points.
+
+        Args:
+            target_deg (float): Output angle for gating and display.
+            target_counts (int): Absolute encoder counts to command.
+            acceleration (Optional[int]): Acceleration parameter (0-254).
+
+        Raises:
+            LockedAndIsolatedError: If lock and isolation are both active.
+            LockedError: If the digital lock is engaged.
+            IsolatedError: If the motor is isolated.
+        """
         if acceleration is None:
             acceleration = self._settings.default_acceleration
         locked = self._state.is_locked()
@@ -61,35 +94,25 @@ class MotionService:
             self._events.record("servo.move.rejected",
                                 "move rejected: locked and isolated",
                                 {"target_deg": target_deg})
-            logger.warning("move rejected: locked and isolated",
-                           metadata={"event": "servo.move.rejected",
-                                     "reason": "locked_isolated"},
-                           extra={"target_deg": target_deg})
-            raise LockedAndIsolatedError("servo is locked and motor is "
-                                         "isolated")
+            raise LockedAndIsolatedError(
+                "servo is locked and motor is isolated",
+                metadata={"target_deg": target_deg})
         if locked is True:
             self._events.record("servo.move.rejected",
                                 "move rejected: locked",
                                 {"target_deg": target_deg})
-            logger.warning("move rejected: locked",
-                           metadata={"event": "servo.move.rejected",
-                                     "reason": "locked"},
-                           extra={"target_deg": target_deg})
-            raise LockedError("servo is locked")
+            raise LockedError("servo is locked",
+                              metadata={"target_deg": target_deg})
         if isolated is True:
             self._events.record("servo.move.rejected",
                                 "move rejected: isolated",
                                 {"target_deg": target_deg})
-            logger.warning("move rejected: isolated",
-                           metadata={"event": "servo.move.rejected",
-                                     "reason": "isolated"},
-                           extra={"target_deg": target_deg})
-            raise IsolatedError("motor is isolated")
+            raise IsolatedError("motor is isolated",
+                               metadata={"target_deg": target_deg})
 
         self._await_settle()
 
         start_deg = self._state.current_output_deg()
-        target_counts = self._state.counts_from_output_deg(target_deg)
         speed_counts = self._state.counts_speed_from_output_speed(
             self._settings.default_speed_dps)
 
@@ -219,9 +242,10 @@ class MotionService:
             return
         low, high = self._state.reachable_output_range_deg()
         raise OutOfTravelError(
-            f"{target_deg:.2f} deg is outside the servo's travel from the "
-            f"current reference; reachable range is {low:.2f} to {high:.2f} "
-            f"deg. Re-calibrate near the middle of travel to recentre it.")
+            f"{target_deg:.2f} deg is outside the reachable range "
+            f"({low:.2f} to {high:.2f} deg). Re-calibrate to recentre it.",
+            metadata={"target_deg": target_deg, "low_deg": low,
+                     "high_deg": high})
 
     def _await_settle(self) -> None:
         """Blocks until any active settle window elapses."""
@@ -244,4 +268,6 @@ class MotionService:
         step = self._settings.output_step_deg
         multiples = target_deg / step
         if abs(multiples - round(multiples)) > 1e-6:
-            raise StepError(f"angle must be in steps of {step} deg")
+            raise StepError(f"angle must be in steps of {step} deg",
+                            metadata={"target_deg": target_deg,
+                                      "step": step})

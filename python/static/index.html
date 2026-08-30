@@ -113,11 +113,12 @@
 
         <section class="card stretch" id="positions">
           <h2>Saved positions</h2>
-          <div class="scrolllist" id="zeroList"></div>
-          <div class="zbtns">
-            <button class="btn small" id="saveBtn">Save current</button>
-            <button class="btn small" id="useBtn">Use</button>
-            <button class="btn small" id="removeBtn">Remove</button>
+          <div class="scrolllist" id="positionList"></div>
+          <div class="posbtns">
+            <button class="btn go small" id="goBtn">Go to</button>
+            <button class="btn small" id="newPositionBtn">New</button>
+            <button class="btn small" id="editPositionBtn">Edit</button>
+            <button class="btn small" id="deletePositionBtn">Delete</button>
           </div>
         </section>
       </div>
@@ -138,16 +139,31 @@
     </div>
   </dialog>
 
-  <!-- text-input dialog: naming a saved position -->
-  <dialog class="modal" id="promptDlg">
-    <h3 class="modal-title" id="promptTitle">Name</h3>
-    <p class="modal-body" id="promptBody"></p>
+  <!-- new/edit dialog: create or edit a saved position -->
+  <dialog class="modal" id="positionDlg">
+    <h3 class="modal-title" id="positionDlgTitle">New position</h3>
     <div class="inputwrap modal-input">
-      <input type="text" id="promptInput" maxlength="40" autocomplete="off">
+      <input type="text" id="posName" maxlength="40" autocomplete="off"
+             placeholder="Name">
     </div>
+    <div class="inputwrap modal-input">
+      <input type="text" id="posDescription" maxlength="200"
+             autocomplete="off" placeholder="Description (optional)">
+    </div>
+    <div class="field"><label for="posAngle">Angle</label>
+      <div class="inputwrap">
+        <button class="step" data-nudge="posAngle" data-d="-0.06">−</button>
+        <input id="posAngle" type="text" inputmode="decimal" value="0.00">
+        <button class="step" data-nudge="posAngle" data-d="0.06">+</button>
+        <span class="unit">DEG</span>
+      </div>
+    </div>
+    <p class="modal-body hint-earlier-reference" id="positionDlgHint" hidden>
+      Saved against an earlier reference. Still the same physical position.
+    </p>
     <div class="modal-actions">
-      <button class="btn small modal-cancel" id="promptNo">Cancel</button>
-      <button class="btn small modal-ok" id="promptYes">Save</button>
+      <button class="btn small modal-cancel" id="positionDlgNo">Cancel</button>
+      <button class="btn small modal-ok" id="positionDlgYes">Save</button>
     </div>
   </dialog>
 

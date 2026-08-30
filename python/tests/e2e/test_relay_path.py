@@ -74,7 +74,6 @@ class TestRelayEndToEnd:
             lambda: ("net_shutdown", (0,)) in BridgeStub.calls, timeout=5)
         status, body = _parse(_reply_bytes(0))
         assert status == 200
-        assert body["active_zero"] == "factory"
         assert body["position_verified"] is False
         # replies were chunked to the Bridge frame budget
         assert all(len(args[1]) <= chunk for name, args in BridgeStub.calls
@@ -102,12 +101,12 @@ class TestRelayEndToEnd:
         relay._on_open(2, "ip-a")
         relay._on_open(3, "ip-b")
         relay._on_rx(2, _http_request("/api/v1/system/health"))
-        relay._on_rx(3, _http_request("/api/v1/zeros"))
+        relay._on_rx(3, _http_request("/api/v1/positions"))
         assert wait_until(
             lambda: ("net_shutdown", (2,)) in BridgeStub.calls
             and ("net_shutdown", (3,)) in BridgeStub.calls, timeout=5)
         health_status, health = _parse(_reply_bytes(2))
-        zeros_status, zeros = _parse(_reply_bytes(3))
+        positions_status, positions = _parse(_reply_bytes(3))
         assert health_status == 200 and "mcu_status" in health
-        assert zeros_status == 200 and zeros == []
+        assert positions_status == 200 and positions == []
         assert live_backend.relay.connections_total >= 2

@@ -11,7 +11,7 @@ _settings = get_settings()
 
 
 class MoveRequest(BaseModel):
-    """Command to move to an output angle relative to the active zero.
+    """Command to move to an output angle relative to the datum.
 
     Attributes:
         target_deg (float): Target output angle in degrees.
@@ -96,6 +96,18 @@ class TorqueRegisterResponse(BaseModel):
     torque_register: Optional[int]
 
 
+class CalibrationResponse(BaseModel):
+    """Result of capturing the datum.
+
+    Attributes:
+        raw_counts (int): Absolute encoder position of the datum.
+        captured_at (str): ISO timestamp of capture.
+    """
+
+    raw_counts: int
+    captured_at: str
+
+
 class RecoverResponse(BaseModel):
     """Acknowledgement of an overload recovery action.
 
@@ -116,7 +128,6 @@ class ServoStateResponse(BaseModel):
         locked (bool): Digital lock state.
         settling (bool): True during post-lock settle delay window.
         position_verified (bool): True once position reference confirmed.
-        active_zero (str): Name of the active baseline.
         temperature_c (Optional[float]): Temperature or None if read failed.
         voltage_v (Optional[float]): Voltage or None if read failed.
         current_a (Optional[float]): Current or None if read failed.
@@ -142,7 +153,6 @@ class ServoStateResponse(BaseModel):
     locked: bool
     settling: bool
     position_verified: bool
-    active_zero: str
     temperature_c: Optional[float]
     voltage_v: Optional[float]
     current_a: Optional[float]
@@ -176,7 +186,6 @@ class ServoStateResponse(BaseModel):
             moving=view.moving, locked=view.locked,
             settling=view.settling,
             position_verified=view.position_verified,
-            active_zero=view.active_zero_name,
             temperature_c=view.temperature_c, voltage_v=view.voltage_v,
             current_a=view.current_a, torque_kgcm=view.torque_kgcm,
             overload=view.overload, overcurrent=view.overcurrent,

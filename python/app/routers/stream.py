@@ -1,4 +1,4 @@
-"""SSE stream for servo state, zeros and events."""
+"""SSE stream for servo state, saved positions and events."""
 
 import asyncio
 import json
@@ -9,12 +9,16 @@ from fastapi.responses import StreamingResponse
 
 from app.core.config import Settings, get_settings
 from app.core.events import EventService
-from app.deps import get_event_service, get_state_store, get_zero_service
+from app.deps import (
+    get_event_service,
+    get_saved_position_service,
+    get_state_store,
+)
+from app.schemas.saved_positions import SavedPositionResponse
 from app.schemas.servo import ServoStateResponse
 from app.schemas.system import EventListResponse, EventResponse
-from app.schemas.zeros import ZeroResponse
+from app.services.saved_position_service import SavedPositionService
 from app.services.servo_state import ServoStateStore
-from app.services.zero_service import ZeroService
 
 router = APIRouter(prefix="/api/v1", tags=["stream"])
 
@@ -22,16 +26,16 @@ router = APIRouter(prefix="/api/v1", tags=["stream"])
 async def _stream_generator(
     request: Request,
     state_store: ServoStateStore,
-    zero_service: ZeroService,
+    positions_service: SavedPositionService,
     event_service: EventService,
     settings: Settings,
 ) -> AsyncGenerator[str, None]:
-    """Generates SSE events for state, zeros and events.
+    """Generates SSE events for state, saved positions and events.
 
     Args:
         request (Request): The incoming HTTP request.
         state_store (ServoStateStore): Injected servo state store.
-        zero_service (ZeroService): Injected zero service.
+        positions_service (SavedPositionService): Injected position service.
         event_service (EventService): Injected event service.
         settings (Settings): Application configuration settings.
 
@@ -41,7 +45,8 @@ async def _stream_generator(
     count = 0
     active = True
     interval = settings.sampler_interval_seconds
-    zeros_events_every = max(1, round(15.0 / interval))
+    events_every = max(1, round(15.0 / interval))
+    last_positions_revision = -1
     try:
         while active is True:
             disconnected = await request.is_disconnected()
@@ -52,27 +57,30 @@ async def _stream_generator(
                 state = ServoStateResponse.from_view(view)
                 yield f"event: state\ndata: {state.model_dump_json()}\n\n"
 
-                if (count % zeros_events_every) == 0:
-                    zeros_list = await asyncio.to_thread(zero_service.list_all)
+                revision = await asyncio.to_thread(
+                    positions_service.revision)
+                changed = (revision != last_positions_revision)
+                due = ((count % events_every) == 0)
+                if changed or due:
+                    views = await asyncio.to_thread(
+                        positions_service.list_all)
+                    positions_json = [
+                        SavedPositionResponse(
+                            id=v.id, name=v.name,
+                            description=v.description,
+                            raw_counts=v.raw_counts,
+                            output_deg=v.output_deg,
+                            stale_reference=v.stale_reference,
+                            created_at=v.created_at,
+                            updated_at=v.updated_at,
+                        ).model_dump(mode="json")
+                        for v in views
+                    ]
+                    yield (f"event: positions\ndata: "
+                           f"{json.dumps(positions_json)}\n\n")
+                    last_positions_revision = revision
 
-                    zeros_resp: list[ZeroResponse] = []
-                    for z in zeros_list:
-                        zeros_resp.append(
-                            ZeroResponse(
-                                id=z.id,
-                                name=z.name,
-                                raw_counts=z.raw_counts,
-                                is_active=z.is_active,
-                                is_datum=z.is_datum,
-                                created_at=z.created_at,
-                            )
-                        )
-
-                    zeros_json_list: list[dict] = []
-                    for z in zeros_resp:
-                        zeros_json_list.append(z.model_dump(mode="json"))
-                    yield f"event: zeros\ndata: {json.dumps(zeros_json_list)}\n\n"
-
+                if due:
                     recent_events = await asyncio.to_thread(
                         event_service.recent, 50)
                     events_list: list[EventResponse] = []
@@ -98,16 +106,17 @@ async def _stream_generator(
 async def stream(
     request: Request,
     state_store: ServoStateStore = Depends(get_state_store),
-    zero_service: ZeroService = Depends(get_zero_service),
+    positions_service: SavedPositionService = Depends(
+        get_saved_position_service),
     event_service: EventService = Depends(get_event_service),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    """Streams servo state, zeros, and events over SSE.
+    """Streams servo state, saved positions, and events over SSE.
 
     Args:
         request (Request): The incoming HTTP request.
         state_store (ServoStateStore): Injected servo state store.
-        zero_service (ZeroService): Injected zero service.
+        positions_service (SavedPositionService): Injected position service.
         event_service (EventService): Injected event service.
         settings (Settings): Application configuration settings.
 
@@ -115,8 +124,8 @@ async def stream(
         StreamingResponse: Continuous SSE streaming response.
     """
     return StreamingResponse(
-        _stream_generator(request, state_store, zero_service, event_service,
-                          settings),
+        _stream_generator(request, state_store, positions_service,
+                          event_service, settings),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

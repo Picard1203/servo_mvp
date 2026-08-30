@@ -208,6 +208,15 @@ gracefully outside it rather than breaking.
 one laptop width (e.g. 1366px); layout fixed at any width in that range that
 breaks rather than degrades.
 
+**Corroborated 30 August 2026, Session 16:** rebuilding the saved-positions
+panel gave cause to check all three widths with Playwright. 1024px and
+1366px render correctly; at 768px `.content` collapses to `height:0` and
+`.col`'s children report zero-height bounding rects — the page renders as
+blank below the header. Not investigated further or fixed this session
+(out of R10's scope); real, reproducible, and it is `.content`/`.col`'s
+own grid sizing under the `@media (max-width:900px)` rule, not the
+positions panel specifically.
+
 ---
 
 
@@ -233,5 +242,30 @@ worth fixing before the demo.
 `output_max_deg`, with the datum visible as a marked centre.
 
 ---
+
+### D38 — A saved position's "earlier reference" tag has no way to dismiss it
+**Status:** open · **Severity:** low · **Found by:** operator, session 16
+(R10's build)
+
+`SavedPositionService._to_view()` flags a position `stale_reference` whenever
+its `updated_at` predates the datum's `datum_captured_at` — the UI shows this
+as an "earlier reference" pill (`app.js:renderPositions()`,
+`style.css:.pos-tag`). The only way to clear it today is to re-save the
+position (any edit sets a new `updated_at`), which is not why an operator
+would open the edit dialog.
+
+**The concern, not yet observed but easy to predict:** after one
+recalibration, every position saved before it carries the tag permanently,
+whether or not the drift is meaningful to the operator (0.06° is not the
+same concern as 6°) — a list-wide badge with no way to say "seen, fine"
+reads as a persistent low-grade alarm rather than useful information the
+first time it is noticed.
+
+**Acceptance:** an operator can dismiss the tag on a position (or a
+recalibration's whole batch of newly-stale positions) without editing its
+name, description or angle — dismissal should not silently change what the
+position stores.
+
+**Related:** R10.
 
 ---

@@ -5,39 +5,40 @@ import time
 from tests.conftest import wait_until
 
 
-class TestZeroLifecycleAcrossServices:
-    """Zeros, state store and motion interacting."""
+class TestCalibrationAndSavedPositionsAcrossServices:
+    """Calibration, saved positions, state store and motion interacting."""
 
-    def test_activate_zero_shifts_command_targets(self, backend, sim):
-        from app.deps import (get_motion_service, get_state_store,
-                              get_zero_service)
+    def test_go_to_saved_position_does_not_shift_the_datum(self, backend,
+                                                            sim):
+        from app.deps import (get_motion_service, get_saved_position_service,
+                              get_state_store)
         motion = get_motion_service()
         store = get_state_store()
-        zeros = get_zero_service()
+        positions = get_saved_position_service()
 
         sim.set_deadband(1)
         motion.move_to(30.0)
         assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
-        zero = zeros.capture("at30")
-        zeros.activate(zero.id)
-        # display rebaselined: same physical spot now reads ~0
-        assert abs(store.current_output_deg()) < 0.1
-        # a move to 10 deg under the new baseline lands 40 deg physical
+        saved = positions.create("at30", "", 30.0)
+        positions.go(saved.id)
+        # unlike the old activate-a-zero model, going to a saved position
+        # never rebaselines the display - the datum is unaffected.
+        assert wait_until(
+            lambda: abs(store.current_output_deg() - 30.0) < 0.8, timeout=6)
         motion.move_to(12.0)
         assert wait_until(
             lambda: abs(store.current_output_deg() - 12.0) < 0.8, timeout=6)
 
     def test_calibrate_then_recalibrate_after_position_change(self, backend,
                                                              sim):
-        from app.deps import get_state_store, get_zero_service
-        zeros = get_zero_service()
+        from app.deps import get_calibration_service, get_state_store
+        calibration = get_calibration_service()
         store = get_state_store()
-        first = zeros.calibrate()
+        calibration.calibrate()
         sim.set_deadband(1)
         sim.command_move(2000, 20000, 50)
         assert wait_until(lambda: abs(sim.read_raw_counts() - 2000) <= 2)
-        second = zeros.calibrate()          # re-home after "power cycle"
-        assert second.id == first.id
+        calibration.calibrate()          # re-home after "power cycle"
         assert abs(store.current_output_deg()) < 0.1
 
 

@@ -1,23 +1,20 @@
 /* Servo Control — frontend logic (revision 3).
-   Same-origin client of the FastAPI backend. Receives live state, zeros,
-   and events through a single SSE stream (/api/v1/stream); posts commands
-   over individual HTTP requests. Replaces the three-connection polling
-   model (revision 2) to stay within the W5500's 6-socket ceiling. */
+   Same-origin client of the FastAPI backend. Receives live state, saved
+   positions, and events through a single SSE stream (/api/v1/stream);
+   posts commands over individual HTTP requests. Replaces the
+   three-connection polling model (revision 2) to stay within the
+   W5500's 6-socket ceiling. */
 
 "use strict";
 
 const API = "/api/v1";
 
 
-/* counts per output degree, display-only (saved-position degrees).
-   The backend owns all real motion math. */
-const COUNTS_PER_OUTPUT_DEG = 4096 * (44 / 30) / 360;
-
 /* Command soft limits, mirroring the backend (output_min_deg /
    output_max_deg). Displayed position may legitimately read negative when
-   the active baseline sits above the current position - that is real
-   information and is NOT wrapped: in a multi-turn system -25 and 335 are
-   different absolute targets, a full output revolution apart. */
+   the datum sits above the current position - that is real information
+   and is NOT wrapped: in a multi-turn system -25 and 335 are different
+   absolute targets, a full output revolution apart. */
 const ANGLE_MIN = -90.0;
 const ANGLE_MAX = 90.0;
 /* one encoder count at the output: (360/4096) * (30/44) */
@@ -52,8 +49,8 @@ const $ = (id) => document.getElementById(id);
 
 const state = {
   lastState: null,
-  zeros: [],
-  selectedZeroId: null,
+  positions: [],
+  selectedPositionId: null,
   acceleration: 50,      /* fixed sensible default; not exposed to the user */
   online: false,
   streamFailures: 0,     /* consecutive SSE connection errors */
@@ -127,8 +124,19 @@ async function apiPost(path, body) {
     body: body ? JSON.stringify(body) : undefined,
   }, true);
 }
-async function apiDelete(path) {
-  return request(path, { method: "DELETE" }, true);
+async function apiPatch(path, body) {
+  return request(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }, true);
+}
+async function apiDelete(path, body) {
+  return request(path, {
+    method: "DELETE",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  }, true);
 }
 async function asApiError(response) {
   let detail = response.statusText, reason = "";
@@ -236,14 +244,20 @@ function askConfirm(title, body, okLabel) {
   });
 }
 
-function askText(title, body, okLabel) {
+/* Shared by New and Edit: name, description and angle, angle behaving
+   exactly like the Move panel's own field (same nudge, same step grid). */
+function askPosition(title, okLabel, initial) {
   return new Promise((resolve) => {
-    const dlg = $("promptDlg");
-    const input = $("promptInput");
-    $("promptTitle").textContent = title;
-    $("promptBody").textContent = body;
-    $("promptYes").textContent = okLabel || "Save";
-    input.value = "";
+    const dlg = $("positionDlg");
+    const nameInput = $("posName");
+    const descInput = $("posDescription");
+    const angleInput = $("posAngle");
+    $("positionDlgTitle").textContent = title;
+    $("positionDlgYes").textContent = okLabel || "Save";
+    nameInput.value = initial.name || "";
+    descInput.value = initial.description || "";
+    angleInput.value = initial.targetDeg.toFixed(2);
+    $("positionDlgHint").hidden = !initial.staleReference;
     let settled = false;
     const finish = (value) => {
       if (settled) return;
@@ -253,25 +267,28 @@ function askText(title, body, okLabel) {
       resolve(value);
     };
     const onYes = () => {
-      const text = input.value.trim();
-      if (!text) { input.focus(); return; }   /* require a name */
-      finish(text);
+      const name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+      const targetDeg = parseFloat(angleInput.value);
+      if (!isFinite(targetDeg)) { angleInput.focus(); return; }
+      finish({ name: name, description: descInput.value.trim(),
+               targetDeg: targetDeg });
     };
     const onNo = () => finish(null);
     const onClose = () => finish(null);
     const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); onYes(); } };
     function cleanup() {
-      $("promptYes").removeEventListener("click", onYes);
-      $("promptNo").removeEventListener("click", onNo);
+      $("positionDlgYes").removeEventListener("click", onYes);
+      $("positionDlgNo").removeEventListener("click", onNo);
       dlg.removeEventListener("close", onClose);
-      input.removeEventListener("keydown", onKey);
+      nameInput.removeEventListener("keydown", onKey);
     }
-    $("promptYes").addEventListener("click", onYes);
-    $("promptNo").addEventListener("click", onNo);
+    $("positionDlgYes").addEventListener("click", onYes);
+    $("positionDlgNo").addEventListener("click", onNo);
     dlg.addEventListener("close", onClose);
-    input.addEventListener("keydown", onKey);
+    nameInput.addEventListener("keydown", onKey);
     dlg.showModal();
-    input.focus();
+    nameInput.focus();
   });
 }
 
@@ -286,8 +303,8 @@ const REFUSALS = {
   isolated: "refused — motor is isolated; un-isolate to move",
   locked_isolated: "refused — servo is locked and motor is isolated; "
                   + "unlock and un-isolate to move",
-  active_zero: "refused — position is in use as the baseline",
-  datum_zero: "refused — the reference cannot be removed",
+  duplicate_name: "refused — a saved position is already called that",
+  stale_position: "someone else changed this position — reloading it now",
   invalid_reading: "refused — the servo did not answer, so its position "
                  + "is not known",
   unreachable: "the controller is busy or did not answer — wait a moment "
@@ -355,11 +372,11 @@ function connectStream() {
     } catch (_) { /* malformed event — next one arrives in ~1 s */ }
   });
 
-  eventSource.addEventListener("zeros", function (msg) {
+  eventSource.addEventListener("positions", function (msg) {
     try {
-      state.zeros = JSON.parse(msg.data);
-      renderZeros();
-    } catch (_) { /* next push arrives in ~15 s */ }
+      state.positions = JSON.parse(msg.data);
+      renderPositions();
+    } catch (_) { /* the stream pushes again once the change settles */ }
   });
 
   eventSource.addEventListener("events", function (msg) {
@@ -382,13 +399,11 @@ function connectStream() {
   };
 }
 
-/* On-demand fetch — used after write commands where the operator
-   expects immediate feedback (zero list changes). The SSE stream
-   delivers regular updates; this is for the gap between a write and
-   the next scheduled push. */
-async function fetchZeros() {
-  try { state.zeros = await apiGet("/zeros"); renderZeros(); }
-  catch (_) { /* stream will deliver zeros shortly; ignore */ }
+/* On-demand fetch — used after write commands so the operator sees the
+   change immediately, rather than waiting out the stream's own tick. */
+async function fetchPositions() {
+  try { state.positions = await apiGet("/positions"); renderPositions(); }
+  catch (_) { /* stream will deliver it shortly; ignore */ }
 }
 
 function setOnline(online) {
@@ -662,28 +677,44 @@ function decodedFaultNames(s) {
   return FAULT_FIELDS.filter((f) => s[f.key]).map((f) => f.label).join(", ");
 }
 
-/* ---------------- zeros (saved positions) ---------------- */
+/* ---------------- saved positions ---------------- */
 
-function renderZeros() {
-  const list = $("zeroList");
-  const active = state.zeros.find((z) => z.is_active) || null;
-  const base = active ? active.raw_counts : 0;
+function renderPositions() {
+  const list = $("positionList");
   list.innerHTML = "";
-  state.zeros
-    .filter((z) => !z.is_datum)          /* reference row is not shown */
-    .forEach((z) => {
-      const row = document.createElement("div");
-      row.className = "z" + (z.is_active ? " active" : "") +
-        (z.id === state.selectedZeroId ? " selected" : "");
-      const deg = (z.raw_counts - base) / COUNTS_PER_OUTPUT_DEG;
-      row.innerHTML =
-        (z.is_active ? '<span class="zt">Active</span>'
-                     : '<span class="spacer"></span>') +
-        "<span>" + escapeHtml(z.name) + "</span>" +
-        '<span class="deg">' + deg.toFixed(2) + "\u00b0</span>";
-      row.onclick = () => { state.selectedZeroId = z.id; renderZeros(); };
-      list.appendChild(row);
-    });
+  if (state.positions.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-hint";
+    empty.textContent = "No saved positions yet. Press New to add one.";
+    list.appendChild(empty);
+    return;
+  }
+  state.positions.forEach((p) => {
+    const row = document.createElement("div");
+    row.className = "saved-position" +
+      (p.id === state.selectedPositionId ? " selected" : "");
+    const main = document.createElement("div");
+    main.className = "pos-main";
+    main.innerHTML =
+      '<span class="pos-name">' + escapeHtml(p.name) + "</span>" +
+      '<span class="pos-deg">' + p.output_deg.toFixed(2) + "\u00b0</span>";
+    const sub = document.createElement("div");
+    sub.className = "pos-sub";
+    sub.innerHTML =
+      '<span class="pos-desc">' + escapeHtml(p.description) + "</span>" +
+      (p.stale_reference
+        ? '<span class="pos-tag" title="Saved against an earlier '
+          + 'reference. Still the same physical position.">earlier '
+          + "reference</span>"
+        : "");
+    row.appendChild(main);
+    row.appendChild(sub);
+    row.onclick = () => {
+      state.selectedPositionId = p.id;
+      renderPositions();
+    };
+    list.appendChild(row);
+  });
 }
 
 function escapeHtml(text) {
@@ -702,9 +733,10 @@ const EVENT_LABELS = {
   "servo.lock.released": "unlocked",
   "servo.calibrated": "reference set",
   "servo.fault.recovered": "fault cleared",
-  "zero.captured": "position saved",
-  "zero.activated": "position used",
-  "zero.deleted": "position removed",
+  "position.saved": "position saved",
+  "position.updated": "position updated",
+  "position.deleted": "position removed",
+  "position.moved": "moved to position",
   "app.boot": "started",
   "telemetry.exported": "export delivered",
 };
@@ -802,7 +834,7 @@ async function doCalibrate() {
   try {
     await apiPost("/servo/calibrate");
     /* success: no notice */
-    fetchZeros();
+    fetchPositions();   /* every position's displayed angle just moved */
   } catch (err) { sayError(err); }
 }
 async function doRecover() {
@@ -810,30 +842,74 @@ async function doRecover() {
   try { await apiPost("/servo/recover"); /* success: no notice */ }
   catch (err) { sayError(err); }
 }
-async function doSave() {
-  clearNotice();
-  const name = await askText("Save position",
-    "Name this position so it can be recalled later.", "Save");
-  if (!name) return;
-  try { await apiPost("/zeros/capture", { name: name }); /* success: no notice */ fetchZeros(); }
-  catch (err) { sayError(err); }
+function selectedPosition() {
+  return state.positions.find((p) => p.id === state.selectedPositionId)
+    || null;
 }
-async function doUse() {
+async function newPosition() {
   clearNotice();
-  if (state.selectedZeroId == null) { say("select a position first", true); return; }
-  try { await apiPost("/zeros/" + state.selectedZeroId + "/activate"); /* success: no notice */ fetchZeros(); }
-  catch (err) { sayError(err); }
+  const current = state.lastState ? state.lastState.output_deg : 0;
+  const result = await askPosition("New position", "Save", {
+    name: "", description: "",
+    targetDeg: current != null ? current : 0, staleReference: false,
+  });
+  if (!result) return;
+  try {
+    await apiPost("/positions", { name: result.name,
+                                 description: result.description,
+                                 target_deg: result.targetDeg });
+    /* success: no notice */
+    fetchPositions();
+  } catch (err) { sayError(err); }
 }
-async function doRemove() {
+async function editPosition() {
   clearNotice();
-  if (state.selectedZeroId == null) { say("select a position first", true); return; }
-  const zero = state.zeros.find((z) => z.id === state.selectedZeroId);
-  if (zero) {
-    const ok = await askConfirm("Remove position",
-      'Remove "' + zero.name + '" from saved positions?', "Remove");
-    if (!ok) return;
+  const position = selectedPosition();
+  if (!position) { say("select a position first", true); return; }
+  const result = await askPosition("Edit position", "Save", {
+    name: position.name, description: position.description,
+    targetDeg: position.output_deg,
+    staleReference: position.stale_reference,
+  });
+  if (!result) return;
+  try {
+    await apiPatch("/positions/" + position.id,
+      { name: result.name, description: result.description,
+       target_deg: result.targetDeg, updated_at: position.updated_at });
+    /* success: no notice */
+    fetchPositions();
+  } catch (err) {
+    sayError(err);
+    if (err.reason === "stale_position") fetchPositions();
   }
-  try { await apiDelete("/zeros/" + state.selectedZeroId); state.selectedZeroId = null; /* success: no notice */ fetchZeros(); }
+}
+async function deletePosition() {
+  clearNotice();
+  const position = selectedPosition();
+  if (!position) { say("select a position first", true); return; }
+  const ok = await askConfirm("Remove position",
+    'Remove "' + position.name + '" from saved positions?', "Remove");
+  if (!ok) return;
+  try {
+    await apiDelete("/positions/" + position.id,
+      { updated_at: position.updated_at });
+    state.selectedPositionId = null;
+    /* success: no notice */
+    fetchPositions();
+  } catch (err) {
+    sayError(err);
+    if (err.reason === "stale_position") fetchPositions();
+  }
+}
+async function goToPosition() {
+  clearNotice();
+  const position = selectedPosition();
+  if (!position) { say("select a position first", true); return; }
+  const ok = await askConfirm("Go to position",
+    'Move to "' + position.name + '" ('
+    + position.output_deg.toFixed(2) + '°)?', "Go");
+  if (!ok) return;
+  try { await apiPost("/positions/" + position.id + "/go"); }
   catch (err) { sayError(err); }
 }
 function formatLocalDatetimeInput(date) {
@@ -2065,11 +2141,13 @@ async function doExport() {
   }
 }
 
+const ANGLE_FIELDS = ["inAngle", "posAngle"];
+
 function nudge(inputId, delta) {
-  /* Angle snaps to the servo's own step grid (D32). */
+  /* Angle fields snap to the servo's own step grid (D32). */
   const input = $(inputId);
   const value = parseFloat(input.value) || 0;
-  const next = inputId === "inAngle"
+  const next = ANGLE_FIELDS.indexOf(inputId) !== -1
     ? Math.round((value + delta) / ANGLE_STEP) * ANGLE_STEP
     : value + delta;
   input.value = next.toFixed(2);
@@ -2104,9 +2182,10 @@ function initUi() {
   bind("calCube", doCalibrate);
   bind("isoCube", toggleIsolate);
   bind("recoverBtn", doRecover);
-  bind("saveBtn", doSave);
-  bind("useBtn", doUse);
-  bind("removeBtn", doRemove);
+  bind("goBtn", goToPosition);
+  bind("newPositionBtn", newPosition);
+  bind("editPositionBtn", editPosition);
+  bind("deletePositionBtn", deletePosition);
   bind("exportBtn", doExport);
 
   setExportPreset("24h");

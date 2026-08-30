@@ -10,7 +10,7 @@ class TestState:
 
     EXPECTED_KEYS = {"output_deg", "reading_valid", "moving", "locked",
                      "settling",
-                     "position_verified", "active_zero", "temperature_c",
+                     "position_verified", "temperature_c",
                      "voltage_v", "current_a", "torque_kgcm", "overload",
                      "overcurrent", "overheat", "voltage_fault",
                      "sensor_fault", "angle_fault", "servo_deg",
@@ -22,7 +22,6 @@ class TestState:
         body = client.get("/api/v1/servo/state").json()
         assert set(body) == self.EXPECTED_KEYS
         assert body["position_verified"] is False
-        assert body["active_zero"] == "factory"
         assert body["locked"] is False
         assert body["target_deg"] is None
         assert body["target_stale"] is False
@@ -153,23 +152,21 @@ class TestIsolate:
 class TestCalibrate:
     """POST /api/v1/servo/calibrate."""
 
-    def test_calibrate_creates_verified_active_datum(self, client):
+    def test_calibrate_verifies_position(self, client):
         response = client.post("/api/v1/servo/calibrate")
         assert response.status_code == 201
         body = response.json()
-        assert body["is_datum"] is True
-        assert body["is_active"] is True
-        assert body["name"] == "datum"
+        assert isinstance(body["raw_counts"], int)
+        assert "captured_at" in body
         state = client.get("/api/v1/servo/state").json()
         assert state["position_verified"] is True
-        assert state["active_zero"] == "datum"
 
-    def test_recalibrate_upserts_single_datum(self, client):
-        first = client.post("/api/v1/servo/calibrate").json()
+    def test_recalibrate_overwrites_the_one_datum(self, client):
+        from app.deps import get_app_state_repository
+        client.post("/api/v1/servo/calibrate")
         second = client.post("/api/v1/servo/calibrate").json()
-        assert second["id"] == first["id"]
-        zeros = client.get("/api/v1/zeros").json()
-        assert sum(1 for z in zeros if z["is_datum"]) == 1
+        assert second["raw_counts"] == int(
+            get_app_state_repository().get("datum_raw_counts"))
 
 
 class TestRecover:
@@ -229,11 +226,9 @@ class TestOutOfTravelSurfaced:
     """An unreachable target must be refused, not silently clamped."""
 
     def test_returns_422_with_reason(self, backend, client):
-        # Capture the datum at the current position, which for a fresh
-        # simulator sits at the bottom of the mechanism's travel.
-        zero = client.post("/api/v1/zeros/capture",
-                           json={"name": "bottom"}).json()
-        client.post(f"/api/v1/zeros/{zero['id']}/activate")
+        # Calibrate at the current position, which for a fresh simulator
+        # sits at the bottom of the mechanism's travel.
+        client.post("/api/v1/servo/calibrate")
         response = client.post("/api/v1/servo/move",
                                json={"target_deg": -90.0})
         assert response.status_code == 422
@@ -242,7 +237,7 @@ class TestOutOfTravelSurfaced:
 
 
 class TestInvalidReadingSurfaced:
-    """Calibrating on a dead bus must refuse, not store a zero."""
+    """Calibrating on a dead bus must refuse, not store a datum."""
 
     def test_returns_409_with_reason(self, backend, client):
         from app.deps import get_servo_repository

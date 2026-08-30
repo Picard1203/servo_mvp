@@ -6,11 +6,13 @@ import time
 from datetime import datetime
 
 from app.db.database import Database
-from app.models.entities import TelemetrySample, ZeroReference
+from app.models.entities import SavedPosition, TelemetrySample
+from app.repositories.concrete.sqlite_app_state_repository import (
+    SqliteAppStateRepository)
+from app.repositories.concrete.sqlite_saved_position_repository import (
+    SqliteSavedPositionRepository)
 from app.repositories.concrete.sqlite_telemetry_repository import (
     SqliteTelemetryRepository)
-from app.repositories.concrete.sqlite_zero_repository import (
-    SqliteZeroRepository)
 
 
 class TestSchema:
@@ -18,11 +20,13 @@ class TestSchema:
 
     def test_tables_and_columns_created(self, tmp_path):
         db = Database(str(tmp_path / "fresh.db"))
-        zero_cols = [r[1] for r in
-                     db.connection.execute("PRAGMA table_info(zeros)")]
+        position_cols = [r[1] for r in db.connection.execute(
+            "PRAGMA table_info(saved_positions)")]
+        assert set(position_cols) == {"id", "name", "description",
+                                      "raw_counts", "created_at",
+                                      "updated_at"}
         telemetry_cols = [r[1] for r in
                           db.connection.execute("PRAGMA table_info(telemetry)")]
-        assert "is_datum" in zero_cols
         for col in ("overload", "overcurrent", "overheat", "voltage_fault",
                     "sensor_fault", "target_deg", "isolated"):
             assert col in telemetry_cols
@@ -30,6 +34,10 @@ class TestSchema:
                           db.connection.execute(
                               "PRAGMA table_info(app_state)")]
         assert set(app_state_cols) == {"key", "value", "updated_at"}
+        zeros_exists = db.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+            " AND name = 'zeros'").fetchone()
+        assert zeros_exists is None
 
     def test_init_idempotent(self, tmp_path):
         path = str(tmp_path / "twice.db")
@@ -40,39 +48,89 @@ class TestSchema:
 class TestMigration:
     """Upgrading a database created before this change pack."""
 
-    def test_old_schema_upgraded_with_rows_intact(self, tmp_path):
+    def test_datum_carried_into_app_state(self, tmp_path):
         path = str(tmp_path / "old.db")
         conn = sqlite3.connect(path)
         conn.executescript(
             "CREATE TABLE zeros (id INTEGER PRIMARY KEY AUTOINCREMENT,"
             " name TEXT NOT NULL UNIQUE, raw_counts INTEGER NOT NULL,"
-            " is_active INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);"
+            " is_active INTEGER NOT NULL DEFAULT 0,"
+            " is_datum INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);"
             "CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT,"
             " timestamp REAL NOT NULL, raw_counts INTEGER NOT NULL, output_deg REAL"
             " NOT NULL, moving INTEGER NOT NULL, locked INTEGER NOT NULL,"
             " temperature_c REAL NOT NULL, voltage_v REAL NOT NULL,"
             " current_a REAL NOT NULL, torque_kgcm REAL NOT NULL);"
-            "INSERT INTO zeros (name, raw_counts, is_active, created_at)"
-            " VALUES ('legacy', 123, 1, '2026-01-01');")
+            "INSERT INTO zeros (name, raw_counts, is_active, is_datum,"
+            " created_at) VALUES ('datum', 2046, 1, 1, '2026-01-01');"
+            "INSERT INTO zeros (name, raw_counts, is_active, is_datum,"
+            " created_at) VALUES ('gate open', 3000, 0, 0, '2026-01-02');")
         conn.commit()
         conn.close()
 
         db = Database(path)
-        row = db.connection.execute(
-            "SELECT * FROM zeros WHERE name = 'legacy'").fetchone()
-        assert row["raw_counts"] == 123
-        assert row["is_datum"] == 0
+        app_state = SqliteAppStateRepository(db)
+        assert app_state.get("datum_raw_counts") == "2046"
+        assert app_state.get("datum_captured_at") == "2026-01-01"
+        positions = SqliteSavedPositionRepository(db).list_all()
+        assert len(positions) == 1
+        assert positions[0].name == "gate open"
+        assert positions[0].raw_counts == 3000
+        zeros_exists = db.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+            " AND name = 'zeros'").fetchone()
+        assert zeros_exists is None
+
+    def test_migration_idempotent_when_run_twice(self, tmp_path):
+        path = str(tmp_path / "old2.db")
+        conn = sqlite3.connect(path)
+        conn.executescript(
+            "CREATE TABLE zeros (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " name TEXT NOT NULL UNIQUE, raw_counts INTEGER NOT NULL,"
+            " is_active INTEGER NOT NULL DEFAULT 0,"
+            " is_datum INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);"
+            "CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " timestamp REAL NOT NULL, raw_counts INTEGER NOT NULL, output_deg REAL"
+            " NOT NULL, moving INTEGER NOT NULL, locked INTEGER NOT NULL,"
+            " temperature_c REAL NOT NULL, voltage_v REAL NOT NULL,"
+            " current_a REAL NOT NULL, torque_kgcm REAL NOT NULL);"
+            "INSERT INTO zeros (name, raw_counts, is_active, is_datum,"
+            " created_at) VALUES ('datum', 2046, 1, 1, '2026-01-01');")
+        conn.commit()
+        conn.close()
+
+        Database(path)
+        db2 = Database(path)  # zeros already dropped: must not raise
+        app_state = SqliteAppStateRepository(db2)
+        assert app_state.get("datum_raw_counts") == "2046"
+
+    def test_old_telemetry_columns_upgraded(self, tmp_path):
+        path = str(tmp_path / "old_telemetry.db")
+        conn = sqlite3.connect(path)
+        conn.executescript(
+            "CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " timestamp REAL NOT NULL, raw_counts INTEGER NOT NULL, output_deg REAL"
+            " NOT NULL, moving INTEGER NOT NULL, locked INTEGER NOT NULL,"
+            " temperature_c REAL NOT NULL, voltage_v REAL NOT NULL,"
+            " current_a REAL NOT NULL, torque_kgcm REAL NOT NULL);")
+        conn.commit()
+        conn.close()
+
+        db = Database(path)
         telemetry_cols = [r[1] for r in
                           db.connection.execute("PRAGMA table_info(telemetry)")]
         assert "sensor_fault" in telemetry_cols
         assert "target_deg" in telemetry_cols
         assert "isolated" in telemetry_cols
         # A database old enough to predate target_deg predates app_state
-        # too - it must be created fresh, not merely migrated onto.
+        # and saved_positions too - both must be created fresh.
         app_state_cols = [r[1] for r in
                           db.connection.execute(
                               "PRAGMA table_info(app_state)")]
         assert set(app_state_cols) == {"key", "value", "updated_at"}
+        position_cols = [r[1] for r in db.connection.execute(
+            "PRAGMA table_info(saved_positions)")]
+        assert "raw_counts" in position_cols
 
     def test_migration_idempotent_on_a_populated_database(self, tmp_path):
         """The ALTER-and-ignore pattern must not raise or lose rows on a
@@ -111,25 +169,26 @@ class TestConcurrentAccess:
 
     def test_reads_survive_concurrent_writes(self, tmp_path):
         db = Database(str(tmp_path / "concurrent.db"))
-        zeros = SqliteZeroRepository(db)
+        positions = SqliteSavedPositionRepository(db)
         telemetry = SqliteTelemetryRepository(db)
-        active = zeros.add(ZeroReference(
-            id=None, name="datum", raw_counts=2046, is_active=True,
-            is_datum=True, created_at=datetime.now().isoformat()))
+        saved = positions.add(SavedPosition(
+            id=None, name="gate open", description="", raw_counts=2046,
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat()))
 
         stop = threading.Event()
         failures = []
 
-        def read_active_zero():
+        def read_position():
             while not stop.is_set():
                 try:
-                    zero = zeros.get_active()
+                    position = positions.get(saved.id)
                 except Exception as exc:  # the corrupted-row failure mode
                     failures.append(exc)
                     return
-                if zero is not None and zero.raw_counts is None:
+                if position is not None and position.raw_counts is None:
                     failures.append(AssertionError(
-                        "get_active() returned a NOT NULL column as None"))
+                        "get() returned a NOT NULL column as None"))
                     return
 
         def write_telemetry():
@@ -142,15 +201,17 @@ class TestConcurrentAccess:
                     voltage_fault=False, sensor_fault=False,
                     angle_fault=False, target_deg=None))
 
-        def write_zero():
+        def write_position():
             while not stop.is_set():
-                zeros.set_active(active.id)
+                positions.update(saved.id, saved.name, "moved",
+                                 saved.raw_counts,
+                                 datetime.now().isoformat())
 
-        threads = ([threading.Thread(target=read_active_zero)
+        threads = ([threading.Thread(target=read_position)
                     for _ in range(4)]
                    + [threading.Thread(target=write_telemetry)
                       for _ in range(2)]
-                   + [threading.Thread(target=write_zero) for _ in range(2)])
+                   + [threading.Thread(target=write_position) for _ in range(2)])
         for t in threads:
             t.start()
         time.sleep(2.0)

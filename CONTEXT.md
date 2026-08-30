@@ -40,23 +40,23 @@ is still known when the position is not. Marked stale (not cleared) after
 measurement; never substituted with 0.
 _Avoid_: commanded angle, desired angle, setpoint
 
-**Zero reference**:
-A saved, named position an operator captures and can later re-select. This is
-the genus; the datum is one distinguished member of it.
-_Avoid_: preset, bookmark, waypoint, favourite
-
 **Datum**:
-The one absolute zero reference, captured by Calibrate from a validated
+The one absolute position reference, captured by Calibrate from a validated
 reading while the mechanism sits at its documented physical reference
-position. There is exactly one, it cannot be deleted, and it must sit
-mid-travel — a datum at count 0 strands the negative half of the window.
-_Avoid_: zero point, home, origin, offset
+position. There is exactly one, it cannot be deleted or reassigned by
+anything else, and it must sit mid-travel — a datum at count 0 strands the
+negative half of the window. Every output degree is measured from it,
+always (R10 retired the earlier model where a saved position could be
+activated to relocate this reference).
+_Avoid_: zero point, home, origin, offset, baseline, zero reference
 
-**Baseline**:
-The position of the currently active zero reference — the point output
-degrees are actually measured from. Exactly one zero reference is active at a
-time; activating another moves the baseline without disturbing the datum.
-_Avoid_: active zero, current origin
+**Saved position**:
+A named, described position an operator can return to with Go to. Stores its
+absolute encoder position, so it stays at the same physical spot across a
+recalibration — its displayed angle may change instead, since that is
+computed against the current datum. Carries no baseline concept of its own;
+moving to one is an ordinary move, not a change to what 0° means.
+_Avoid_: zero, preset, bookmark, waypoint, favourite
 
 **Travel window**:
 The reachable output-angle range, ±90° by default. A target outside it is

@@ -97,7 +97,7 @@ class TestStream:
             state_data = json.loads(state_events[0]["data"])
             expected_keys = {
                 "output_deg", "reading_valid", "moving", "locked",
-                "settling", "position_verified", "active_zero",
+                "settling", "position_verified",
                 "temperature_c", "voltage_v", "current_a", "torque_kgcm",
                 "overload", "overcurrent", "overheat", "voltage_fault",
                 "sensor_fault", "angle_fault", "servo_deg", "target_deg",
@@ -106,26 +106,50 @@ class TestStream:
             }
             assert set(state_data) == expected_keys
 
-    def test_emits_zeros_event(self, client: TestClient,
-                               monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_emits_positions_event(self, client: TestClient,
+                                   monkeypatch: pytest.MonkeyPatch) -> None:
         async def mock_sleep(*args: Any, **kwargs: Any) -> None:
             raise StopStream()
-        
+
         monkeypatch.setattr("app.routers.stream.asyncio.sleep", mock_sleep)
 
         with client.stream("GET", "/api/v1/stream") as response:
             lines = _read_sse_lines(response, 9)
             events = _parse_sse_events(lines)
 
-            zeros_events = []
+            positions_events = []
             for e in events:
-                if e["event"] == "zeros":
-                    zeros_events.append(e)
+                if e["event"] == "positions":
+                    positions_events.append(e)
 
-            assert len(zeros_events) > 0
+            assert len(positions_events) > 0
 
-            zeros_data = json.loads(zeros_events[0]["data"])
-            assert isinstance(zeros_data, list)
+            positions_data = json.loads(positions_events[0]["data"])
+            assert isinstance(positions_data, list)
+
+    def test_positions_pushed_immediately_on_change(
+            self, client: TestClient,
+            monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.deps import get_saved_position_service
+        calls = {"n": 0}
+
+        async def mock_sleep(*args: Any, **kwargs: Any) -> None:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                get_saved_position_service().create("p", "", 10.0)
+            if calls["n"] >= 3:
+                raise StopStream()
+
+        monkeypatch.setattr("app.routers.stream.asyncio.sleep", mock_sleep)
+
+        with client.stream("GET", "/api/v1/stream") as response:
+            lines = _read_sse_lines(response, 20)
+            events = _parse_sse_events(lines)
+            payloads = [json.loads(e["data"]) for e in events
+                       if e["event"] == "positions"]
+            # the created position reaches the stream well before the
+            # ~15s periodic floor, on the very next tick after it exists.
+            assert any(len(p) == 1 for p in payloads)
 
     def test_emits_events_event(self, client: TestClient,
                                 monkeypatch: pytest.MonkeyPatch) -> None:

@@ -7,23 +7,21 @@ from typing import Optional
 from Logger461 import logger
 
 from app.core.exceptions import InvalidReadingError
-from app.models.entities import (
-    ServoStateView,
-    ZeroReference,
-)
+from app.models.entities import ServoStateView
 from app.repositories.abstract.app_state_repository import AppStateRepository
 from app.repositories.abstract.servo_repository import ServoRepository
-from app.repositories.abstract.zero_repository import ZeroRepository
 
 _ISOLATED_INTENT_KEY = "isolated"
+_DATUM_RAW_COUNTS_KEY = "datum_raw_counts"
+_DATUM_CAPTURED_AT_KEY = "datum_captured_at"
 
 
 class ServoStateStore:
-    """Coordinates lock state, baseline, isolation, and settle timing.
+    """Coordinates lock state, the datum, isolation, and settle timing.
 
     Attributes:
         _servo (ServoRepository): Servo repository for hardware reads.
-        _zeros (ZeroRepository): Zero reference repository for active baseline.
+        _app_state (AppStateRepository): App-state repository for the datum.
         _settling_seconds (float): Lock settle duration in seconds.
         _isolation_idle_timeout_s (float): Idle duration before auto-isolation.
         _counts_per_turn (int): Encoder counts per full servo turn.
@@ -40,13 +38,12 @@ class ServoStateStore:
         _isolated_known (bool): Hardware acknowledged motor isolation state.
     """
 
-    def __init__(self, servo: ServoRepository, zeros: ZeroRepository,
-                 app_state: AppStateRepository, settling_seconds: float,
-                 counts_per_turn: int, servo_deg_per_output_deg: float,
-                 servo_direction: int = 1,
+    def __init__(self, servo: ServoRepository, app_state: AppStateRepository,
+                 settling_seconds: float, counts_per_turn: int,
+                 servo_deg_per_output_deg: float, servo_direction: int = 1,
                  isolation_idle_timeout_s: float = 0.0) -> None:
         self._servo: ServoRepository = servo
-        self._zeros: ZeroRepository = zeros
+        self._app_state: AppStateRepository = app_state
         self._settling_seconds: float = settling_seconds
         self._isolation_idle_timeout_s: float = isolation_idle_timeout_s
         self._counts_per_turn: int = counts_per_turn
@@ -176,7 +173,7 @@ class ServoStateStore:
             return (self._target_deg, self._target_stale)
 
     def output_deg_from_counts(self, raw_counts: int) -> float:
-        """Converts raw counts to output degrees against the active zero.
+        """Converts raw counts to output degrees against the datum.
 
         Args:
             raw_counts (int): Absolute encoder counts.
@@ -184,18 +181,18 @@ class ServoStateStore:
         Returns:
             float: Output angle in degrees.
         """
-        return self._to_output_deg(raw_counts, self._zeros.get_active())
+        return self._to_output_deg(raw_counts, self._datum_counts())
 
     def reachable_output_range_deg(self) -> tuple[float, float]:
-        """Returns output angles reachable from current baseline.
+        """Returns output angles reachable from the datum.
 
         Returns:
             tuple[float, float]: Minimum and maximum reachable output degrees.
         """
-        baseline = self._active_counts()
+        datum = self._datum_counts()
         span = self._counts_per_servo_deg * self._servo_deg_per_output_deg
-        low = (0 - baseline) / span
-        high = ((self._counts_per_turn - 1) - baseline) / span
+        low = (0 - datum) / span
+        high = ((self._counts_per_turn - 1) - datum) / span
         if self._servo_direction < 0:
             low, high = -high, -low
         return (low, high)
@@ -223,7 +220,7 @@ class ServoStateStore:
         """
         servo_deg = (output_deg * self._servo_deg_per_output_deg
                      * self._servo_direction)
-        return self._active_counts() + round(
+        return self._datum_counts() + round(
             servo_deg * self._counts_per_servo_deg)
 
     def counts_speed_from_output_speed(self, speed_dps: float) -> int:
@@ -239,13 +236,13 @@ class ServoStateStore:
         return max(1, round(servo_dps * self._counts_per_servo_deg))
 
     def snapshot(self) -> ServoStateView:
-        """Returns a coherent snapshot of servo, lock and baseline.
+        """Returns a coherent snapshot of servo, lock and datum state.
 
         Returns:
             ServoStateView: Atomic state view for API and telemetry.
         """
         reading = self._servo.read_snapshot()
-        active = self._zeros.get_active()
+        datum = self._datum_counts()
         with self._lock:
             locked = self._locked
             settling = (self._settle_deadline > monotonic())
@@ -255,15 +252,13 @@ class ServoStateStore:
             isolated = self._isolated_known
         if reading.valid is False:
             logger.warning("servo read failed; position is not known",
-                           metadata={"event": "servo.read.failed"},
-                           extra={"active_zero": active.name
-                                  if active is not None else "factory"})
+                           metadata={"event": "servo.read.failed"})
         have_reading = (reading.valid is True) and (reading.raw_counts is not None)
         output_min_deg, output_max_deg = self.reachable_output_range_deg()
         return ServoStateView(
-            output_deg=(round(self._to_output_deg(reading.raw_counts, active),
+            output_deg=(round(self._to_output_deg(reading.raw_counts, datum),
                               2) if have_reading is True else None),
-            servo_deg=(round(self._to_servo_deg(reading.raw_counts, active),
+            servo_deg=(round(self._to_servo_deg(reading.raw_counts, datum),
                              2) if have_reading is True else None),
             raw_counts=reading.raw_counts if reading.valid is True else None,
             reading_valid=reading.valid,
@@ -271,7 +266,6 @@ class ServoStateStore:
             locked=locked,
             settling=settling,
             position_verified=verified,
-            active_zero_name=active.name if active is not None else "factory",
             temperature_c=reading.temperature_c if reading.valid is True else None,
             voltage_v=reading.voltage_v if reading.valid is True else None,
             current_a=reading.current_a if reading.valid is True else None,
@@ -290,12 +284,20 @@ class ServoStateStore:
             isolation_idle_timeout_s=self._isolation_idle_timeout_s)
 
     def current_output_deg(self) -> Optional[float]:
-        """Returns current output angle relative to the active zero.
+        """Returns current output angle relative to the datum.
 
         Returns:
             Optional[float]: Output angle or None if read failed.
         """
         return self.snapshot().output_deg
+
+    def datum_captured_at(self) -> Optional[str]:
+        """Returns the datum's capture timestamp, or None if uncalibrated.
+
+        Returns:
+            Optional[str]: ISO timestamp, or None before any calibration.
+        """
+        return self._app_state.get(_DATUM_CAPTURED_AT_KEY)
 
     def read_counts(self) -> int:
         """Returns the current absolute encoder position in counts.
@@ -309,55 +311,43 @@ class ServoStateStore:
         reading = self._servo.read_snapshot()
         if reading.valid is False:
             raise InvalidReadingError(
-                "the servo did not answer the position read")
+                "the servo did not answer the position read",
+                metadata={"operation": "read_counts"})
         return reading.raw_counts
 
-    def _baseline_counts(self, active: Optional[ZeroReference]) -> int:
-        """Returns baseline in raw counts for a prefetched zero.
-
-        Args:
-            active (Optional[ZeroReference]): Active zero reference or None.
+    def _datum_counts(self) -> int:
+        """Returns the datum in raw counts, or mid-travel if uncalibrated.
 
         Returns:
-            int: Active zero raw counts or center of travel.
+            int: The calibration datum, or the count range's centre.
         """
-        if active is not None:
-            return active.raw_counts
-        return self._counts_per_turn // 2
+        stored = self._app_state.get(_DATUM_RAW_COUNTS_KEY)
+        if stored is None:
+            return self._counts_per_turn // 2
+        return int(stored)
 
-    def _active_counts(self) -> int:
-        """Returns the active baseline in raw counts.
-
-        Returns:
-            int: Active zero raw counts or center of travel.
-        """
-        return self._baseline_counts(self._zeros.get_active())
-
-    def _to_servo_deg(self, raw_counts: int,
-                      active: Optional[ZeroReference]) -> float:
+    def _to_servo_deg(self, raw_counts: int, datum: int) -> float:
         """Converts counts to servo pre-ratio degrees.
 
         Args:
             raw_counts (int): Absolute encoder counts.
-            active (Optional[ZeroReference]): Active zero reference or None.
+            datum (int): Datum in raw counts.
 
         Returns:
             float: Servo shaft angle in degrees.
         """
-        return ((raw_counts - self._baseline_counts(active))
-                / self._counts_per_servo_deg)
+        return (raw_counts - datum) / self._counts_per_servo_deg
 
-    def _to_output_deg(self, raw_counts: int,
-                       active: Optional[ZeroReference]) -> float:
-        """Converts counts to output degrees using a prefetched baseline.
+    def _to_output_deg(self, raw_counts: int, datum: int) -> float:
+        """Converts counts to output degrees using a prefetched datum.
 
         Args:
             raw_counts (int): Absolute encoder counts.
-            active (Optional[ZeroReference]): Active zero reference or None.
+            datum (int): Datum in raw counts.
 
         Returns:
             float: Output angle in degrees.
         """
-        servo_deg = self._to_servo_deg(raw_counts, active)
+        servo_deg = self._to_servo_deg(raw_counts, datum)
         return (servo_deg / self._servo_deg_per_output_deg
                 * self._servo_direction)

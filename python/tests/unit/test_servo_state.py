@@ -105,7 +105,6 @@ class TestSnapshot:
         from app.deps import get_state_store
         store = get_state_store()
         view = store.snapshot()
-        assert view.active_zero_name == "factory"
         assert view.position_verified is False
         assert view.locked is False
         assert view.overload is False
@@ -267,10 +266,9 @@ class TestDirection:
 
     def test_reversed_direction_inverts_counts(self, backend):
         from app.services.servo_state import ServoStateStore
-        from app.deps import (get_app_state_repository, get_servo_repository,
-                              get_zero_repository)
+        from app.deps import get_app_state_repository, get_servo_repository
         reversed_store = ServoStateStore(
-            servo=get_servo_repository(), zeros=get_zero_repository(),
+            servo=get_servo_repository(),
             app_state=get_app_state_repository(),
             settling_seconds=backend.settings.settling_seconds,
             counts_per_turn=backend.settings.counts_per_turn,
@@ -300,10 +298,9 @@ class TestReachableRange:
 
     def test_reversed_direction_range_is_mirrored(self, backend):
         from app.services.servo_state import ServoStateStore
-        from app.deps import (get_app_state_repository, get_servo_repository,
-                              get_zero_repository)
+        from app.deps import get_app_state_repository, get_servo_repository
         store = ServoStateStore(
-            servo=get_servo_repository(), zeros=get_zero_repository(),
+            servo=get_servo_repository(),
             app_state=get_app_state_repository(),
             settling_seconds=backend.settings.settling_seconds,
             counts_per_turn=backend.settings.counts_per_turn,

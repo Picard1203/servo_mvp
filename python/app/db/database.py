@@ -36,13 +36,13 @@ class Database:
         with self.write_lock:
             self._connection.executescript(
                 """
-                CREATE TABLE IF NOT EXISTS zeros (
+                CREATE TABLE IF NOT EXISTS saved_positions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE,
+                    description TEXT NOT NULL DEFAULT '',
                     raw_counts INTEGER NOT NULL,
-                    is_active INTEGER NOT NULL DEFAULT 0,
-                    is_datum INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS telemetry (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,4 +102,40 @@ class Database:
                 self._connection.execute(statement)
             except sqlite3.OperationalError:
                 pass
+        self._connection.commit()
+        self._migrate_zeros_to_datum_and_saved_positions()
+
+    def _migrate_zeros_to_datum_and_saved_positions(self) -> None:
+        """Carries the old zeros table's rows into app_state and saved_positions."""
+        exists = self._connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+            " AND name = 'zeros'").fetchone()
+        if exists is None:
+            return
+        datum = self._connection.execute(
+            "SELECT raw_counts, created_at FROM zeros"
+            " WHERE is_datum = 1").fetchone()
+        if datum is not None:
+            self._connection.execute(
+                "INSERT INTO app_state (key, value, updated_at) VALUES"
+                " ('datum_raw_counts', ?, ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value,"
+                " updated_at = excluded.updated_at",
+                (str(datum["raw_counts"]), datum["created_at"]))
+            self._connection.execute(
+                "INSERT INTO app_state (key, value, updated_at) VALUES"
+                " ('datum_captured_at', ?, ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value,"
+                " updated_at = excluded.updated_at",
+                (datum["created_at"], datum["created_at"]))
+        points = self._connection.execute(
+            "SELECT name, raw_counts, created_at FROM zeros"
+            " WHERE is_datum = 0").fetchall()
+        for point in points:
+            self._connection.execute(
+                "INSERT INTO saved_positions (name, description, raw_counts,"
+                " created_at, updated_at) VALUES (?, '', ?, ?, ?)",
+                (point["name"], point["raw_counts"], point["created_at"],
+                 point["created_at"]))
+        self._connection.execute("DROP TABLE zeros")
         self._connection.commit()

@@ -246,23 +246,40 @@ and the byte path from browser to servo, plus an ERD for the SQLite schema.
 ---
 
 ### T6 — Restructure the exception hierarchy
-**Status:** open · **Priority:** later, but agreed
+**Status:** open · half-done · **Priority:** later, but agreed · structure
+built 30 August 2026, Session 16 (opportunistic, alongside R10)
 
-Adopt the three-tier hierarchy from `CONVENTIONS.md`: service base
-(`ServoMvpException`) → general category (`NotFoundException`) → concrete
-(`ServoNotFoundError`). Each class carries its FastAPI status code; error codes
-accumulate with `+=` into `SERVO_MVP.NOT_FOUND.SERVO_NOT_FOUND`.
+**Done:** the three-tier hierarchy — `ServoAppException` (not
+`ServoMvpException`; renamed, the "MVP" phase label doesn't belong in a
+permanent exception name) → category (`ConflictException`,
+`NotFoundException`, `ValidationException`) → concrete
+(`LockedError`, `DuplicateNameError`, ...). Each carries its `fastapi.status`
+code. Error codes accumulate via `ServoAppException.__init_subclass__`
+reading `code=` off the class-definition line (`class LockedError(
+ConflictException, code="LOCKED")`), not hand-written string
+concatenation at each level — `LockedError.error_code ==
+"SERVO_MVP.CONFLICT.LOCKED"`. One handler in `app.py`
+(`_register_error_handlers`) replaced eleven per-type handlers, logging
+every domain refusal from the exception itself instead of the scattered
+`logger.warning()` calls at raise sites, which were removed as
+redundant.
 
-Exceptions must **carry metadata**, passed uniformly and logged at the top level.
-They do not today.
+**Not done:** the acceptance below still isn't met. `metadata` is
+structurally supported by every exception (`ServoAppException.__init__`
+accepts it, inherited unchanged by every subclass) and is populated at
+the four sites `motion_service.py` raises from
+(`LockedError`/`IsolatedError`/`LockedAndIsolatedError`/`StepError`/
+`OutOfTravelError`), but not yet at the others (`InvalidReadingError` in
+`calibration_service.py`/`servo_state.py`, `NotFoundError`/
+`StalePositionError`/`PositionOutOfRangeError` in
+`saved_position_service.py`, `DuplicateNameError` in
+`sqlite_saved_position_repository.py`). Deferred deliberately, at the
+user's instruction, mid-session — infra first, population later, not
+this run.
 
-The payoff is one handler on the service base exception instead of a handler per
-type.
-
-Current state: a flat set under `DomainError`, no error codes, no metadata.
-
-**Acceptance:** one exception handler covers the service; every raised exception
-carries a dotted error code and metadata.
+**Acceptance:** one exception handler covers the service (met); every
+raised exception carries a dotted error code (met) and populated
+metadata (not met — sweep the remaining raise sites).
 
 ---
 

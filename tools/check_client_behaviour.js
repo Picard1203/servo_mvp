@@ -23,10 +23,23 @@ const path = require("path");
 const REPO = process.env.REPO || path.join(__dirname, "..");
 const APP = path.join(REPO, "python/static/app.js");
 
+/* Mirrors the one DOM behaviour escapeHtml() in app.js actually relies
+   on: assigning textContent HTML-escapes into innerHTML. */
+function escapeForInnerHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function makeEl(id) {
+  let _textContent = "";
   const el = {
     id,
-    textContent: "",
+    get textContent() { return _textContent; },
+    set textContent(v) { _textContent = v; el.innerHTML = escapeForInnerHtml(v); },
     innerHTML: "",
     value: "",
     disabled: false,
@@ -171,7 +184,7 @@ console.log("\nD14 - a refused connection reads as something to act on");
   console.log("\nD16 - a failed read renders no measurements");
   const good = {
     output_deg: 12.5, reading_valid: true, moving: false, locked: false,
-    settling: false, position_verified: true, active_zero: "datum",
+    settling: false, position_verified: true,
     temperature_c: 34.2, voltage_v: 12.1, current_a: 0.22,
     torque_kgcm: 1.4, overload: false, overcurrent: false, overheat: false,
     voltage_fault: false, sensor_fault: false, angle_fault: false,
@@ -185,7 +198,7 @@ console.log("\nD14 - a refused connection reads as something to act on");
     // six, which stopped being what the real API sends the moment D23
     // shipped.
     output_deg: null, reading_valid: false, moving: null, locked: false,
-    settling: false, position_verified: true, active_zero: "datum",
+    settling: false, position_verified: true,
     temperature_c: null, voltage_v: null, current_a: null,
     torque_kgcm: null, overload: null, overcurrent: null, overheat: null,
     voltage_fault: null, sensor_fault: null, angle_fault: null,
@@ -556,6 +569,84 @@ console.log("\nD14 - a refused connection reads as something to act on");
         sentBody && sentBody.target_deg === 0.08, sentBody);
   check("the backend's own refusal reaches the operator",
         lastToast() && /0\.06/.test(lastToast().message), lastToast());
+
+  /* ---------- R10: saved positions ---------- */
+  console.log("\nR10 - the position angle field snaps to the servo's step grid");
+  $("posAngle").value = "12";
+  ctx.nudge("posAngle", 0.06);
+  check("posAngle snaps like inAngle does",
+        $("posAngle").value === "12.06", $("posAngle").value);
+
+  console.log("\nR10 - renderPositions renders the empty state");
+  ctx.fetch = async () => ({ ok: true, json: async () => [] });
+  await ctx.fetchPositions();
+  let listEl = $("positionList");
+  let lastChild = listEl.children[listEl.children.length - 1];
+  check("an empty list shows guidance, not a blank box",
+        lastChild && /Press New/.test(lastChild.textContent),
+        lastChild && lastChild.textContent);
+
+  console.log("\nR10 - a position row escapes its name and flags an earlier reference");
+  ctx.fetch = async () => ({
+    ok: true,
+    json: async () => [{ id: 1, name: "<b>gate</b>", description: "note",
+                         raw_counts: 100, output_deg: 12.34,
+                         stale_reference: true, created_at: "t",
+                         updated_at: "t" }],
+  });
+  await ctx.fetchPositions();
+  listEl = $("positionList");
+  let row = listEl.children[listEl.children.length - 1];
+  const mainHtml = row.children[0].innerHTML;
+  const subHtml = row.children[1].innerHTML;
+  check("the name is escaped, not rendered as markup",
+        mainHtml.indexOf("<b>gate</b>") === -1
+        && /&lt;b&gt;gate&lt;\/b&gt;/.test(mainHtml), mainHtml);
+  check("the live angle the server computed is shown, not derived here",
+        /12\.34/.test(mainHtml), mainHtml);
+  check("a position saved before the current datum carries the advisory tag",
+        /earlier\s*reference/i.test(subHtml), subHtml);
+
+  console.log("\nR10 - askPosition refuses an empty name");
+  let resolved = null;
+  ctx.askPosition("New position", "Save",
+    { name: "", description: "", targetDeg: 0, staleReference: false })
+    .then((v) => { resolved = { value: v }; });
+  $("posName").value = "";
+  $("positionDlgYes")._listeners.click();
+  await Promise.resolve();
+  check("an empty name does not close the dialog", resolved === null, resolved);
+  $("posName").value = "work point";
+  $("positionDlgYes")._listeners.click();
+  await Promise.resolve();
+  check("a real name resolves with the typed fields",
+        resolved && resolved.value && resolved.value.name === "work point",
+        resolved);
+
+  console.log("\nR10 - goToPosition names the position and its angle before moving");
+  ctx.fetch = async () => ({
+    ok: true,
+    json: async () => [{ id: 7, name: "stow", description: "",
+                         raw_counts: 0, output_deg: -45.5,
+                         stale_reference: false, created_at: "t",
+                         updated_at: "t" }],
+  });
+  await ctx.fetchPositions();
+  listEl = $("positionList");
+  listEl.children[listEl.children.length - 1].onclick();
+  let goCalled = false;
+  ctx.fetch = async (url) => {
+    if (String(url).indexOf("/positions/7/go") !== -1) goCalled = true;
+    return { ok: true, json: async () => ({ accepted: true }) };
+  };
+  const goPromise = ctx.goToPosition();
+  check("the confirmation names the position",
+        /stow/.test($("confirmBody").textContent), $("confirmBody").textContent);
+  check("the confirmation states the angle it will move to",
+        /-45\.5/.test($("confirmBody").textContent), $("confirmBody").textContent);
+  $("confirmYes")._listeners.click();
+  await goPromise;
+  check("confirming sends the go command", goCalled === true);
 
   console.log("\n" + (failures ? failures + " FAILURE(S)" : "all checks passed"));
   process.exit(failures ? 1 : 0);

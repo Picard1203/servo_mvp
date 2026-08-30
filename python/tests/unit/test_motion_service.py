@@ -311,12 +311,10 @@ class TestTravelLimits:
 
     def test_target_beyond_the_count_range_is_refused(self, backend, motion):
         from app.core.exceptions import OutOfTravelError as OutOfTravel
-        from app.deps import get_state_store, get_zero_service
-        # Put the datum at the very bottom of travel, as a failed read
-        # once did, and the negative half becomes physically unreachable.
-        zeros = get_zero_service()
-        zero = zeros.capture("bottom")
-        zeros.activate(zero.id)
+        from app.deps import get_calibration_service, get_state_store
+        # Calibrate at the very bottom of travel, as a failed read once
+        # did, and the negative half becomes physically unreachable.
+        get_calibration_service().calibrate()
         store = get_state_store()
         low, high = store.reachable_output_range_deg()
         assert low > backend.settings.output_min_deg

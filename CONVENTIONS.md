@@ -104,14 +104,14 @@ paragraph here is simply deleted, not copied again. Only genuinely new
 rationale gets added, in distilled form, to the matching doc. See T15.
 
 ```python
-def get_zero_by_name(self, name: str) -> Optional[ZeroReference]:
-    """Retrieve a stored zero reference by its operator-given name.
+def get_position_by_name(self, name: str) -> Optional[SavedPosition]:
+    """Retrieve a stored saved position by its operator-given name.
 
     Args:
-        name (str): The zero reference name to search for.
+        name (str): The position name to search for.
 
     Returns:
-        Optional[ZeroReference]: The matching zero, or None if not found.
+        Optional[SavedPosition]: The matching position, or None if not found.
     """
 ```
 
@@ -119,7 +119,7 @@ def get_zero_by_name(self, name: str) -> Optional[ZeroReference]:
 
 ```python
     Raises:
-        NotFoundError: If no zero has this id.
+        NotFoundError: If no position has this id.
 ```
 
 ### Class docstrings carry `Attributes:`
@@ -128,13 +128,13 @@ Observed in `Eyal-FastAPI-Project`, absent from this repo. Every attribute is
 listed with its type.
 
 ```python
-class ZeroService:
-    """Manages saved zeros, the active baseline, and calibration.
+class SavedPositionService:
+    """Manages saved positions and moves the mechanism to one.
 
     Attributes:
-        _zeros (ZeroRepository): Zero reference data access.
-        _servo (ServoRepository): Servo access, simulated or hardware.
-        _state (ServoStateStore): Shared servo and lock state.
+        _positions (SavedPositionRepository): Saved-position persistence.
+        _state (ServoStateStore): Shared servo and datum state.
+        _motion (MotionService): Motion service used by go().
     """
 ```
 
@@ -287,9 +287,9 @@ if (reading.valid is True) and (zero.is_datum is False):
 - **`deps.py` is the only module that names concrete classes.** It is the
   composition root.
 
-This repo already follows the pattern: SQLite sits behind `ZeroRepository` and
-`TelemetryRepository`, and the simulated/hardware servo swap happens solely in
-`get_servo_repository()`.
+This repo already follows the pattern: SQLite sits behind `SavedPositionRepository`
+and `TelemetryRepository`, and the simulated/hardware servo swap happens solely
+in `get_servo_repository()`.
 
 ## Git
 

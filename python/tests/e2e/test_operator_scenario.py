@@ -8,19 +8,18 @@ from tests.conftest import wait_until
 
 
 class TestOperatorSession:
-    """Boot -> calibrate -> move -> lock -> zeros -> telemetry -> fault."""
+    """Boot -> calibrate -> move -> lock -> saved positions -> telemetry -> fault."""
 
     def test_full_session(self, backend, live_backend):
         with httpx.Client(base_url=live_backend.base_url,
                           timeout=5.0) as http:
-            # 1. boot: unverified, factory baseline
+            # 1. boot: unverified
             state = http.get("/api/v1/servo/state").json()
             assert state["position_verified"] is False
-            assert state["active_zero"] == "factory"
 
             # 2. install calibration at the physical reference
             datum = http.post("/api/v1/servo/calibrate").json()
-            assert datum["is_datum"] and datum["is_active"]
+            assert "raw_counts" in datum and "captured_at" in datum
             assert http.get(
                 "/api/v1/servo/state").json()["position_verified"] is True
 
@@ -49,16 +48,24 @@ class TestOperatorSession:
             assert time.monotonic() - started >= \
                 backend.settings.settling_seconds * 0.7
 
-            # 5. operational zero on top of the datum
+            # 5. save a position, refuse a duplicate name, go to it
             assert wait_until(lambda: not http.get(
                 "/api/v1/servo/state").json()["moving"], timeout=8)
-            zero = http.post("/api/v1/zeros/capture",
-                             json={"name": "work-point"}).json()
-            http.post(f"/api/v1/zeros/{zero['id']}/activate")
-            assert abs(http.get(
-                "/api/v1/servo/state").json()["output_deg"]) < 0.8
-            assert http.delete(
-                f"/api/v1/zeros/{zero['id']}").status_code == 409
+            position = http.post(
+                "/api/v1/positions",
+                json={"name": "work point", "target_deg": 6.0}).json()
+            assert abs(position["output_deg"] - 6.0) < 0.01
+            assert http.post(
+                "/api/v1/positions",
+                json={"name": "work point", "target_deg": 10.0}
+            ).status_code == 409
+            assert http.post(
+                f"/api/v1/positions/{position['id']}/go"
+            ).json()["accepted"] is True
+            assert wait_until(lambda: (
+                lambda s: not s["moving"]
+                and abs(s["output_deg"] - 6.0) < 0.8)(
+                    http.get("/api/v1/servo/state").json()), timeout=8)
 
             # 6. overload -> visible -> recovered
             from app.deps import get_servo_repository
@@ -84,7 +91,7 @@ class TestOperatorSession:
                 "/api/v1/system/events").json()["events"]}
             assert {"servo.calibrated", "servo.move.accepted",
                     "servo.lock.engaged", "servo.lock.released",
-                    "zero.captured", "zero.activated",
+                    "position.saved", "position.moved",
                     "servo.fault.recovered"} <= names
 
             # 9. health reports the (stub) MCU and service identity

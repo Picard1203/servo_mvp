@@ -48,6 +48,21 @@ figure is closer to 45-70 deg/s regardless of the label. No board this
 session, so that figure is inherited, not re-measured. **R10 is next, same
 session, in progress.**
 
+**30 August 2026 — Session 16: R10 closed, scope grown mid-session.**
+Zeros are gone: one datum (`app_state`, read fresh on every access, never
+cached), saved positions in their own table, storing `raw_counts` so a
+point keeps its physical spot across recalibration while its displayed
+angle may drift. The user extended R10's original design mid-session to
+full CRUD — create at any angle, edit, delete, not just capture-and-go —
+with duplicate-name and concurrent-edit conflicts both surfacing as a
+409, not a 500. Frontend panel rebuilt, not patched; a real bug (new
+`.saved-position` rows first named `.pos`, colliding with the existing
+measured-position readout's own `.pos`) was caught live by the operator
+and fixed. Verified via Playwright against the running simulator — no
+board this session. Bonus, opportunistic: T6 (exception hierarchy)
+restructured, half-done — see its backlog entry. One new defect filed,
+D38. `tools/verify.py`: 305/99.64%/194/105.
+
 **27–30 August 2026 — Session 15: first client demo held, ahead of the planned 15–19 sequence; feedback triaged into a new plan, session closed out.** Time moved up unexpectedly; the demo ran on `dev` at Session 14's commit state, its whole-app `/twin-review` findings (`docs/REVIEW_FINDINGS.md`) not yet triaged. This session did not run the originally-planned 15–19 content in order: session 18's deliverable (a presenter walkthrough script) was produced live instead, ad hoc, immediately before the demo; the rest of session 15's original job (triaging `REVIEW_FINDINGS.md` in full) and sessions 16/17/19's content (R1 remeasure, D17/T10/T11, dry-run) did not happen and are explicitly deferred — see `docs/BACKLOG.md`'s START HERE table, not restated here.
 
 **The demo blocked once, live, on a bug Session 14 had already found and flagged HIGH/build-breaking:** a stray unmatched closing brace at `NetworkRelay.cpp:170` (`docs/REVIEW_FINDINGS.md` firmware #1), invisible to `tools/verify.py` because the native suite never compiles a file needing `Arduino.h`. Fixed live so the app could start, committed and closed the same session — **D37**, `docs/CLOSED.md`. A small prevention check (`tools/check_brace_balance.py`) was added the same session rather than deferred, and wired straight into `tools/verify.py`'s gate as its 5th check — not left as a manual script or a separate backlog item, since finishing it cost nothing worth deferring.

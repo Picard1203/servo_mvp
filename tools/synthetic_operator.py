@@ -5,11 +5,11 @@ reproducing in seven minutes is rare, not absent, and only sustained realistic
 load can tell the difference.
 
 Each virtual operator reproduces `app.js`'s exact traffic shape: three
-independent polling streams - state once a second, the zero list and the
+independent polling streams - state once a second, the position list and the
 event list every 15 seconds, each on its own kept-alive HTTP connection
 (`--enhanced 8 August 2026`, closing backlog D27) - plus, between polls, what
 a person does: moves somewhere, waits to see it arrive, thinks for a while,
-occasionally locks, saves a zero or pulls an export. Think time is
+occasionally locks, saves a position or pulls an export. Think time is
 randomised, because several operators acting in lockstep is a load pattern
 no real site produces.
 
@@ -61,7 +61,7 @@ POLL_STATE_SECONDS: float = 1.0
 # Matching static/app.js's POLL_LISTS_MS - two SEPARATE timers, same period,
 # not one shared poll. That is what lets them drift into overlapping with
 # each other and with the state poll over a multi-hour run.
-POLL_ZEROS_SECONDS: float = 15.0
+POLL_POSITIONS_SECONDS: float = 15.0
 POLL_EVENTS_SECONDS: float = 15.0
 
 # Human pauses between deliberate actions. A person lines up a move, watches
@@ -394,7 +394,7 @@ class SyntheticOperator:
             return json.loads(body)
         except urllib.error.HTTPError as error:
             # 4xx is the API answering deliberately - refused while locked,
-            # out of travel, no such zero. That is behaviour, not breakage.
+            # out of travel, no such position. That is behaviour, not breakage.
             if (error.code >= 400) and (error.code < 500):
                 self._metrics.record_rejection(action)
                 return None
@@ -464,8 +464,8 @@ class SyntheticOperator:
             self._metrics.record_reading(
                 payload.get("reading_valid", True), payload.get("output_deg"))
             self._last_state_at = now
-        elif event == "zeros":
-            self._metrics.record_success("zeros_poll", 0.0)
+        elif event == "positions":
+            self._metrics.record_success("positions_poll", 0.0)
         elif event == "events":
             self._metrics.record_success("events_poll", 0.0)
 
@@ -496,7 +496,7 @@ class SyntheticOperator:
             self._toggle_lock()
             return
         if roll < 0.84:
-            self._request("zeros_list", "/zeros")
+            self._request("positions_list", "/positions")
             return
         if roll < 0.90:
             self._request("stop", "/servo/stop", payload={})

@@ -17,7 +17,7 @@ work would have been blocked on hardware that was not ready.
   above `deps.py` is untouched. **Note:** `README.md` §7 still describes this as
   future work ("when the sketch is ready, switch `deps.py`"); that is stale, the
   swap is already wired.
-- The same pattern applies to storage: SQLite sits behind `ZeroRepository` and
+- The same pattern applies to storage: SQLite sits behind `SavedPositionRepository` and
   `TelemetryRepository`.
 - The cost is a real one and worth stating: a green test suite proves the
   *simulated* path works. Every defect this project has actually suffered lived

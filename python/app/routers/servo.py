@@ -5,14 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.deps import (
+    get_calibration_service,
     get_isolation_service,
     get_motion_service,
     get_servo_repository,
     get_state_store,
-    get_zero_service,
 )
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.schemas.servo import (
+    CalibrationResponse,
     IsolateRequest,
     IsolateResponse,
     LockRequest,
@@ -24,17 +25,17 @@ from app.schemas.servo import (
     StopResponse,
     TorqueRegisterResponse,
 )
-from app.schemas.zeros import ZeroResponse
+from app.services.calibration_service import CalibrationService
 from app.services.isolation_service import IsolationService
 from app.services.motion_service import MotionService
 from app.services.servo_state import ServoStateStore
-from app.services.zero_service import ZeroService
 
 router = APIRouter(prefix="/api/v1/servo", tags=["servo"])
 
 MotionDep = Annotated[MotionService, Depends(get_motion_service)]
 StateDep = Annotated[ServoStateStore, Depends(get_state_store)]
-ZeroDep = Annotated[ZeroService, Depends(get_zero_service)]
+CalibrationDep = Annotated[CalibrationService,
+                          Depends(get_calibration_service)]
 IsolationDep = Annotated[IsolationService, Depends(get_isolation_service)]
 ServoDep = Annotated[ServoRepository, Depends(get_servo_repository)]
 
@@ -115,21 +116,19 @@ def post_isolate(request: IsolateRequest,
     return IsolateResponse(isolated=request.isolated)
 
 
-@router.post("/calibrate", status_code=201, response_model=ZeroResponse)
-def post_calibrate(zeros: ZeroDep) -> ZeroResponse:
-    """Captures the current physical position as the calibration datum.
+@router.post("/calibrate", status_code=201, response_model=CalibrationResponse)
+def post_calibrate(calibration: CalibrationDep) -> CalibrationResponse:
+    """Captures the current physical position as the datum.
 
     Args:
-        zeros (ZeroService): Injected zero service.
+        calibration (CalibrationService): Injected calibration service.
 
     Returns:
-        ZeroResponse: The stored datum zero reference.
+        CalibrationResponse: The stored datum.
     """
-    datum = zeros.calibrate()
-    return ZeroResponse(id=datum.id, name=datum.name,
-                        raw_counts=datum.raw_counts,
-                        is_active=datum.is_active, is_datum=datum.is_datum,
-                        created_at=datum.created_at)
+    datum = calibration.calibrate()
+    return CalibrationResponse(raw_counts=datum.raw_counts,
+                               captured_at=datum.captured_at)
 
 
 @router.get("/diagnostics/torque_register",

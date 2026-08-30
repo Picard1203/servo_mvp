@@ -8,9 +8,11 @@ from app.db.database import Database
 from app.relay.bridge_relay import BridgeRelay
 from app.relay.mcu_log import McuLog
 from app.repositories.abstract.app_state_repository import AppStateRepository
+from app.repositories.abstract.saved_position_repository import (
+    SavedPositionRepository,
+)
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.repositories.abstract.telemetry_repository import TelemetryRepository
-from app.repositories.abstract.zero_repository import ZeroRepository
 from app.repositories.concrete.bridge_servo_repository import (
     BridgeServoRepository,
 )
@@ -20,17 +22,18 @@ from app.repositories.concrete.simulated_servo_repository import (
 from app.repositories.concrete.sqlite_app_state_repository import (
     SqliteAppStateRepository,
 )
+from app.repositories.concrete.sqlite_saved_position_repository import (
+    SqliteSavedPositionRepository,
+)
 from app.repositories.concrete.sqlite_telemetry_repository import (
     SqliteTelemetryRepository,
 )
-from app.repositories.concrete.sqlite_zero_repository import (
-    SqliteZeroRepository,
-)
+from app.services.calibration_service import CalibrationService
 from app.services.isolation_service import IsolationService
 from app.services.motion_service import MotionService
+from app.services.saved_position_service import SavedPositionService
 from app.services.servo_state import ServoStateStore
 from app.services.telemetry_service import TelemetryService
-from app.services.zero_service import ZeroService
 
 
 @lru_cache
@@ -72,13 +75,13 @@ def get_servo_repository() -> ServoRepository:
 
 
 @lru_cache
-def get_zero_repository() -> ZeroRepository:
-    """Returns the zero repository.
+def get_saved_position_repository() -> SavedPositionRepository:
+    """Returns the saved-position repository.
 
     Returns:
-        ZeroRepository: The process-wide zero repository.
+        SavedPositionRepository: The process-wide saved-position repository.
     """
-    return SqliteZeroRepository(get_database())
+    return SqliteSavedPositionRepository(get_database())
 
 
 @lru_cache
@@ -110,7 +113,7 @@ def get_state_store() -> ServoStateStore:
     """
     settings = get_settings()
     return ServoStateStore(
-        servo=get_servo_repository(), zeros=get_zero_repository(),
+        servo=get_servo_repository(),
         app_state=get_app_state_repository(),
         settling_seconds=settings.settling_seconds,
         counts_per_turn=settings.counts_per_turn,
@@ -143,14 +146,27 @@ def get_isolation_service() -> IsolationService:
 
 
 @lru_cache
-def get_zero_service() -> ZeroService:
-    """Returns the zero service.
+def get_calibration_service() -> CalibrationService:
+    """Returns the calibration service.
 
     Returns:
-        ZeroService: The process-wide zero service.
+        CalibrationService: The process-wide calibration service.
     """
-    return ZeroService(get_zero_repository(), get_servo_repository(),
-                       get_event_service(), get_state_store())
+    return CalibrationService(get_servo_repository(),
+                              get_app_state_repository(),
+                              get_event_service(), get_state_store())
+
+
+@lru_cache
+def get_saved_position_service() -> SavedPositionService:
+    """Returns the saved-position service.
+
+    Returns:
+        SavedPositionService: The process-wide saved-position service.
+    """
+    return SavedPositionService(get_saved_position_repository(),
+                                get_state_store(), get_motion_service(),
+                                get_event_service())
 
 
 @lru_cache

@@ -4,25 +4,63 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+@dataclass(slots=True, frozen=True)
+class Calibration:
+    """The calibration datum.
+
+    Attributes:
+        raw_counts (int): Absolute encoder position of the datum.
+        captured_at (str): ISO timestamp of capture.
+    """
+
+    raw_counts: int
+    captured_at: str
+
+
 @dataclass(slots=True)
-class ZeroReference:
-    """A saved baseline position.
+class SavedPosition:
+    """A named, described position an operator can return to.
 
     Attributes:
         id (Optional[int]): Database identifier or None before saving.
-        name (str): Unique name for this zero reference.
+        name (str): Unique operator-given name.
+        description (str): Operator-given description of the position.
         raw_counts (int): Absolute encoder position in raw counts.
-        is_active (bool): True if this zero is the active baseline.
-        is_datum (bool): True if this zero is the calibration datum.
-        created_at (str): ISO timestamp of capture.
+        created_at (str): ISO timestamp of creation.
+        updated_at (str): ISO timestamp of the last edit.
     """
 
     id: Optional[int]
     name: str
+    description: str
     raw_counts: int
-    is_active: bool
-    is_datum: bool
     created_at: str
+    updated_at: str
+
+
+@dataclass(slots=True, frozen=True)
+class SavedPositionView:
+    """A saved position enriched with its live angle, for display.
+
+    Attributes:
+        id (int): Database identifier.
+        name (str): Unique operator-given name.
+        description (str): Operator-given description of the position.
+        raw_counts (int): Absolute encoder position in raw counts.
+        output_deg (float): Live output angle against the current datum.
+        stale_reference (bool): True if saved before the current datum.
+        created_at (str): ISO timestamp of creation.
+        updated_at (str): ISO timestamp of the last edit.
+    """
+
+    id: int
+    name: str
+    description: str
+    raw_counts: int
+    output_deg: float
+    stale_reference: bool
+    created_at: str
+    updated_at: str
 
 
 @dataclass(slots=True, frozen=True)
@@ -72,7 +110,6 @@ class ServoStateView:
         locked (bool): Digital lock engagement state.
         settling (bool): True during post-lock settle delay window.
         position_verified (bool): True once datum calibration confirmed.
-        active_zero_name (str): Active baseline name or 'factory'.
         temperature_c (Optional[float]): Temperature or None if read failed.
         voltage_v (Optional[float]): Voltage or None if read failed.
         current_a (Optional[float]): Current or None if read failed.
@@ -99,7 +136,6 @@ class ServoStateView:
     locked: bool
     settling: bool
     position_verified: bool
-    active_zero_name: str
     temperature_c: Optional[float]
     voltage_v: Optional[float]
     current_a: Optional[float]
@@ -126,7 +162,7 @@ class TelemetrySample:
     Attributes:
         timestamp (float): Unix timestamp of the sample.
         raw_counts (int): Encoder counts at sample time.
-        output_deg (float): Output angle relative to active zero.
+        output_deg (float): Output angle relative to the datum.
         moving (bool): True if motion was in progress.
         locked (bool): Digital lock engagement state.
         temperature_c (float): Servo temperature in Celsius.

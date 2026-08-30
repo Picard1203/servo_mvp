@@ -20,10 +20,11 @@ against it.
 | [0008](0008-a-failed-read-is-reported-as-unknown.md) | A failed read is reported as unknown, never as a number | the servo read path, the API contract, the UI |
 | [0009](0009-connection-ceiling.md) | Connection ceiling stays at 6; `timeout_keep_alive` is the real lever | the relay, connection limits |
 | [0010](0010-motor-isolation-state-survives-a-reboot.md) | Motor isolation state survives a reboot | R2, motor isolation, reboot/startup behaviour |
+| [0011](0011-saved-positions-and-a-single-datum.md) | Saved positions replace zeros; the datum is the only reference | calibration, saved positions, `app_state` |
 
 ## Numbering
 
-Scan this directory for the highest number and increment. `0011` is next.
+Scan this directory for the highest number and increment. `0012` is next.
 
 ## Candidates not yet written
 

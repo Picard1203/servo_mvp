@@ -73,10 +73,10 @@ button{font-family:inherit}
 
 /* ---------- measured position ---------- */
 .posrow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.pos{display:flex;align-items:baseline;gap:9px;min-width:0}
+.pos{display:flex;align-items:flex-start;gap:9px;min-width:0}
 .pos .n{font-family:var(--mono);font-size:clamp(58px,7vw,104px);font-weight:700;
   letter-spacing:-4px;line-height:.85;color:var(--ink);margin-left:8px}
-.pos .u{font-size:34px;color:var(--dim)}
+.pos .u{font-size:34px;color:var(--dim);margin-top:6px}
 .chip{font-family:var(--ant);font-size:15px;font-weight:600;letter-spacing:1.4px;
   padding:8px 20px;border-radius:18px;background:var(--panel2);color:var(--dim);
   white-space:nowrap;text-transform:uppercase;flex:none;display:flex;align-items:center;
@@ -236,24 +236,40 @@ button{font-family:inherit}
   animation:working 1.1s ease-out infinite}
 @keyframes working{0%{filter:brightness(1.25)}100%{filter:brightness(1)}}
 
-/* ---------- saved positions ---------- */
-.z{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:13px;
-  font-family:"Segoe UI",sans-serif;font-size:15px;cursor:pointer;
-  border:1.5px solid transparent;border-bottom:1px solid var(--line);
+/* ---------- saved positions ----------
+   Named .saved-position, not .pos - .pos is already the measured-position
+   readout above (index.html:26); reusing it bled padding, a hover state
+   and border-radius onto that unrelated element. */
+.saved-position{display:flex;flex-direction:column;gap:4px;padding:11px 13px;
+  border-radius:13px;cursor:pointer;border:1.5px solid transparent;
+  border-bottom:1px solid var(--line);
   transition:background .12s ease,border-color .12s ease}
-.z:last-child{border-bottom:1.5px solid transparent}
-.z:hover{background:var(--panel2)}
-.z.active{background:var(--panel2)}
-.z.selected{border-color:var(--bluebell)}
-.zt{font-family:var(--ant);font-size:11px;font-weight:600;letter-spacing:1.1px;
-  padding:4px 11px;border-radius:10px;background:var(--bluebell);color:#fff;
-  text-transform:uppercase;flex:none}
-.z .spacer{width:60px;flex:none}
-.z .deg{margin-left:auto;font-family:var(--mono);font-size:16px;font-weight:600}
-.zbtns{display:flex;gap:12px;margin-top:16px;flex:none}
+.saved-position:last-child{border-bottom:1.5px solid transparent}
+.saved-position:hover{background:var(--panel2)}
+.saved-position.selected{border-color:var(--bluebell)}
+.pos-main{display:flex;align-items:baseline;gap:11px}
+.pos-name{font-family:var(--ant);font-size:15px;font-weight:600;
+  letter-spacing:.6px}
+.pos-deg{margin-left:auto;font-family:var(--mono);font-size:16px;
+  font-weight:600;flex:none}
+.pos-sub{display:flex;align-items:center;gap:11px;min-height:18px}
+.pos-desc{font-family:"Segoe UI",sans-serif;font-size:13px;color:var(--dim);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pos-tag{font-family:var(--ant);font-size:10px;font-weight:600;
+  letter-spacing:1px;padding:3px 9px;border-radius:9px;
+  background:var(--warn-bg);color:var(--warn);text-transform:uppercase;
+  flex:none;margin-left:auto}
+.empty-hint{padding:20px 13px;font-family:"Segoe UI",sans-serif;
+  font-size:14px;color:var(--faint);text-align:center}
+.posbtns{display:flex;gap:12px;margin-top:16px;flex:none;flex-wrap:wrap}
 .btn.small{padding:11px 14px;font-size:14px;border-radius:13px;letter-spacing:1.1px;
   background:var(--panel2);color:var(--ink);flex:1}
 .btn.small:hover:not(:disabled){background:var(--tanoi);filter:none}
+/* .btn.small sets its own background/color and comes after .btn.go in
+   this file, so the combined class needs its own, higher-specificity
+   rule or the tangerine motion colour would lose to the quiet default. */
+.btn.go.small{background:var(--tangerine);color:var(--action-ink)}
+.btn.go.small:hover:not(:disabled){background:var(--tangerine);filter:brightness(1.06)}
 
 /* ---------- telemetry export ---------- */
 .preset-bar{display:flex;gap:8px;margin-bottom:12px}
@@ -331,6 +347,8 @@ button{font-family:inherit}
 .modal .modal-input{margin-bottom:18px}
 .modal .modal-input input{font-family:"Segoe UI",sans-serif;font-size:15px;
   font-weight:500}
+.modal .modal-body.hint-earlier-reference{color:var(--warn);font-weight:600;
+  margin-top:-6px}
 .modal .modal-actions{display:flex;gap:12px;justify-content:flex-end}
 .modal .modal-actions .btn{flex:0 0 auto;min-width:118px}
 .modal .modal-ok{background:var(--tangerine);color:var(--action-ink)}

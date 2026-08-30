@@ -48,6 +48,8 @@ synthetic) software stress test, varying operator counts, no rig involved
 — session 17 in `../BACKLOG.md`'s current plan. Still unverified
 regardless: the USB-C/Q9 question above.
 
+**Update, 30 August 2026 (Session 17):** Soak testing mechanics and tooling modernized in preparation for the measurement: `synthetic_operator.py` and `soak_report.py` updated with operator profiles (`mixed`, `active`, `monitor`), 0.06° step quantization, saved-position CRUD & Go (R10), motor isolation (R2), streaming binary telemetry export (R5), separate stream and request metrics, and an R1 Capacity Scorecard. Suite of 5 structured runs (Run 0 pre-flight, Run 1 1-op calibration, Run 2 3-op nominal target, Run 3 60-min sustained stress with USB-C Q9 verification, Run 4 cliff-edge probe) prepared.
+
 ---
 
 ### R3 — Confirm whether the Bridge could carry a frontend framework

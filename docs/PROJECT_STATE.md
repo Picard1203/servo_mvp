@@ -39,6 +39,22 @@ Bridge contract checker: both sides agree
 (as of Session 8, 25 August 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
+**30 August 2026 — Session 17: Soak mechanics modernized in preparation for supervised runs.**
+`tools/synthetic_operator.py` and `tools/soak_report.py` overhauled:
+fixed obsolete `/telemetry/export` call to `/telemetry/binary?from=...&to=...`
+(restoring real Bridge binary streaming stress); enforced 0.06° step quantization
+(eliminating accidental `StepError` rejections); added R10 saved-position CRUD
+and R2 motor isolation flows; separated SSE stream health (uptime, frame cadence,
+jitter, max gap) from REST HTTP request latencies; decoded 4xx rejections by
+reason code (`locked`, `isolated`, `moving`, etc.); added configurable operator
+profiles (`active`, `monitor`, `mixed`, `stress`) and `--preflight` probe.
+`tools/soak_report.py` gains `--client-report` ingestion for cross-validating client
+and board accounts, detects electrical/thermal anomalies (voltage sags <4.5V,
+current spikes, temp rise, torque saturation), computes 30-day storage growth,
+and prints an R1 Capacity & Stability Scorecard. Five soak runs designed (Run 0
+pre-flight through Run 4 cliff-edge). Old logs truncated and temp databases
+cleaned. `tools/verify.py`: 313/99.64%/194/105/ok.
+
 **30 August 2026 — Session 16: R9 closed.** Speed is now a fixed, global
 `default_speed_dps` (30.0, unchanged) — no field, no nudge, removed from
 `MoveRequest`, `MotionService.move_to()`, and the UI. `max_speed_dps` deleted.

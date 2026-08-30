@@ -1,46 +1,29 @@
 """Synthetic operators that drive the running board like people would.
 
-Written for the soak described in `docs/BACKLOG.md` D4: a race that stopped
-reproducing in seven minutes is rare, not absent, and only sustained realistic
-load can tell the difference.
+Written for the soak testing and capacity verification described in
+`docs/BACKLOG.md` (Session 17, R1 concurrent-operator ceiling).
 
-Each virtual operator reproduces `app.js`'s exact traffic shape: three
-independent polling streams - state once a second, the position list and the
-event list every 15 seconds, each on its own kept-alive HTTP connection
-(`--enhanced 8 August 2026`, closing backlog D27) - plus, between polls, what
-a person does: moves somewhere, waits to see it arrive, thinks for a while,
-occasionally locks, saves a position or pulls an export. Think time is
-randomised, because several operators acting in lockstep is a load pattern
-no real site produces.
+Each virtual operator maintains:
+1. One persistent Server-Sent Events (SSE) stream (`GET /api/v1/stream`)
+   receiving state, saved positions, and audit events.
+2. Deliberate human-paced actions (moves, saved-position CRUD, motor isolation,
+   lock toggling, diagnostic queries, and binary telemetry export) with
+   randomized think times.
 
-Earlier versions of this tool used `urllib.request`, which opens and closes
-a fresh TCP connection on every call. That is not what a browser does - a
-browser holds one connection open per active poll via HTTP keep-alive - and
-it materially understated real connection-slot pressure on the relay's
-6-socket ceiling (ADR-0009). Each poll stream here now reuses one
-`http.client.HTTPConnection`, reconnecting only when the server actually
-closes it (uvicorn's `timeout_keep_alive`) or a transport error occurs.
-`connection_opens` in the report is how often that happened - it should stay
-low if keep-alive is doing its job.
+Supports configurable operator profiles:
+- 'active': Drives the mechanism, manages saved positions, toggles lock/isolation.
+- 'monitor': Passive screen left open, holding persistent SSE stream with
+  occasional health checks (matching real operator usage in Q2).
+- 'mixed': Operator 1 drives actively, remaining operators monitor passively.
+- 'stress': Heavy burst load of moves, concurrent binary exports, and commands.
 
-Everything it reports is client-side: what the API answered and how long it
-took. The board's own side of the story - sampler gaps, fabricated positions,
-logged failures, the MCU's own counters (backlog D3) - comes from
-`tools/soak_report.py` afterwards, and the two are compared by timestamp.
+Run examples:
+    # Pre-flight health and datum check
+    python3 tools/synthetic_operator.py --host 192.168.10.60 --preflight
 
-    python3 tools/synthetic_operator.py --host 192.168.10.60 --minutes 120 \\
-        --operators 3 --report soak.json
-
-Built to survive being left alone for stretches, not just a continuous
-watch: every `--checkpoint-minutes` (default 5) it prints a one-line status
-and rewrites the report file in place, so a check-in mid-run has fresh data
-and a crash or a closed terminal loses at most one checkpoint. Ctrl-C (or a
-SIGTERM) writes the report as it stands and exits cleanly rather than losing
-everything gathered so far.
-
-Safe by construction: it stays inside the travel window, treats a refusal as
-a valid answer rather than an error, and never commands a move while it
-believes the mechanism is still moving.
+    # 10-minute 3-operator soak (R1 nominal target)
+    python3 tools/synthetic_operator.py --host 192.168.10.60 --minutes 10 \\
+        --operators 3 --profile mixed --report run2_3op.json
 """
 
 import argparse
@@ -55,71 +38,80 @@ import urllib.error
 import urllib.request
 from typing import Any, Optional
 
-# One poll per second, matching static/app.js's POLL_STATE_MS.
+# One poll per second for motion settle polling
 POLL_STATE_SECONDS: float = 1.0
 
-# Matching static/app.js's POLL_LISTS_MS - two SEPARATE timers, same period,
-# not one shared poll. That is what lets them drift into overlapping with
-# each other and with the state poll over a multi-hour run.
-POLL_POSITIONS_SECONDS: float = 15.0
-POLL_EVENTS_SECONDS: float = 15.0
+# Human pauses between deliberate actions.
+THINK_SECONDS_MIN: float = 3.0
+THINK_SECONDS_MAX: float = 15.0
 
-# Human pauses between deliberate actions. A person lines up a move, watches
-# it, thinks, then does the next thing.
-THINK_SECONDS_MIN: float = 4.0
-THINK_SECONDS_MAX: float = 20.0
-
-# Kept inside the +/-90 window so refusals mean something went wrong rather
-# than the generator asking for the impossible.
+# Motion travel limits (degrees)
 TARGET_DEG_MIN: float = -80.0
 TARGET_DEG_MAX: float = 80.0
+DEFAULT_STEP_DEG: float = 0.06
 
-# Longest a move is waited on before giving up and moving on.
+# Longest a move is waited on before giving up
 MOVE_SETTLE_TIMEOUT_SECONDS: float = 45.0
 
-# How often, by default, to print a live status line and rewrite the report
-# file - the "check in periodically, be away for stretches" usage pattern.
+# Default interval for status printing and JSON report rewrite
 DEFAULT_CHECKPOINT_MINUTES: float = 5.0
 
 
+def quantize_deg(deg: float, step: float = DEFAULT_STEP_DEG) -> float:
+    """Snaps an angle to the nearest valid step multiple.
+
+    Args:
+        deg (float): Desired angle in output degrees.
+        step (float): Configured step resolution in output degrees.
+
+    Returns:
+        float: Angle snapped to the step grid, rounded to 2 decimal places.
+    """
+    multiples = round(deg / step)
+    return round(multiples * step, 2)
+
+
 class Metrics:
-    """Thread-safe tally of everything the operators observed.
+    """Thread-safe tally of everything the synthetic operators observed.
 
     Attributes:
-        _lock (threading.Lock): Guards every field below.
-        _latencies (dict[str, list[float]]): Seconds per request, by action.
-        _failures (dict[str, int]): Transport failures, by action.
-        _rejections (dict[str, int]): Refusals the API answered deliberately.
-        _connection_opens (dict[str, int]): New TCP connections opened, by
-            action - stays low when keep-alive is working.
-        _requests (int): Total requests attempted.
+        _lock (threading.Lock): Guards internal data structures.
+        _latencies (dict[str, list[float]]): Seconds per REST request by action.
+        _failures (dict[str, int]): Transport failures by action.
+        _rejections (dict[str, dict[str, int]]): Refusals by action and reason.
+        _requests (int): Total REST HTTP requests attempted.
+        _stream_frames (dict[str, int]): Frames received by SSE event type.
+        _stream_intervals (list[float]): Inter-arrival intervals for state frames.
+        _stream_opens (int): Total SSE connections opened.
+        _stream_reconnects (int): Total SSE reconnections after drops.
+        _stream_failures (int): Total SSE transport failures.
         _invalid_readings (int): Replies carrying reading_valid false.
         _unknown_positions (int): Replies carrying a null output_deg.
-        _first_invalid_at (Optional[float]): Unix timestamp of the first
-            invalid reading, for lining up against the database.
+        _first_invalid_at (Optional[float]): Unix timestamp of first invalid reading.
     """
 
     def __init__(self) -> None:
-        """Creates an empty tally."""
+        """Initializes an empty metrics tally."""
         self._lock: threading.Lock = threading.Lock()
         self._latencies: dict[str, list[float]] = {}
         self._failures: dict[str, int] = {}
-        self._rejections: dict[str, int] = {}
-        self._connection_opens: dict[str, int] = {}
+        self._rejections: dict[str, dict[str, int]] = {}
         self._requests: int = 0
+        self._stream_frames: dict[str, int] = {}
+        self._stream_intervals: list[float] = []
+        self._stream_opens: int = 0
+        self._stream_reconnects: int = 0
+        self._stream_failures: int = 0
         self._invalid_readings: int = 0
         self._unknown_positions: int = 0
         self._first_invalid_at: Optional[float] = None
 
-    def record_success(self, action: str, seconds: float) -> None:
-        """Records one completed request.
+    def record_request_success(self, action: str, seconds: float) -> None:
+        """Records one completed REST request.
 
         Args:
             action (str): Name of the action performed.
-            seconds (float): Round-trip time.
-
-        Returns:
-            None
+            seconds (float): Round-trip latency in seconds.
         """
         with self._lock:
             self._requests += 1
@@ -127,63 +119,66 @@ class Metrics:
                 self._latencies[action] = []
             self._latencies[action].append(seconds)
 
-    def record_failure(self, action: str) -> None:
-        """Records a request that did not complete at all.
+    def record_request_failure(self, action: str) -> None:
+        """Records a request that failed to connect or completed with a 5xx error.
 
         Args:
             action (str): Name of the action performed.
-
-        Returns:
-            None
         """
         with self._lock:
             self._requests += 1
             self._failures[action] = self._failures.get(action, 0) + 1
 
-    def record_rejection(self, action: str) -> None:
-        """Records a refusal the API issued on purpose.
-
-        A move refused as out of travel, or while locked, is the system
-        working. It is counted apart from failures so the two are never
-        confused in the report.
+    def record_request_rejection(self, action: str, reason: str) -> None:
+        """Records a deliberate 4xx refusal from the API with its reason.
 
         Args:
             action (str): Name of the action performed.
-
-        Returns:
-            None
+            reason (str): Decoded reason code or HTTP status string.
         """
         with self._lock:
-            self._rejections[action] = self._rejections.get(action, 0) + 1
+            self._requests += 1
+            if action not in self._rejections:
+                self._rejections[action] = {}
+            self._rejections[action][reason] = (
+                self._rejections[action].get(reason, 0) + 1
+            )
 
-    def record_connection_opened(self, action: str) -> None:
-        """Records that a poll stream opened a fresh TCP connection.
-
-        A stream that opens many connections over a long run means
-        keep-alive is not helping - either the server is closing idle
-        connections faster than expected, or something upstream (the relay)
-        is dropping them. Either is exactly what ADR-0009 needs measured.
+    def record_stream_open(self, is_reconnect: bool) -> None:
+        """Records an SSE stream connection open.
 
         Args:
-            action (str): Name of the poll stream.
-
-        Returns:
-            None
+            is_reconnect (bool): True if this was a reconnection after a drop.
         """
         with self._lock:
-            self._connection_opens[action] = \
-                self._connection_opens.get(action, 0) + 1
+            self._stream_opens += 1
+            if is_reconnect:
+                self._stream_reconnects += 1
+
+    def record_stream_failure(self) -> None:
+        """Records a disconnect or transport failure on an SSE stream."""
+        with self._lock:
+            self._stream_failures += 1
+
+    def record_stream_frame(self, event: str, interval_s: Optional[float]) -> None:
+        """Records reception of one SSE frame.
+
+        Args:
+            event (str): Event name (state, positions, events).
+            interval_s (Optional[float]): Time elapsed since last state event.
+        """
+        with self._lock:
+            self._stream_frames[event] = self._stream_frames.get(event, 0) + 1
+            if (event == "state") and (interval_s is not None):
+                self._stream_intervals.append(interval_s)
 
     def record_reading(self, reading_valid: bool,
                        output_deg: Optional[float]) -> None:
-        """Records what a state reply said about the position.
+        """Records whether a state snapshot carried valid telemetry.
 
         Args:
-            reading_valid (bool): The reply's reading_valid flag.
-            output_deg (Optional[float]): The reported angle, or None.
-
-        Returns:
-            None
+            reading_valid (bool): Valid reading flag from server.
+            output_deg (Optional[float]): Output angle or None if unknown.
         """
         with self._lock:
             if reading_valid is False:
@@ -194,408 +189,390 @@ class Metrics:
                 self._unknown_positions += 1
 
     def summary(self) -> dict[str, Any]:
-        """Builds the report.
+        """Builds a comprehensive summary dictionary.
 
         Returns:
-            dict[str, Any]: Counts and latency percentiles per action.
+            dict[str, Any]: Detailed metrics breakdown.
         """
         with self._lock:
             actions: dict[str, Any] = {}
             for action in sorted(self._latencies.keys()):
                 samples = sorted(self._latencies[action])
+                act_rejections = self._rejections.get(action, {})
                 actions[action] = {
                     "count": len(samples),
-                    "median_s": round(statistics.median(samples), 3),
-                    "p95_s": round(samples[int(len(samples) * 0.95) - 1], 3),
-                    "max_s": round(samples[-1], 3),
+                    "median_s": round(statistics.median(samples), 3) if samples else 0.0,
+                    "p95_s": round(samples[int(len(samples) * 0.95) - 1], 3) if samples else 0.0,
+                    "max_s": round(samples[-1], 3) if samples else 0.0,
                     "failures": self._failures.get(action, 0),
-                    "rejections": self._rejections.get(action, 0),
-                    "connection_opens": self._connection_opens.get(action, 0),
+                    "rejections": sum(act_rejections.values()),
+                    "rejections_by_reason": act_rejections,
                 }
-            total_failures = 0
-            for count in self._failures.values():
-                total_failures += count
+
+            all_actions = set(self._latencies.keys()) | set(self._failures.keys()) | set(self._rejections.keys())
+            for action in sorted(all_actions):
+                if action not in actions:
+                    act_rejections = self._rejections.get(action, {})
+                    actions[action] = {
+                        "count": 0,
+                        "median_s": 0.0,
+                        "p95_s": 0.0,
+                        "max_s": 0.0,
+                        "failures": self._failures.get(action, 0),
+                        "rejections": sum(act_rejections.values()),
+                        "rejections_by_reason": act_rejections,
+                    }
+
+            total_failures = sum(self._failures.values())
+            total_rejections = sum(
+                sum(reasons.values()) for reasons in self._rejections.values()
+            )
+
+            stream_cadence = {"median_s": 0.0, "p95_s": 0.0, "max_gap_s": 0.0}
+            gaps_over_2s = 0
+            if self._stream_intervals:
+                sorted_intervals = sorted(self._stream_intervals)
+                stream_cadence["median_s"] = round(statistics.median(sorted_intervals), 3)
+                p95_idx = max(0, int(len(sorted_intervals) * 0.95) - 1)
+                stream_cadence["p95_s"] = round(sorted_intervals[p95_idx], 3)
+                stream_cadence["max_gap_s"] = round(sorted_intervals[-1], 3)
+                gaps_over_2s = sum(1 for iv in sorted_intervals if iv > 2.0)
+
             return {
                 "requests": self._requests,
                 "failures": total_failures,
+                "rejections": total_rejections,
                 "invalid_readings": self._invalid_readings,
                 "unknown_positions": self._unknown_positions,
                 "first_invalid_at": self._first_invalid_at,
+                "stream": {
+                    "frames_total": sum(self._stream_frames.values()),
+                    "events": dict(self._stream_frames),
+                    "connection_opens": self._stream_opens,
+                    "reconnects": self._stream_reconnects,
+                    "failures": self._stream_failures,
+                    "cadence": stream_cadence,
+                    "gaps_over_2s": gaps_over_2s,
+                },
                 "actions": actions,
             }
 
 
-class PersistentPoller:
-    """One HTTP/1.1 keep-alive connection, reused across a polling loop.
-
-    This is what makes the load shape match a real browser tab: `app.js`
-    holds one TCP connection open per active poll stream, reusing it every
-    interval. `urllib.request.urlopen` does not do this - each call opens
-    and closes its own connection - which understates the relay's real
-    connection-slot pressure. Reconnects transparently on a transport error
-    or once the server actually closes the connection (uvicorn's
-    `timeout_keep_alive`), and counts every reconnect via
-    `Metrics.record_connection_opened`.
-    """
-
-    def __init__(self, host: str, port: int, metrics: Metrics,
-                 action: str) -> None:
-        """Creates a poller bound to one action name.
-
-        Args:
-            host (str): Board address.
-            port (int): API port.
-            metrics (Metrics): Shared tally.
-            action (str): Name recorded in the metrics for every request.
-
-        Returns:
-            None
-        """
-        self._host = host
-        self._port = port
-        self._metrics = metrics
-        self._action = action
-        self._connection: Optional[http.client.HTTPConnection] = None
-
-    def get(self, path: str) -> Optional[Any]:
-        """Performs one GET, reusing the open connection when there is one.
-
-        Args:
-            path (str): Full request path, including the API prefix.
-
-        Returns:
-            Optional[Any]: The decoded JSON reply, or None on failure or a
-            deliberate refusal.
-        """
-        started = time.monotonic()
-        for attempt in range(2):   # one retry, on a freshly opened connection
-            try:
-                if self._connection is None:
-                    self._connection = http.client.HTTPConnection(
-                        self._host, self._port, timeout=10)
-                    self._metrics.record_connection_opened(self._action)
-                self._connection.request("GET", path)
-                response = self._connection.getresponse()
-                body = response.read()
-                if response.status >= 400:
-                    if 400 <= response.status < 500:
-                        self._metrics.record_rejection(self._action)
-                    else:
-                        self._metrics.record_failure(self._action)
-                    return None
-                self._metrics.record_success(self._action,
-                                             time.monotonic() - started)
-                return json.loads(body)
-            except (http.client.HTTPException, OSError):
-                self.close()
-                # First attempt: the connection may simply have been closed
-                # by the server (idle keep-alive timeout) - retry once on a
-                # fresh one before counting a failure.
-        self._metrics.record_failure(self._action)
-        return None
-
-    def close(self) -> None:
-        """Drops the current connection, if any. Safe to call repeatedly.
-
-        Returns:
-            None
-        """
-        if self._connection is not None:
-            try:
-                self._connection.close()
-            except OSError:
-                pass
-            self._connection = None
-
-
 class SyntheticOperator:
-    """One virtual operator: three poll streams plus deliberate actions.
+    """One virtual operator running an SSE stream and deliberate HTTP actions.
 
     Attributes:
-        _host (str): Board address.
-        _port (int): API port.
-        _base_url (str): Root of the API, without a trailing slash - used
-            only by the one-off actions in _perform_one_action.
-        _metrics (Metrics): Shared tally.
-        _name (str): Identifier used in console output.
-        _random (random.Random): Independently seeded, so operators do not
-            act in lockstep.
-        _deadline (float): Monotonic time at which this operator stops.
+        _host (str): Target board IP or hostname.
+        _port (int): Port for FastAPI service.
+        _base_url (str): Base URL for API calls.
+        _metrics (Metrics): Shared metrics accumulator.
+        _name (str): Unique operator identifier.
+        _profile (str): Action profile ('active', 'monitor', 'stress').
+        _step_deg (float): Output angle step resolution.
+        _random (random.Random): Independent RNG.
+        _deadline (float): Monotonic deadline.
+        _stop (threading.Event): Signal to terminate.
+        _pos_counter (int): Counter for generating unique saved position names.
+        _created_position_ids (list[int]): IDs of positions created by this operator.
     """
 
     def __init__(self, host: str, port: int, metrics: Metrics, name: str,
-                 seed: int, deadline: float) -> None:
-        """Creates one operator.
+                 seed: int, deadline: float, profile: str = "active",
+                 step_deg: float = DEFAULT_STEP_DEG) -> None:
+        """Creates a synthetic operator.
 
         Args:
-            host (str): Board address.
-            port (int): API port.
-            metrics (Metrics): Shared tally.
-            name (str): Identifier used in console output.
-            seed (int): Seed for this operator's think times and targets.
-            deadline (float): Monotonic time at which to stop.
-
-        Returns:
-            None
+            host (str): Target host.
+            port (int): Target port.
+            metrics (Metrics): Shared metrics instance.
+            name (str): Name label.
+            seed (int): RNG seed.
+            deadline (float): Monotonic stop time.
+            profile (str): Operator profile.
+            step_deg (float): Angle step resolution.
         """
         self._host: str = host
         self._port: int = port
         self._base_url: str = f"http://{host}:{port}/api/v1"
         self._metrics: Metrics = metrics
         self._name: str = name
+        self._profile: str = profile
+        self._step_deg: float = step_deg
         self._random: random.Random = random.Random(seed)
         self._deadline: float = deadline
         self._stop: threading.Event = threading.Event()
-        self._last_state_at: float = time.monotonic()
+        self._pos_counter: int = 0
+        self._created_position_ids: list[int] = []
+        self._last_state_at: Optional[float] = None
 
     def stop(self) -> None:
-        """Signals background threads to stop.
-
-        Returns:
-            None
-        """
+        """Signals worker threads to stop."""
         self._stop.set()
 
-    def _request(self, action: str, path: str,
+    def _request(self, action: str, path: str, method: str = "GET",
                  payload: Optional[dict[str, Any]] = None,
-                 read_body: bool = True) -> Optional[Any]:
-        """Performs one one-off HTTP call and records its outcome.
-
-        Deliberate, occasional actions (a move, a lock, an export) - unlike
-        the three continuous poll streams, these do not model persistent
-        connection reuse; a single click opening its own connection is a
-        reasonable worst case, and is not what ADR-0009's finding was about.
+                 drain_stream: bool = False) -> Optional[Any]:
+        """Performs one REST HTTP call and updates metrics.
 
         Args:
-            action (str): Name recorded in the metrics.
-            path (str): Path below the API root.
-            payload (Optional[dict[str, Any]]): JSON body for a POST.
-            read_body (bool): False to drain the body without decoding it,
-                for responses that are not JSON.
+            action (str): Metrics action label.
+            path (str): Endpoint path relative to /api/v1.
+            method (str): HTTP method.
+            payload (Optional[dict[str, Any]]): JSON body for POST/PATCH/DELETE.
+            drain_stream (bool): True to read raw stream without JSON decoding.
 
         Returns:
-            Optional[Any]: The decoded reply, or None when the call failed
-            or was deliberately refused.
+            Optional[Any]: Parsed JSON response or True on drained stream, None on error.
         """
         data: Optional[bytes] = None
         headers: dict[str, str] = {}
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
-        request = urllib.request.Request(self._base_url + path, data=data,
-                                         headers=headers)
+
+        url = self._base_url + path
+        request = urllib.request.Request(url, data=data, headers=headers,
+                                         method=method)
         started = time.monotonic()
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=25) as response:
+                if drain_stream:
+                    total_bytes = 0
+                    while True:
+                        chunk = response.read(65536)
+                        if not chunk:
+                            break
+                        total_bytes += len(chunk)
+                    self._metrics.record_request_success(action, time.monotonic() - started)
+                    return total_bytes
+
                 body = response.read()
-            self._metrics.record_success(action, time.monotonic() - started)
-            if read_body is False:
-                return len(body)
-            return json.loads(body)
+                self._metrics.record_request_success(action, time.monotonic() - started)
+                if not body:
+                    return {}
+                return json.loads(body.decode("utf-8"))
         except urllib.error.HTTPError as error:
-            # 4xx is the API answering deliberately - refused while locked,
-            # out of travel, no such position. That is behaviour, not breakage.
-            if (error.code >= 400) and (error.code < 500):
-                self._metrics.record_rejection(action)
-                return None
-            self._metrics.record_failure(action)
+            reason = str(error.code)
+            try:
+                err_body = error.read().decode("utf-8")
+                err_json = json.loads(err_body)
+                if "reason" in err_json:
+                    reason = str(err_json["reason"])
+                elif "detail" in err_json:
+                    reason = str(err_json["detail"])
+            except Exception:
+                pass
+
+            if 400 <= error.code < 500:
+                self._metrics.record_request_rejection(action, reason)
+            else:
+                self._metrics.record_request_failure(action)
             return None
         except Exception:
-            self._metrics.record_failure(action)
+            self._metrics.record_request_failure(action)
             return None
 
     def stream_forever(self) -> None:
-        """Reads the SSE stream forever.
-
-        Returns:
-            None
-        """
-        while (time.monotonic() < self._deadline) and (not self._stop.is_set()):
+        """Reads the persistent SSE stream until deadline or stop."""
+        is_reconnect = False
+        while (time.monotonic() < self._deadline) and not self._stop.is_set():
+            conn: Optional[http.client.HTTPConnection] = None
             try:
                 conn = http.client.HTTPConnection(self._host, self._port, timeout=30)
-                self._metrics.record_connection_opened("stream")
-                conn.request("GET", "/api/v1/stream", 
-                            headers={"Accept": "text/event-stream"})
+                self._metrics.record_stream_open(is_reconnect)
+                conn.request("GET", "/api/v1/stream",
+                             headers={"Accept": "text/event-stream"})
                 resp = conn.getresponse()
                 if resp.status != 200:
-                    raise http.client.HTTPException(f"{resp.status}")
-                
-                current_event = None
-                current_data = None
-                # Read line by line from the chunked response
+                    raise http.client.HTTPException(f"HTTP {resp.status}")
+
+                current_event: Optional[str] = None
+                current_data: Optional[str] = None
+
                 for raw_line in resp:
-                    if self._stop.is_set() or time.monotonic() >= self._deadline:
-                        conn.close()
-                        return
-                    line = raw_line.decode("utf-8").rstrip("\n").rstrip("\r")
+                    if self._stop.is_set() or (time.monotonic() >= self._deadline):
+                        break
+                    line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
                     if line.startswith("event: "):
                         current_event = line[7:]
                     elif line.startswith("data: "):
                         current_data = line[6:]
                     elif line == "":
                         if current_event and current_data:
-                            self._handle_sse_event(current_event, current_data)
+                            self._handle_sse_frame(current_event, current_data)
                         current_event = None
                         current_data = None
-            except (http.client.HTTPException, OSError, json.JSONDecodeError):
-                self._metrics.record_failure("stream")
-                self._stop.wait(3.0)  # reconnect delay
+            except Exception:
+                self._metrics.record_stream_failure()
+                is_reconnect = True
+                self._stop.wait(2.0)
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
-    def _handle_sse_event(self, event: str, data: str) -> None:
-        """Processes one SSE event from the stream.
+    def _handle_sse_frame(self, event: str, data: str) -> None:
+        """Decodes an SSE frame and records stream metrics.
 
         Args:
-            event (str): The event type.
-            data (str): The raw JSON payload.
-
-        Returns:
-            None
+            event (str): Event name.
+            data (str): JSON event payload string.
         """
         now = time.monotonic()
-        try:
-            payload = json.loads(data)
-        except json.JSONDecodeError:
-            self._metrics.record_failure("stream")
-            return
+        delta_s: Optional[float] = None
+        if event == "state":
+            if self._last_state_at is not None:
+                delta_s = now - self._last_state_at
+            self._last_state_at = now
+
+        self._metrics.record_stream_frame(event, delta_s)
 
         if event == "state":
-            elapsed = now - self._last_state_at
-            self._metrics.record_success("state", elapsed)
-            self._metrics.record_reading(
-                payload.get("reading_valid", True), payload.get("output_deg"))
-            self._last_state_at = now
-        elif event == "positions":
-            self._metrics.record_success("positions_poll", 0.0)
-        elif event == "events":
-            self._metrics.record_success("events_poll", 0.0)
+            try:
+                payload = json.loads(data)
+                self._metrics.record_reading(
+                    payload.get("reading_valid", True),
+                    payload.get("output_deg"),
+                )
+            except json.JSONDecodeError:
+                pass
 
     def act_forever(self) -> None:
-        """Performs deliberate actions with human pauses until the deadline.
-
-        Returns:
-            None
-        """
-        while (time.monotonic() < self._deadline) and (not self._stop.is_set()):
+        """Executes deliberate actions with think times."""
+        while (time.monotonic() < self._deadline) and not self._stop.is_set():
             self._perform_one_action()
-            think = self._random.uniform(THINK_SECONDS_MIN,
-                                         THINK_SECONDS_MAX)
-            time.sleep(min(think, max(0.0,
-                                      self._deadline - time.monotonic())))
+            think = self._random.uniform(THINK_SECONDS_MIN, THINK_SECONDS_MAX)
+            time.sleep(min(think, max(0.0, self._deadline - time.monotonic())))
 
     def _perform_one_action(self) -> None:
-        """Chooses and performs a single action, weighted like real use.
+        """Dispatches an action based on the operator's profile."""
+        if self._profile == "monitor":
+            if self._random.random() < 0.08:
+                self._request("health", "/system/health")
+            return
 
-        Returns:
-            None
-        """
+        if self._profile == "stress":
+            roll = self._random.random()
+            if roll < 0.40:
+                self._move_somewhere()
+            elif roll < 0.65:
+                self._pull_export()
+            elif roll < 0.85:
+                self._act_saved_positions()
+            else:
+                self._read_diagnostics()
+            return
+
         roll = self._random.random()
-        if roll < 0.62:
+        if roll < 0.45:
             self._move_somewhere()
-            return
-        if roll < 0.74:
+        elif roll < 0.65:
+            self._act_saved_positions()
+        elif roll < 0.75:
             self._toggle_lock()
-            return
-        if roll < 0.84:
-            self._request("positions_list", "/positions")
-            return
-        if roll < 0.90:
-            self._request("stop", "/servo/stop", payload={})
-            return
-        if roll < 0.96:
-            self._request("health", "/system/health")
-            return
-        self._pull_export()
+        elif roll < 0.83:
+            self._toggle_isolation()
+        elif roll < 0.90:
+            self._read_diagnostics()
+        elif roll < 0.95:
+            self._request("stop", "/servo/stop", method="POST", payload={})
+        else:
+            self._pull_export()
 
     def _move_somewhere(self) -> None:
-        """Commands a move and waits for the mechanism to settle.
-
-        Returns:
-            None
-        """
-        target = round(self._random.uniform(TARGET_DEG_MIN,
-                                            TARGET_DEG_MAX), 1)
-        accepted = self._request("move", "/servo/move",
+        """Commands a motion to a quantized valid angle."""
+        raw_deg = self._random.uniform(TARGET_DEG_MIN, TARGET_DEG_MAX)
+        target = quantize_deg(raw_deg, self._step_deg)
+        accepted = self._request("move", "/servo/move", method="POST",
                                  payload={"target_deg": target})
-        if accepted is None:
-            return
-        self._wait_until_stopped()
+        if accepted is not None:
+            self._wait_until_stopped()
 
     def _wait_until_stopped(self) -> None:
-        """Polls until the mechanism stops moving or the timeout expires.
-
-        A person watches a move finish before starting the next one.
-        Commanding the next move mid-travel would be a load pattern, not a
-        simulation.
-
-        Returns:
-            None
-        """
+        """Polls until movement settles or timeout elapses."""
         limit = time.monotonic() + MOVE_SETTLE_TIMEOUT_SECONDS
         moving = True
         while (moving is True) and (time.monotonic() < limit) \
-                and (time.monotonic() < self._deadline) and (not self._stop.is_set()):
+                and (time.monotonic() < self._deadline) and not self._stop.is_set():
             time.sleep(POLL_STATE_SECONDS)
-            # Deliberately a separate action name from the persistent
-            # "state" poll stream: this one-off, fresh-connection check
-            # during a move is a different traffic shape and must not be
-            # merged into poll_state_forever's kept-alive numbers.
             state = self._request("state_settle", "/servo/state")
             if state is None:
                 moving = False
             else:
                 moving = state.get("moving", False)
 
-    def _toggle_lock(self) -> None:
-        """Engages the lock, waits, then releases it.
+    def _act_saved_positions(self) -> None:
+        """Exercises saved-position CRUD operations."""
+        roll = self._random.random()
+        if (roll < 0.40) or not self._created_position_ids:
+            self._pos_counter += 1
+            name = f"pos-{self._name[-1]}-{self._pos_counter}"
+            deg = quantize_deg(self._random.uniform(TARGET_DEG_MIN, TARGET_DEG_MAX),
+                               self._step_deg)
+            created = self._request(
+                "position_create", "/positions", method="POST",
+                payload={"name": name, "description": "soak point", "target_deg": deg},
+            )
+            if created and isinstance(created, dict) and "id" in created:
+                self._created_position_ids.append(created["id"])
+                if len(self._created_position_ids) > 10:
+                    self._created_position_ids.pop(0)
+            return
 
-        Returns:
-            None
-        """
-        self._request("lock", "/servo/lock", payload={"locked": True})
-        time.sleep(self._random.uniform(2.0, 6.0))
-        self._request("lock", "/servo/lock", payload={"locked": False})
+        if roll < 0.75:
+            pos_id = self._random.choice(self._created_position_ids)
+            resp = self._request("position_go", f"/positions/{pos_id}/go", method="POST")
+            if resp:
+                self._wait_until_stopped()
+            return
+
+        if roll < 0.90:
+            pos_id = self._random.choice(self._created_position_ids)
+            deg = quantize_deg(self._random.uniform(TARGET_DEG_MIN, TARGET_DEG_MAX),
+                               self._step_deg)
+            self._request(
+                "position_update", f"/positions/{pos_id}", method="PATCH",
+                payload={"name": f"upd-{pos_id}", "description": "updated soak point",
+                         "target_deg": deg},
+            )
+            return
+
+        pos_id = self._created_position_ids.pop(0)
+        self._request("position_delete", f"/positions/{pos_id}", method="DELETE", payload={})
+
+    def _toggle_lock(self) -> None:
+        """Engages digital lock, waits briefly, and releases it."""
+        self._request("lock", "/servo/lock", method="POST", payload={"locked": True})
+        time.sleep(self._random.uniform(1.0, 3.0))
+        self._request("lock", "/servo/lock", method="POST", payload={"locked": False})
+
+    def _toggle_isolation(self) -> None:
+        """Engages motor isolation, pauses, and restores torque."""
+        self._request("isolate", "/servo/isolate", method="POST", payload={"isolated": True})
+        time.sleep(self._random.uniform(1.0, 3.0))
+        self._request("isolate", "/servo/isolate", method="POST", payload={"isolated": False})
+
+    def _read_diagnostics(self) -> None:
+        """Queries hardware diagnostic registers."""
+        self._request("diag_torque", "/servo/diagnostics/torque_register")
 
     def _pull_export(self) -> None:
-        """Requests a telemetry export.
-
-        The heaviest thing the UI can ask for, and the best stress on the
-        relay: the reply is streamed CSV, so it crosses the Bridge in far
-        more chunks than any other response.
-
-        Returns:
-            None
-        """
+        """Streams binary telemetry export over the Bridge link."""
         finish = time.time()
-        start = finish - 3600.0
-        self._request("export", f"/telemetry/export?ts_from={start}"
-                                f"&ts_to={finish}", read_body=False)
+        start = finish - 1800.0
+        self._request("export_binary", f"/telemetry/binary?from={start}&to={finish}",
+                      drain_stream=True)
 
 
 class Checkpointer:
-    """Periodically prints a status line and rewrites the report file.
-
-    Exists for the "in the room most of the time, gone for stretches"
-    running mode: a check-in mid-run sees fresh numbers rather than silence,
-    and a crash or a closed terminal loses at most one checkpoint interval
-    of data rather than the whole run.
-    """
+    """Periodically prints status and persists checkpoint reports."""
 
     def __init__(self, metrics: Metrics, report_path: Optional[str],
                  interval_seconds: float, started_at: float,
                  deadline: float) -> None:
-        """Creates a checkpointer. Call run() on its own thread.
-
-        Args:
-            metrics (Metrics): Shared tally to snapshot.
-            report_path (Optional[str]): Where to write the report, or None
-                to only print.
-            interval_seconds (float): Seconds between checkpoints.
-            started_at (float): Wall-clock start time (time.time()).
-            deadline (float): Monotonic time the run ends.
-
-        Returns:
-            None
-        """
+        """Initializes checkpointer."""
         self._metrics = metrics
         self._report_path = report_path
         self._interval_seconds = interval_seconds
@@ -604,11 +581,7 @@ class Checkpointer:
         self._stop = threading.Event()
 
     def run(self) -> None:
-        """Loops until stop() is called or the deadline passes.
-
-        Returns:
-            None
-        """
+        """Executes the checkpoint loop until stopped."""
         while not self._stop.is_set():
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
@@ -618,91 +591,125 @@ class Checkpointer:
             self.write_once()
 
     def write_once(self) -> None:
-        """Prints one status line and rewrites the report file, if given.
-
-        Returns:
-            None
-        """
+        """Prints a live summary line and rewrites the report file."""
         summary = self._metrics.summary()
         elapsed_min = (time.time() - self._started_at) / 60.0
-        opens = sum(row.get("connection_opens", 0)
-                   for row in summary["actions"].values())
+        stream = summary.get("stream", {})
         print(f"[{time.strftime('%H:%M:%S')}] checkpoint  "
-              f"elapsed={elapsed_min:.0f}m  requests={summary['requests']}  "
+              f"elapsed={elapsed_min:.1f}m  requests={summary['requests']}  "
               f"failures={summary['failures']}  "
-              f"invalid_readings={summary['invalid_readings']}  "
-              f"connection_opens={opens}")
+              f"rejections={summary['rejections']}  "
+              f"stream_frames={stream.get('frames_total', 0)}  "
+              f"cadence_p95={stream.get('cadence', {}).get('p95_s', 0.0)}s")
         if self._report_path is not None:
             _write_report(self._report_path, summary)
 
     def stop(self) -> None:
-        """Signals run() to return promptly.
-
-        Returns:
-            None
-        """
+        """Terminates the checkpoint loop."""
         self._stop.set()
 
 
 def _write_report(report_path: str, summary: dict[str, Any]) -> None:
-    """Writes the summary as JSON, overwriting any previous checkpoint.
+    """Writes the summary dictionary to a JSON file.
 
     Args:
-        report_path (str): Destination path.
-        summary (dict[str, Any]): What to write.
-
-    Returns:
-        None
+        report_path (str): Destination file path.
+        summary (dict[str, Any]): Data payload.
     """
     with open(report_path, "w", encoding="utf-8") as handle:
         json.dump(summary, handle, indent=2)
 
 
-def run_soak(host: str, port: int, minutes: float, operators: int,
-             report_path: Optional[str], checkpoint_minutes: float) -> int:
-    """Runs the soak and prints the report.
+def run_preflight(host: str, port: int) -> bool:
+    """Queries board status and prints pre-flight diagnostics.
 
     Args:
-        host (str): Board address serving the UI.
-        port (int): Port the API listens on.
-        minutes (float): How long to run.
-        operators (int): How many virtual operators to simulate.
-        report_path (Optional[str]): Where to write the JSON report.
-        checkpoint_minutes (float): Interval between live status updates and
-            report rewrites; 0 disables checkpointing.
+        host (str): Board IP.
+        port (int): API port.
 
     Returns:
-        int: 0 when no transport failures occurred, 1 otherwise.
+        bool: True if board responded healthy with valid datum.
+    """
+    print(f"pre-flight: probing http://{host}:{port}...")
+    base = f"http://{host}:{port}/api/v1"
+    try:
+        req = urllib.request.Request(f"{base}/system/health")
+        with urllib.request.urlopen(req, timeout=5) as r:
+            health = json.loads(r.read().decode("utf-8"))
+
+        req = urllib.request.Request(f"{base}/servo/state")
+        with urllib.request.urlopen(req, timeout=5) as r:
+            state = json.loads(r.read().decode("utf-8"))
+
+        print("---- pre-flight check ----")
+        print(f"app status:        {health.get('status')} ({health.get('app_name')} v{health.get('version')})")
+        print(f"servo reading:     {'VALID' if state.get('reading_valid') else 'INVALID'}")
+        print(f"output angle:      {state.get('output_deg')} deg")
+        print(f"reachable window:  {state.get('output_min_deg')} to {state.get('output_max_deg')} deg")
+        print(f"position verified: {state.get('position_verified')}")
+        print(f"isolated:          {state.get('isolated')}")
+        print(f"locked:            {state.get('locked')}")
+        print()
+        if not state.get("reading_valid"):
+            print("WARNING: Servo reading is marked INVALID. Verify servo connection and .env!")
+            return False
+        if not state.get("position_verified"):
+            print("WARNING: Position reference is NOT verified. Needs calibration before negative travel!")
+        print("PRE-FLIGHT: OK to proceed.")
+        return True
+    except Exception as exc:
+        print(f"PRE-FLIGHT FAILED: could not reach board: {exc}")
+        return False
+
+
+def run_soak(host: str, port: int, minutes: float, operators: int,
+             report_path: Optional[str], checkpoint_minutes: float,
+             profile: str, step_deg: float) -> int:
+    """Orchestrates synthetic operators during a soak test.
+
+    Args:
+        host (str): Board address.
+        port (int): API port.
+        minutes (float): Duration in minutes.
+        operators (int): Number of virtual operators.
+        report_path (Optional[str]): Output report path.
+        checkpoint_minutes (float): Interval between status updates.
+        profile (str): Load profile ('active', 'monitor', 'mixed', 'stress').
+        step_deg (float): Output step resolution in degrees.
+
+    Returns:
+        int: 0 on success with 0 failures, 1 if failures occurred, 2 if interrupted.
     """
     metrics = Metrics()
     deadline = time.monotonic() + (minutes * 60.0)
     started_at = time.time()
     threads: list[threading.Thread] = []
 
-    print(f"soak: {operators} operator(s) against {host}:{port} "
-          f"for {minutes:g} minute(s)")
+    print(f"soak: {operators} operator(s) [profile={profile}] against {host}:{port} for {minutes:g}m")
     print(f"soak: started at {time.strftime('%H:%M:%S')}, "
           f"ends about {time.strftime('%H:%M:%S', time.localtime(started_at + minutes * 60.0))}")
 
     operator_instances: list[SyntheticOperator] = []
     for index in range(operators):
-        operator = SyntheticOperator(host, port, metrics,
-                                     f"operator-{index + 1}",
-                                     seed=1000 + index, deadline=deadline)
-        operator_instances.append(operator)
-        for target in (operator.stream_forever, operator.act_forever):
-            thread = threading.Thread(target=target, daemon=True)
-            threads.append(thread)
-            thread.start()
+        if profile == "mixed":
+            op_profile = "active" if index == 0 else "monitor"
+        else:
+            op_profile = profile
+
+        op = SyntheticOperator(host, port, metrics, f"operator-{index + 1}",
+                               seed=1000 + index, deadline=deadline,
+                               profile=op_profile, step_deg=step_deg)
+        operator_instances.append(op)
+        for target in (op.stream_forever, op.act_forever):
+            t = threading.Thread(target=target, daemon=True)
+            threads.append(t)
+            t.start()
 
     checkpointer: Optional[Checkpointer] = None
     if checkpoint_minutes > 0:
-        checkpointer = Checkpointer(metrics, report_path,
-                                    checkpoint_minutes * 60.0, started_at,
-                                    deadline)
-        checkpoint_thread = threading.Thread(target=checkpointer.run,
-                                             daemon=True)
-        checkpoint_thread.start()
+        checkpointer = Checkpointer(metrics, report_path, checkpoint_minutes * 60.0,
+                                    started_at, deadline)
+        threading.Thread(target=checkpointer.run, daemon=True).start()
 
     interrupted = False
 
@@ -712,9 +719,9 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
 
     previous_sigterm = signal.signal(signal.SIGTERM, _on_interrupt)
     try:
-        for thread in threads:
-            while thread.is_alive():
-                thread.join(timeout=1.0)
+        for t in threads:
+            while t.is_alive():
+                t.join(timeout=1.0)
                 if interrupted:
                     break
             if interrupted:
@@ -725,44 +732,50 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
         signal.signal(signal.SIGTERM, previous_sigterm)
         if checkpointer is not None:
             checkpointer.stop()
-        for operator in operator_instances:
-            operator.stop()
+        for op in operator_instances:
+            op.stop()
 
     if interrupted:
-        print()
-        print("soak: interrupted - writing what was gathered so far")
+        print("\nsoak: interrupted - writing gathered metrics...")
 
     summary = metrics.summary()
     summary["host"] = host
     summary["operators"] = operators
+    summary["profile"] = profile
     summary["started_at"] = started_at
     summary["finished_at"] = time.time()
     summary["minutes"] = minutes
     summary["interrupted"] = interrupted
 
-    print()
-    print("---- soak report ----")
-    print(f"requests           {summary['requests']}")
-    print(f"transport failures {summary['failures']}")
-    print(f"invalid readings   {summary['invalid_readings']}")
-    print(f"unknown positions  {summary['unknown_positions']}")
-    print()
-    for action in sorted(summary["actions"].keys()):
-        row = summary["actions"][action]
-        print(f"  {action:<12} n={row['count']:<6} "
-              f"median={row['median_s']:<7} p95={row['p95_s']:<7} "
-              f"max={row['max_s']:<7} fail={row['failures']} "
-              f"refused={row['rejections']} "
-              f"conn_opens={row['connection_opens']}")
+    print("\n---- soak report ----")
+    print(f"requests:           {summary['requests']}")
+    print(f"transport failures: {summary['failures']}")
+    print(f"rejections (4xx):   {summary['rejections']}")
+    print(f"invalid readings:   {summary['invalid_readings']}")
+    print(f"unknown positions:  {summary['unknown_positions']}")
+
+    stream = summary.get("stream", {})
+    print(f"\n---- sse stream ----")
+    print(f"frames received:    {stream.get('frames_total')}")
+    print(f"connection opens:   {stream.get('connection_opens')}")
+    print(f"reconnects:         {stream.get('reconnects')}")
+    print(f"stream failures:    {stream.get('failures')}")
+    cadence = stream.get("cadence", {})
+    print(f"cadence median/p95: {cadence.get('median_s')}s / {cadence.get('p95_s')}s (max gap {cadence.get('max_gap_s')}s)")
+    print(f"gaps > 2.0s:        {stream.get('gaps_over_2s')}")
+
+    print("\n---- actions breakdown ----")
+    for action, row in sorted(summary["actions"].items()):
+        reasons_str = ""
+        if row["rejections_by_reason"]:
+            reasons_str = f" [{', '.join(f'{k}:{v}' for k, v in row['rejections_by_reason'].items())}]"
+        print(f"  {action:<16} n={row['count']:<5} "
+              f"median={row['median_s']:<6} p95={row['p95_s']:<6} max={row['max_s']:<6} "
+              f"fail={row['failures']} refused={row['rejections']}{reasons_str}")
 
     if report_path is not None:
         _write_report(report_path, summary)
-        print()
-        print(f"report written to {report_path}")
-        print("compare it against the board: sampler gaps over 2 s, rows with "
-              "counts <= 0, and any servo.read.failed in the log. "
-              "tools/soak_report.py reads the board's own account, including "
-              "the MCU-side counters (backlog D3).")
+        print(f"\nreport written to {report_path}")
 
     if interrupted:
         return 2
@@ -772,32 +785,39 @@ def run_soak(host: str, port: int, minutes: float, operators: int,
 
 
 def main() -> int:
-    """Parses arguments and runs the soak.
-
-    Returns:
-        int: Process exit code.
-    """
+    """Parses arguments and runs the soak."""
     parser = argparse.ArgumentParser(
         description="Drive the running board like real operators would.")
     parser.add_argument("--host", default="192.168.10.60",
                         help="board address serving the UI")
     parser.add_argument("--port", type=int, default=8000,
                         help="API port")
-    parser.add_argument("--minutes", type=float, default=120.0,
-                        help="how long to run")
+    parser.add_argument("--minutes", type=float, default=10.0,
+                        help="how long to run in minutes")
     parser.add_argument("--operators", type=int, default=3,
-                        help="virtual operators; 3 remote is the target in R1")
+                        help="number of virtual operators")
+    parser.add_argument("--profile", choices=["mixed", "active", "monitor", "stress"],
+                        default="mixed",
+                        help="operator profile: mixed (1 active, rest monitor), "
+                             "active, monitor, or stress")
+    parser.add_argument("--step-deg", type=float, default=DEFAULT_STEP_DEG,
+                        help="motion resolution step size (default 0.06)")
     parser.add_argument("--report", default=None,
-                        help="path for the JSON report, rewritten at every "
-                             "checkpoint")
+                        help="path for the JSON report")
     parser.add_argument("--checkpoint-minutes", type=float,
                         default=DEFAULT_CHECKPOINT_MINUTES,
-                        help="live status + report rewrite interval; 0 to "
-                             "disable")
-    arguments = parser.parse_args()
-    return run_soak(arguments.host, arguments.port, arguments.minutes,
-                    arguments.operators, arguments.report,
-                    arguments.checkpoint_minutes)
+                        help="interval between status updates (0 to disable)")
+    parser.add_argument("--preflight", action="store_true",
+                        help="probe board health and datum without running soak")
+    args = parser.parse_args()
+
+    if args.preflight:
+        ok = run_preflight(args.host, args.port)
+        return 0 if ok else 1
+
+    return run_soak(args.host, args.port, args.minutes, args.operators,
+                    args.report, args.checkpoint_minutes, args.profile,
+                    args.step_deg)
 
 
 if __name__ == "__main__":

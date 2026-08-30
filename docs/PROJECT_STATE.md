@@ -30,13 +30,14 @@ Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
 (one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-244 Python tests, coverage of app/ gated at 99% (99.45% measured, D24)
+313 Python tests, coverage of app/ gated at 99% (99.64% measured)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
-75 client-behaviour assertions (T12, promoted to a real check 25 Aug 2026)
+105 client-behaviour assertions (T12)
+Brace balance check: ok
 ```
 
-(as of Session 8, 25 August 2026 — `tools/verify.py` is the source of truth
+(as of Session 18, 30 August 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
 **30 August 2026 — Session 18: Clean board wipe completed, closing the experimental phase ahead of Rig Day.**

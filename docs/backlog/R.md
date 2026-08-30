@@ -345,32 +345,6 @@ This is a delivery-shaping constraint, not a task.
 
 ---
 
-### R9 — Speed becomes a global parameter, removed from operator control
-**Status:** open · **Raised by:** client demo feedback, 27 August 2026,
-decided with the team lead, 30 August 2026
-
-The client didn't see the value in per-move speed control and asked whether
-speed gives the movement more force. It doesn't: the ST3215's `GoalSpeed`
-register and its torque registers (`0x10` max torque, `0x30` torque limit)
-are independent — confirmed against Waveshare's own register map
-(`skills/uno-q-st3215/SKILL.md`). Speed only changes how fast the servo
-reaches a target, never how hard.
-
-**Decision:** speed becomes a fixed, global setting (config-level, not
-operator-facing) instead of a per-move value the operator chooses. Removes
-the speed field/nudge from the UI and `speed_dps` from the operator-facing
-move flow.
-
-**Open before building:** what the fixed value should be. D35 (open,
-unresolved) found commanded and actual speed disagree ~1.5–2.3x — pick the
-global value with that uncertainty in mind, or resolve D35 first if time
-allows; don't hardcode a value D35 would immediately contradict.
-
-**Related:** D32, D35 — both about the speed-step/speed-accuracy this
-decision removes from the operator, not from the system.
-
----
-
 ### R10 — Zero service overhaul: calibration stays, "zeros" become saved points
 **Status:** open · **Raised by:** client demo feedback, 27 August 2026,
 decided with the team lead, 30 August 2026 · **Design worked out in full

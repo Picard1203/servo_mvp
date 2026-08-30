@@ -514,10 +514,8 @@ class SyntheticOperator:
         """
         target = round(self._random.uniform(TARGET_DEG_MIN,
                                             TARGET_DEG_MAX), 1)
-        speed = self._random.choice([10.0, 20.0, 30.0, 45.0, 60.0])
         accepted = self._request("move", "/servo/move",
-                                 payload={"target_deg": target,
-                                          "speed_dps": speed})
+                                 payload={"target_deg": target})
         if accepted is None:
             return
         self._wait_until_stopped()

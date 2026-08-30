@@ -28,8 +28,7 @@ class Settings(BaseSettings):
         output_min_deg (float): Minimum allowable output angle limit.
         output_max_deg (float): Maximum allowable output angle limit.
         output_step_deg (float): Commanded angle resolution step.
-        default_speed_dps (float): Default speed in output deg per second.
-        max_speed_dps (float): Maximum allowable speed in deg per second.
+        default_speed_dps (float): Fixed move speed in output deg per second.
         servo_direction (int): Motion direction multiplier (+1 or -1).
         use_hardware_servo (bool): True for hardware servo, False for mock.
         multi_turn_enabled (bool): True for multi-turn servo positioning.
@@ -70,7 +69,6 @@ class Settings(BaseSettings):
     output_max_deg: float = 90.0
     output_step_deg: float = 0.06
     default_speed_dps: float = 30.0
-    max_speed_dps: float = 60.0
     servo_direction: int = 1
     use_hardware_servo: bool = False
     multi_turn_enabled: bool = False

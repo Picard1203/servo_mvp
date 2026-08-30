@@ -56,7 +56,7 @@ Distilled facts, rationale, and implementation details relocated from source doc
 - **Settings env_file path**: Configured using an absolute path anchored to `Path(__file__).resolve().parent.parent.parent / ".env"` rather than a relative path, ensuring settings load consistently regardless of working directory (see D8/CLAUDE.md §5 for what a relative path breaks on the board).
 - **Angle resolution scaling**: `output_step_deg = (360/counts_per_turn) * (belt_driven/belt_driving)` = `(360/4096) * (30/44)` ≈ **0.0599°**, rounded to 0.06. Target degrees round to integer counts to avoid accumulating drift.
 - **Travel window sizing**: default ±90 output deg = 264 servo deg = 3004 counts, inside one servo turn (4096) with room to spare. Widen `output_min_deg`/`output_max_deg` alone to change the window; past one servo turn, also set `multi_turn_enabled`.
-- **Max speed ceiling, measured**: the servo saturates near 1100 counts/s regardless of the commanded value (~66 output deg/s); `max_speed_dps = 60` keeps the accepted range inside what the hardware can actually deliver. Relevant background for **D35**'s open speed-disagreement investigation.
+- **Speed ceiling, measured**: the servo saturates near 1100 counts/s regardless of the commanded value (~66 output deg/s). `default_speed_dps = 30` (fixed for every move, R9) sits well inside it. Relevant background for **D35**'s open speed-disagreement investigation.
 
 ## python/app/core/events.py
 

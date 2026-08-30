@@ -24,13 +24,13 @@ class TestValidation:
     """Step-size validation."""
 
     def test_valid_steps_accepted(self, motion):
-        motion.move_to(12.0, 60.0)
-        motion.move_to(12.06, 60.0)
+        motion.move_to(12.0)
+        motion.move_to(12.06)
 
     def test_move_message_states_full_precision(self, motion, backend):
         """D34: 0.06 deg is the real minimum step; a message rounded to
         1 decimal cannot show it (0.06 and 0.12 both read "0.1")."""
-        motion.move_to(12.06, 60.0)
+        motion.move_to(12.06)
         accepted = next(e for e in _events(backend)
                         if e.event == "servo.move.accepted")
         assert "12.06" in accepted.message
@@ -39,7 +39,7 @@ class TestValidation:
         from app.deps import get_state_store
         monkeypatch.setattr(get_state_store(), "current_output_deg",
                             lambda: 6.06)
-        motion.move_to(12.0, 60.0)
+        motion.move_to(12.0)
         accepted = [e for e in _events(backend)
                    if e.event == "servo.move.accepted"][-1]
         assert accepted.data["from_deg"] == 6.06
@@ -47,7 +47,7 @@ class TestValidation:
     @pytest.mark.parametrize("bad", [10.05, 0.333, 359.99])
     def test_invalid_steps_rejected(self, motion, bad):
         with pytest.raises(StepError):
-            motion.move_to(bad, 60.0)
+            motion.move_to(bad)
 
 
 class TestLockGate:
@@ -56,13 +56,13 @@ class TestLockGate:
     def test_locked_rejects_move(self, motion):
         motion.set_lock(True)
         with pytest.raises(LockedError):
-            motion.move_to(12.0, 60.0)
+            motion.move_to(12.0)
 
     def test_unlock_then_move_waits_out_settle(self, backend, motion):
         motion.set_lock(True)
         motion.set_lock(False)
         started = time.monotonic()
-        motion.move_to(12.0, 60.0)
+        motion.move_to(12.0)
         waited = time.monotonic() - started
         assert waited >= backend.settings.settling_seconds * 0.7
 
@@ -72,7 +72,7 @@ class TestLockGate:
         assert wait_until(
             lambda: not _settling(backend), timeout=2.0)
         started = time.monotonic()
-        motion.move_to(12.0, 60.0)
+        motion.move_to(12.0)
         assert time.monotonic() - started < 0.1
 
 
@@ -83,14 +83,14 @@ class TestIsolationGate:
         from app.deps import get_isolation_service
         get_isolation_service().set_isolated(True)
         with pytest.raises(IsolatedError):
-            motion.move_to(12.0, 60.0)
+            motion.move_to(12.0)
 
     def test_un_isolate_then_move_succeeds(self, motion):
         from app.deps import get_isolation_service
         isolation = get_isolation_service()
         isolation.set_isolated(True)
         isolation.set_isolated(False)
-        motion.move_to(12.0, 60.0)   # must not raise
+        motion.move_to(12.0)   # must not raise
 
     def test_isolated_not_guarded_by_motion_state(self, motion, sim):
         """Unlike a lock change, isolating must take effect immediately
@@ -99,11 +99,11 @@ class TestIsolationGate:
         enough to need isolating would be exactly backwards."""
         from app.deps import get_isolation_service
         sim.set_deadband(1)
-        motion.move_to(60.0, 20.0)
+        motion.move_to(60.0)
         assert wait_until(lambda: sim.read_snapshot().moving)
         get_isolation_service().set_isolated(True)   # must not raise
         with pytest.raises(IsolatedError):
-            motion.move_to(12.0, 60.0)
+            motion.move_to(12.0)
 
     def test_isolated_and_locked_are_distinct_reasons(self, motion):
         """The two gates must not collapse into one reason code - an
@@ -112,11 +112,11 @@ class TestIsolationGate:
         from app.deps import get_isolation_service
         motion.set_lock(True)
         with pytest.raises(LockedError):
-            motion.move_to(12.0, 60.0)
+            motion.move_to(12.0)
         motion.set_lock(False)
         get_isolation_service().set_isolated(True)
         with pytest.raises(IsolatedError):
-            motion.move_to(12.0, 60.0)
+            motion.move_to(12.0)
 
     def test_locked_and_isolated_together_raises_the_combined_error(
             self, motion):
@@ -128,7 +128,7 @@ class TestIsolationGate:
         motion.set_lock(True)
         get_isolation_service().set_isolated(True)
         with pytest.raises(LockedAndIsolatedError):
-            motion.move_to(12.0, 60.0)
+            motion.move_to(12.0)
 
 
 def _settling(backend) -> bool:
@@ -149,7 +149,7 @@ class TestMoveGuard:
 
     def test_guard_disabled_allows_lock_while_moving(self, motion, sim):
         sim.set_deadband(1)
-        motion.move_to(60.0, 20.0)   # long slow move
+        motion.move_to(60.0)   # long slow move
         motion.set_lock(True)          # default: allowed
 
     def test_guard_enabled_refuses_lock_while_moving(self, monkeypatch,
@@ -158,7 +158,7 @@ class TestMoveGuard:
         from app.deps import get_motion_service
         motion = get_motion_service()
         sim.set_deadband(1)
-        motion.move_to(60.0, 20.0)
+        motion.move_to(60.0)
         assert wait_until(lambda: sim.read_snapshot().moving)
         with pytest.raises(MovingError):
             motion.set_lock(True)
@@ -168,11 +168,11 @@ class TestAcceleration:
     """Acceleration pass-through."""
 
     def test_default_acceleration_used(self, backend, motion, sim):
-        motion.move_to(6.0, 60.0)
+        motion.move_to(6.0)
         assert sim._acceleration == backend.settings.default_acceleration
 
     def test_explicit_acceleration_used(self, motion, sim):
-        motion.move_to(6.0, 60.0, acceleration=99)
+        motion.move_to(6.0, acceleration=99)
         assert sim._acceleration == 99
 
 
@@ -181,9 +181,9 @@ class TestFineApproach:
 
     def test_disabled_by_default_direct_move(self, backend, motion, sim):
         sim.set_deadband(1)
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
-        motion.move_to(12.0, 60.0)   # downward, but feature off
+        motion.move_to(12.0)   # downward, but feature off
         events = [e.event for e in _events(backend)]
         assert "servo.move.fine_approach" not in events
 
@@ -194,9 +194,9 @@ class TestFineApproach:
         motion = get_motion_service()
         store = get_state_store()
         sim.set_deadband(1)
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
-        motion.move_to(12.0, 60.0)
+        motion.move_to(12.0)
         # Wait for the fine-approach event FIRST: the overshoot leg travels
         # through the target on its way below it, so a position check alone
         # can succeed mid-transit before the final leg is even commanded.
@@ -211,7 +211,7 @@ class TestFineApproach:
         monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
         from app.deps import get_motion_service
         motion = get_motion_service()
-        motion.move_to(18.0, 60.0)   # upward from 0: no overshoot leg
+        motion.move_to(18.0)   # upward from 0: no overshoot leg
         events = [e.event for e in _events(backend)]
         assert "servo.move.fine_approach" not in events
 
@@ -235,7 +235,7 @@ class TestTarget:
 
     def test_accepted_move_sets_target(self, motion):
         from app.deps import get_state_store
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         target_deg, stale = get_state_store().target_state()
         assert target_deg == 30.0
         assert stale is False
@@ -244,13 +244,13 @@ class TestTarget:
         from app.deps import get_state_store
         motion.set_lock(True)
         with pytest.raises(LockedError):
-            motion.move_to(30.0, 60.0)
+            motion.move_to(30.0)
         target_deg, _ = get_state_store().target_state()
         assert target_deg is None
 
     def test_stop_marks_target_stale_without_clearing_it(self, motion):
         from app.deps import get_state_store
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         motion.stop()
         target_deg, stale = get_state_store().target_state()
         assert target_deg == 30.0
@@ -258,9 +258,9 @@ class TestTarget:
 
     def test_next_move_clears_staleness(self, motion):
         from app.deps import get_state_store
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         motion.stop()
-        motion.move_to(12.0, 60.0)
+        motion.move_to(12.0)
         target_deg, stale = get_state_store().target_state()
         assert target_deg == 12.0
         assert stale is False
@@ -276,9 +276,9 @@ class TestTarget:
         motion = get_motion_service()
         store = get_state_store()
         sim.set_deadband(1)
-        motion.move_to(30.0, 60.0)
+        motion.move_to(30.0)
         assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
-        motion.move_to(12.0, 60.0)   # downward: triggers the overshoot leg
+        motion.move_to(12.0)   # downward: triggers the overshoot leg
         assert wait_until(
             lambda: "servo.move.fine_approach" in
             [e.event for e in _events(backend)], timeout=8)
@@ -321,7 +321,7 @@ class TestTravelLimits:
         low, high = store.reachable_output_range_deg()
         assert low > backend.settings.output_min_deg
         with pytest.raises(OutOfTravel):
-            motion.move_to(backend.settings.output_min_deg, 30.0)
+            motion.move_to(backend.settings.output_min_deg)
 
     def test_reachable_range_is_symmetric_from_the_centre(self, backend,
                                                           motion):
@@ -332,5 +332,5 @@ class TestTravelLimits:
 
     def test_full_window_works_from_the_default_baseline(self, motion,
                                                          backend):
-        motion.move_to(backend.settings.output_min_deg, 30.0)
-        motion.move_to(backend.settings.output_max_deg, 30.0)
+        motion.move_to(backend.settings.output_min_deg)
+        motion.move_to(backend.settings.output_max_deg)

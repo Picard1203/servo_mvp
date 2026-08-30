@@ -39,6 +39,15 @@ Bridge contract checker: both sides agree
 (as of Session 8, 25 August 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
+**30 August 2026 — Session 16: R9 closed.** Speed is now a fixed, global
+`default_speed_dps` (30.0, unchanged) — no field, no nudge, removed from
+`MoveRequest`, `MotionService.move_to()`, and the UI. `max_speed_dps` deleted.
+Kept at 30 rather than a lower value, confirmed with the operator: it is
+exactly what the demo already ran at, and D35 (still open) means the real
+figure is closer to 45-70 deg/s regardless of the label. No board this
+session, so that figure is inherited, not re-measured. **R10 is next, same
+session, in progress.**
+
 **27–30 August 2026 — Session 15: first client demo held, ahead of the planned 15–19 sequence; feedback triaged into a new plan, session closed out.** Time moved up unexpectedly; the demo ran on `dev` at Session 14's commit state, its whole-app `/twin-review` findings (`docs/REVIEW_FINDINGS.md`) not yet triaged. This session did not run the originally-planned 15–19 content in order: session 18's deliverable (a presenter walkthrough script) was produced live instead, ad hoc, immediately before the demo; the rest of session 15's original job (triaging `REVIEW_FINDINGS.md` in full) and sessions 16/17/19's content (R1 remeasure, D17/T10/T11, dry-run) did not happen and are explicitly deferred — see `docs/BACKLOG.md`'s START HERE table, not restated here.
 
 **The demo blocked once, live, on a bug Session 14 had already found and flagged HIGH/build-breaking:** a stray unmatched closing brace at `NetworkRelay.cpp:170` (`docs/REVIEW_FINDINGS.md` firmware #1), invisible to `tools/verify.py` because the native suite never compiles a file needing `Arduino.h`. Fixed live so the app could start, committed and closed the same session — **D37**, `docs/CLOSED.md`. A small prevention check (`tools/check_brace_balance.py`) was added the same session rather than deferred, and wired straight into `tools/verify.py`'s gate as its 5th check — not left as a manual script or a separate backlog item, since finishing it cost nothing worth deferring.

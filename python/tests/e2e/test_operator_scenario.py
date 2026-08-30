@@ -26,7 +26,7 @@ class TestOperatorSession:
 
             # 3. commanded move is observable while in flight, then lands
             response = http.post("/api/v1/servo/move",
-                                 json={"target_deg": 24.0, "speed_dps": 60})
+                                 json={"target_deg": 24.0})
             assert response.status_code == 202
             assert wait_until(lambda: http.get(
                 "/api/v1/servo/state").json()["moving"], timeout=2)
@@ -44,8 +44,7 @@ class TestOperatorSession:
             http.post("/api/v1/servo/lock", json={"locked": False})
             started = time.monotonic()
             accepted = http.post("/api/v1/servo/move",
-                                 json={"target_deg": 30.0,
-                                       "speed_dps": 60})
+                                 json={"target_deg": 30.0})
             assert accepted.status_code == 202
             assert time.monotonic() - started >= \
                 backend.settings.settling_seconds * 0.7

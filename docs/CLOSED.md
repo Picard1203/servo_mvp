@@ -64,6 +64,56 @@ design, not by patching `renderZeros()`'s fallback.
 
 ---
 
+### R9 — Speed becomes a global parameter, removed from operator control
+**Status:** CLOSED · 30 August 2026 · Session 16 · simulator-verified, no
+board this session
+
+`speed_dps` is gone from `MoveRequest`, the move endpoint, `MotionService`
+and the UI: no field, no nudge buttons. Every move now uses
+`Settings.default_speed_dps` (30.0, unchanged), read the same way
+`MotionService.recover()` already read it. `max_speed_dps` deleted from
+`config.py` and every `.env` file — nothing per-move is bounded any more.
+
+**Chosen value: kept at 30, not changed.** D35 (still open) found actual
+speed running roughly 1.5-2.3x commanded, so the real figure at the
+mechanism is closer to 45-70 deg/s — but that is exactly what the 27 August
+demo already ran at, so this closes with no physical behaviour change.
+Confirmed with the operator before building, not decided silently. D35's own
+entry now notes the global value depends on resolving it.
+
+**Tested:** every move accepts with no speed field and uses the configured
+speed; the ~14 test call sites that used to send `speed_dps` explicitly were
+updated rather than left relying on pydantic's silent extra-field ignore,
+which would have kept them green while asserting nothing. **Assumed:** that
+30 deg/s (which measures ~45-70 deg/s per D35) is the right physical value —
+no board this session.
+
+**Related:** D35.
+
+**Original report follows.**
+
+The client didn't see the value in per-move speed control and asked whether
+speed gives the movement more force. It doesn't: the ST3215's `GoalSpeed`
+register and its torque registers (`0x10` max torque, `0x30` torque limit)
+are independent — confirmed against Waveshare's own register map
+(`skills/uno-q-st3215/SKILL.md`). Speed only changes how fast the servo
+reaches a target, never how hard.
+
+**Decision:** speed becomes a fixed, global setting (config-level, not
+operator-facing) instead of a per-move value the operator chooses. Removes
+the speed field/nudge from the UI and `speed_dps` from the operator-facing
+move flow.
+
+**Open before building:** what the fixed value should be. D35 (open,
+unresolved) found commanded and actual speed disagree ~1.5–2.3x — pick the
+global value with that uncertainty in mind, or resolve D35 first if time
+allows; don't hardcode a value D35 would immediately contradict.
+
+**Related:** D32, D35 — both about the speed-step/speed-accuracy this
+decision removes from the operator, not from the system.
+
+---
+
 ### D1 — A move to a negative angle stops at 0
 **Status:** done · 7 August 2026 · **Confirmed on hardware, both halves**
 

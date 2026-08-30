@@ -34,7 +34,7 @@ class TestMove:
 
     def test_accepted_202(self, client):
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": 12.0, "speed_dps": 60})
+                               json={"target_deg": 12.0})
         assert response.status_code == 202
         assert response.json() == {"accepted": True, "target_deg": 12.0}
 
@@ -49,7 +49,7 @@ class TestMove:
         client.post("/api/v1/servo/lock", json={"locked": False})
         started = time.monotonic()
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": 12.0, "speed_dps": 60})
+                               json={"target_deg": 12.0})
         waited = time.monotonic() - started
         assert response.status_code == 202
         assert waited >= backend.settings.settling_seconds * 0.7
@@ -71,7 +71,7 @@ class TestMove:
 
     def test_movement_reaches_target(self, backend, client):
         client.post("/api/v1/servo/move",
-                    json={"target_deg": 18.0, "speed_dps": 60})
+                    json={"target_deg": 18.0})
         assert wait_until(lambda: abs(
             client.get("/api/v1/servo/state").json()["output_deg"] - 18.0)
             < 0.8, timeout=6)
@@ -111,7 +111,7 @@ class TestIsolate:
     def test_move_while_isolated_409_isolated(self, client):
         client.post("/api/v1/servo/isolate", json={"isolated": True})
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": 12.0, "speed_dps": 30})
+                               json={"target_deg": 12.0})
         assert response.status_code == 409
         assert response.json()["reason"] == "isolated"
 
@@ -121,20 +121,20 @@ class TestIsolate:
         thing."""
         client.post("/api/v1/servo/lock", json={"locked": True})
         locked_response = client.post(
-            "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
+            "/api/v1/servo/move", json={"target_deg": 12.0})
         assert locked_response.json()["reason"] == "locked"
 
         client.post("/api/v1/servo/lock", json={"locked": False})
         client.post("/api/v1/servo/isolate", json={"isolated": True})
         isolated_response = client.post(
-            "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
+            "/api/v1/servo/move", json={"target_deg": 12.0})
         assert isolated_response.json()["reason"] == "isolated"
 
     def test_move_while_locked_and_isolated_names_both_reasons(self, client):
         client.post("/api/v1/servo/lock", json={"locked": True})
         client.post("/api/v1/servo/isolate", json={"isolated": True})
         response = client.post(
-            "/api/v1/servo/move", json={"target_deg": 12.0, "speed_dps": 30})
+            "/api/v1/servo/move", json={"target_deg": 12.0})
         assert response.status_code == 409
         assert response.json()["reason"] == "locked_isolated"
 
@@ -194,7 +194,7 @@ class TestMoveGuardOverHttp:
         from app.deps import get_servo_repository
         get_servo_repository().set_deadband(1)
         client.post("/api/v1/servo/move",
-                    json={"target_deg": 60.0, "speed_dps": 15})
+                    json={"target_deg": 60.0})
         assert wait_until(lambda: client.get(
             "/api/v1/servo/state").json()["moving"], timeout=3)
         response = client.post("/api/v1/servo/lock", json={"locked": True})
@@ -207,7 +207,7 @@ class TestTravelWindow:
 
     def test_negative_angle_accepted(self, client):
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": -60.0, "speed_dps": 30})
+                               json={"target_deg": -60.0})
         assert response.status_code == 202
 
     def test_below_minimum_rejected(self, client):
@@ -235,7 +235,7 @@ class TestOutOfTravelSurfaced:
                            json={"name": "bottom"}).json()
         client.post(f"/api/v1/zeros/{zero['id']}/activate")
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": -90.0, "speed_dps": 30})
+                               json={"target_deg": -90.0})
         assert response.status_code == 422
         assert response.json()["reason"] == "out_of_travel"
         assert "reachable range" in response.json()["detail"]
@@ -323,7 +323,7 @@ class TestStepRefusalStatesTheEnforcedStep:
         from app.core.config import get_settings
         step = get_settings().output_step_deg
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": 12.345, "speed_dps": 60})
+                               json={"target_deg": 12.345})
         assert response.status_code == 422
         assert response.json()["reason"] == "step"
         assert str(step) in response.json()["detail"]

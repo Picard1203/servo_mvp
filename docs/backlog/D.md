@@ -13,59 +13,81 @@ Under load, a move to e.g. 90° can settle at ~89°. Pressing 90° again produce
 no corrective step. Commanding several degrees further does reach the target.
 The operator cannot trust that the number on screen is the number achieved.
 
-**Ruled out, read from code, this session.** No stale-target short-circuit
-exists in `MotionService.move_to()`/`_command()` — every call reaches
-`command_move()` unconditionally, so the second press *is* dispatched.
-`servo_deadband_counts` is `0` on the board's live `.env`, so no software dead
-zone is swallowing it.
+**D40a — three prerequisite fixes, landed and verified this session**
+(branch `feature/move-acknowledgement`). `command_move`/`command_stop` now
+return whether the servo acknowledged; `MotionService` raises
+`CommandNotAcknowledgedError` on a move, stop, or recover the servo never
+acknowledged, instead of reporting acceptance regardless — closes D46's first
+finding. The fine-approach background thread now carries a generation token
+and aborts on supersession or on isolation, and logs rather than swallows any
+exception raised in its body. `_needs_fine_approach()` no longer crashes when
+the current position is unknown. Software deadband (`servo_deadband_counts`)
+is confirmed `0` on the board — ruling out a *software* dead zone
+specifically; it does not rule out a mechanical one, which is what the
+investigation below found instead.
 
-**Three live candidates, in the order the investigation should test them:**
-1. **Acked as success but never executed** — `_command()`
-   (`bridge_servo_repository.py:207-220`) only logs a warning on a non-`"ok"`
-   Bridge reply and returns success regardless (Session 14 `/twin-review`,
-   backend finding 1, HIGH — verified with a stubbed `"err"` reply). "Press 90
-   again, nothing happens" is exactly what a false `202 {"accepted": true}`
-   looks like.
-2. **Static friction under load** — the servo's own controller may not break
-   stiction for a residual of a few counts, but can for a larger error.
-   Matches "a few degrees further works."
-3. **Direction-dependent backlash** — an anti-backlash mechanism already
-   exists (`fine_approach_enabled`, off by default, never board-tuned) but is
-   one-directional: `_needs_fine_approach()` (`motion_service.py:189-201`)
-   only fires when `target_deg < start_deg`. If the shortfall bites on
-   *increasing* moves, it cannot help as written.
+**D40b — investigation findings, this session, unloaded on the rig.**
+1. **False ack — ruled out.** D40a's fix is live on the board: every tested
+   move genuinely acknowledges, and the shortfall persists unchanged. A false
+   `202` is not the mechanism.
+2. **Firmware edge-triggering (repeating the same Goal Position is a no-op) —
+   tested directly, not supported.** A three-condition test at three
+   positions (−60°, 0°, 60°) compared an identical re-command against a
+   genuinely different tiny nudge (0.06° away, then back): both produced the
+   same near-zero movement at every position. A clean edge-trigger would also
+   forbid the occasional real movement an identical repeat did produce at 0°
+   — that happened too. Ruled out.
+3. **`MinStartForce` register (0x18) — found unconfigured, partially fixed.**
+   Never written anywhere in `sketch/src/` before this session, despite being
+   documented (servo datasheet/forums) as the minimum startup torque needed
+   to break the servo free from rest. Writing `0` at boot
+   (`Config.h`/`ServoController::Begin()`, this session) produced a real but
+   partial, **position-inconsistent** improvement: 0.3° became a reliable
+   corrective step at 2 of 3 tested positions (0°, 60°); at the third (−60°)
+   the fix measured *worse*, needing ≥1.2° where 0.6° had sometimes worked
+   before the fix — though this specific before/after delta is confounded by
+   an intervening datum recalibration (see caveats) and should not be read as
+   the fix backfiring. **Not independently confirmed** — the register write
+   was never read back from the board over the Bridge, so this fix should be
+   treated as deployed but unverified until a diagnostic readback closes that
+   gap (first item for D40c).
+4. **Conclusion: genuine mechanical stiction/backlash in the belt-and-gear
+   drivetrain** (44:30 belt reduction, `docs/sprint/RIG_TESTING_PROTOCOL.md`),
+   not a software or firmware quirk. Position-dependent, occasionally breaks
+   free on its own, and needs a real-magnitude corrective offset — no repeat
+   command trick substitutes for one. Reliable correction floor measured,
+   post-fix, at 0.3–0.6° at two of three positions; −60° needed ≥1.2° both
+   before and after the fix.
 
-**Prerequisites before `fine_approach` is ever flipped on** — both live code
-waiting on that flag, both Session 14 `/twin-review` HIGHs:
-- No `None`-guard on `start_deg`: `current_output_deg()` returns `None` on an
-  invalid read, `_needs_fine_approach()` does `target_deg < start_deg`
-  unguarded. **Verified**: reproduces `TypeError` at `motion_service.py:177`.
-- The fine-approach thread (`motion_service.py:98-102`) has no cancellation
-  and unconditionally issues its *original* target after sleeping up to 30s —
-  a second `move_to()` call during that sleep is silently overridden
-  afterward — and its body is unguarded, so any exception inside it
-  (including the one above) is swallowed by `threading` with no trace.
+**Caveats on the numbers above.** The datum was recalibrated mid-session
+(an app restart reset the in-memory verified flag), so a position label like
+"−60°" is not the same physical gear position before and after that point —
+the before/after comparison at −60° above is directional, not a clean A/B.
+All D40b testing was unloaded: the loaded comparison originally planned was
+set aside once the unloaded data already supported the mechanical-stiction
+conclusion. Position P/D/I gain registers (0x15–0x17), also never configured,
+were noted as a further lead but not tested.
 
-**Proposed mechanism:** a bounded convergence retry — after settle, if
-|measured − target| exceeds a tolerance, re-command with an offset large
-enough to break stiction, up to N attempts, aborting on overload or on no
-progress between attempts, recording an event either way. Config-gated,
-default off until board-validated. `fine_approach` stays a separate switch —
-it addresses backlash direction, not residual error; whether its direction
-gate needs generalizing is answered by the investigation above, not assumed.
+**Proposed mechanism for D40c:** a bounded convergence retry that escalates
+rather than uses one fixed offset — a single value fails at the stiffest
+position measured. Start near 0.3–0.6°, escalate to at least 1.2° on
+continued failure (the −60° floor above), bounded attempt count, abort on no
+progress between attempts or on overload, recording an event either way.
+Config-gated, default off until board-validated. `fine_approach` stays a
+separate switch — whether its direction gate needs generalizing is still
+open, not exercised this session.
 
-**Twin-path:** `move_to()` and `move_to_counts()` are the two entry points,
-and `move_to_counts()` is what every saved-position "go" uses — D2's shape
-(`calibrate()` fixed, `capture()` not) if the mechanism only reaches one.
+**Twin-path:** `move_to()` and `move_to_counts()` both funnel through the
+same D40a-fixed `_command()`, so the saved-position "go" path is covered by
+the same fix, not a separate one.
 
 **Acceptance:** a move converges to its target within a stated tolerance, or
 reports plainly that it could not — never silently settles short while
-reporting success. Reproduced and tuned with the operator holding the rig as
-a temporary fixed point (the real pipe is not yet connected to it); tolerance
-and attempt-count values are re-tuned once it is.
+reporting success. D40a and D40b done; D40c (the retry) and D40d (tuning)
+remain open, Session 21.
 
-**Related:** D46 (the false-ack finding this investigation checks first),
-ADR-0008 (the anti-pattern this mirrors on the Python side).
+**Related:** D46 (its first finding closed by D40a), ADR-0008 (the anti-pattern
+D40a's ack-surfacing mirrors on the write side).
 
 ---
 

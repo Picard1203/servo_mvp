@@ -340,3 +340,26 @@ class TestSamplerLifecycleIsolation:
         assert calls == ["stop_sampler", "close"], (
             "closing before the sampler is confirmed stopped is exactly "
             "the segfault this test used to risk")
+
+    def test_teardown_joins_the_fine_approach_thread_before_closing(self):
+        """The same mechanism, for MotionService's own background thread -
+        added once that thread also started segfaulting the suite the same
+        way the sampler once did."""
+        import unittest.mock as mock
+        from tests.conftest import _clear_all_caches
+        calls = []
+        with mock.patch("app.deps.get_telemetry_service") as get_telemetry, \
+             mock.patch("app.deps.get_motion_service") as get_motion, \
+             mock.patch("app.deps.get_database") as get_db, \
+             mock.patch("app.core.config.get_settings"):
+            get_telemetry.cache_info.return_value = mock.Mock(currsize=0)
+            get_motion.cache_info.return_value = mock.Mock(currsize=1)
+            get_motion.return_value.join_fine_approach.side_effect = \
+                lambda: calls.append("join_fine_approach")
+            get_db.cache_info.return_value = mock.Mock(currsize=1)
+            get_db.return_value.close.side_effect = \
+                lambda: calls.append("close")
+            _clear_all_caches()
+        assert calls == ["join_fine_approach", "close"], (
+            "closing before the fine-approach thread is confirmed joined "
+            "risks the same segfault the sampler ordering test guards")

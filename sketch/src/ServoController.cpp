@@ -16,6 +16,10 @@ uint8_t ClampDeadband(uint8_t counts) {
   return counts > units::kMaxDeadZone ? units::kMaxDeadZone : counts;
 }
 
+uint16_t ClampMinStartForce(uint16_t force) {
+  return force > units::kMaxTorqueLimit ? units::kMaxTorqueLimit : force;
+}
+
 uint8_t ClampAmplification(uint8_t amplification) {
   if (amplification < 1) return 1;
   if (amplification > units::kMaxAmplification) {
@@ -29,10 +33,12 @@ uint8_t ClampAmplification(uint8_t amplification) {
 ServoController::ServoController(ServoBus& bus) : bus_(bus) {}
 
 bool ServoController::Begin(bool multi_turn, uint8_t angle_resolution,
-                            uint8_t deadband_counts, uint16_t torque_limit) {
+                            uint8_t deadband_counts, uint16_t torque_limit,
+                            uint16_t min_start_force) {
   if (!bus_.Ping()) return false;
   bool ok = ConfigureRange(multi_turn, angle_resolution);
   ok = SetDeadband(deadband_counts) && ok;
+  ok = SetMinStartForce(min_start_force) && ok;
   ok = bus_.WriteWord(reg::kTorqueLimit,
                       static_cast<int16_t>(torque_limit)) && ok;
   // EnableTorque: 0 fail / 1 success, never -1.
@@ -106,6 +112,12 @@ bool ServoController::SetDeadband(uint8_t counts) {
   const bool cw = bus_.WriteEepromByte(reg::kCwDeadZone, clamped);
   const bool ccw = bus_.WriteEepromByte(reg::kCcwDeadZone, clamped);
   return cw && ccw;
+}
+
+bool ServoController::SetMinStartForce(uint16_t force) {
+  const uint16_t clamped = ClampMinStartForce(force);
+  return bus_.WriteEepromWord(reg::kMinStartForce,
+                              static_cast<int16_t>(clamped));
 }
 
 bool ServoController::ConfigureRange(bool multi_turn,

@@ -19,6 +19,7 @@ constexpr uint8_t kAngleResolution  = 1;
 constexpr uint8_t  kDeadbandCounts     = 0;
 constexpr uint8_t  kDefaultAcceleration = 50;
 constexpr uint16_t kTorqueLimit        = 1000;
+constexpr uint16_t kMinStartForce      = 0;
 
 constexpr uint32_t kConsoleBaud = 115200UL;
 

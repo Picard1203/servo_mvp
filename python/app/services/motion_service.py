@@ -31,6 +31,8 @@ class MotionService:
         _events (EventService): Event service for recording audit events.
         _settings (Settings): Application configuration settings.
         _move_generation (int): Counter bumped on each dispatched move.
+        _fine_approach_thread (Optional[Thread]): Most recently spawned
+            fine-approach worker thread.
     """
 
     def __init__(self, servo: ServoRepository, state: ServoStateStore,
@@ -40,6 +42,17 @@ class MotionService:
         self._events: EventService = events
         self._settings: Settings = settings
         self._move_generation: int = 0
+        self._fine_approach_thread: Optional[Thread] = None
+
+    def join_fine_approach(self, timeout: float = 2.0) -> None:
+        """Waits for the most recent fine-approach thread to finish.
+
+        Args:
+            timeout (float): Maximum seconds to wait.
+        """
+        if self._fine_approach_thread is not None:
+            self._fine_approach_thread.join(timeout=timeout)
+            self._fine_approach_thread = None
 
     def move_to(self, target_deg: float,
                 acceleration: Optional[int] = None) -> None:
@@ -128,10 +141,12 @@ class MotionService:
         generation = self._move_generation
 
         if self._needs_fine_approach(start_deg, target_deg) is True:
-            Thread(target=self._fine_approach,
-                   args=(generation, target_deg, target_counts,
-                         speed_counts, acceleration),
-                   daemon=True).start()
+            self._fine_approach_thread = Thread(
+                target=self._fine_approach,
+                args=(generation, target_deg, target_counts, speed_counts,
+                      acceleration),
+                daemon=True)
+            self._fine_approach_thread.start()
         else:
             acked = self._servo.command_move(target_counts, speed_counts,
                                              acceleration)

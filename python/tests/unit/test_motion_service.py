@@ -352,6 +352,32 @@ class TestFineApproach:
         motion.move_to(target_deg)   # downward: spawns the thread
         assert wait_until(lambda: len(logged) > 0, timeout=4)
 
+    def test_join_fine_approach_is_a_no_op_with_no_thread(self, motion):
+        motion.join_fine_approach(timeout=0.1)   # must not raise
+
+    def test_join_fine_approach_actually_stops_the_thread(
+            self, monkeypatch, backend, sim):
+        """Forces the wait loop to stay alive for a fixed window, the same
+        way the isolation-abort test does, so observing the thread alive
+        before joining it is deterministic rather than a timing race."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        monkeypatch.setattr(backend.settings,
+                            "fine_approach_timeout_seconds", 0.5)
+        from app.deps import get_motion_service, get_state_store
+        monkeypatch.setattr(get_state_store(), "current_output_deg",
+                            lambda: 30.0)
+        real_read_snapshot = sim.read_snapshot
+        monkeypatch.setattr(
+            sim, "read_snapshot",
+            lambda: replace(real_read_snapshot(), moving=True))
+        motion = get_motion_service()
+        motion.move_to(12.0)   # downward: spawns the fine-approach thread
+        assert wait_until(lambda: motion._fine_approach_thread is not None
+                          and motion._fine_approach_thread.is_alive(),
+                          timeout=1.0)
+        motion.join_fine_approach()
+        assert motion._fine_approach_thread is None
+
 
 def _events(backend):
     """Returns recorded operator events.

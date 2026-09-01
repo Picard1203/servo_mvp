@@ -189,12 +189,15 @@ def _clear_all_caches() -> None:
     """
     from app import deps
     from app.core.config import get_settings
-    # Sampler first, then the database it reads through - stopping the
-    # thread before closing the connection it may still be mid-read on
-    # is what makes closing the connection safe at all (see
-    # TelemetryService.stop_sampler and Database.close).
+    # Background threads first, then the database they read through -
+    # stopping them before closing the connection they may still be
+    # mid-read on is what makes closing the connection safe at all (see
+    # TelemetryService.stop_sampler, MotionService.join_fine_approach and
+    # Database.close).
     if deps.get_telemetry_service.cache_info().currsize > 0:
         deps.get_telemetry_service().stop_sampler()
+    if deps.get_motion_service.cache_info().currsize > 0:
+        deps.get_motion_service().join_fine_approach()
     if deps.get_database.cache_info().currsize > 0:
         deps.get_database().close()
     get_settings.cache_clear()

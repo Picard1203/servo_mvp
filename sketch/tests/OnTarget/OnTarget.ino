@@ -40,6 +40,7 @@ namespace {
 constexpr int32_t kSafeMin = 1200;
 constexpr int32_t kSafeMax = 2900;
 constexpr uint16_t kTestTorqueLimit = 400;
+constexpr uint16_t kTestMinStartForce = 0;
 
 SMS_STS driver;
 servo::ServoBus bus(driver, config::kServoId, config::kBusReadRetries);
@@ -125,12 +126,15 @@ void setup() {
 
   // --- startup configuration sticks --------------------------------------
   Check(controller.Begin(config::kMultiTurnEnabled, config::kAngleResolution,
-                         config::kDeadbandCounts, kTestTorqueLimit),
+                         config::kDeadbandCounts, kTestTorqueLimit,
+                         kTestMinStartForce),
         "Begin() configured the servo");
   Check(bus.ReadByte(servo::reg::kCwDeadZone) == config::kDeadbandCounts,
         "CW dead zone written");
   Check(bus.ReadByte(servo::reg::kCcwDeadZone) == config::kDeadbandCounts,
         "CCW dead zone written");
+  Check(bus.ReadWord(servo::reg::kMinStartForce) == kTestMinStartForce,
+        "minimum start force written");
   Check(bus.ReadByte(servo::reg::kMode) == 0, "mode is position servo");
 
   // --- a snapshot is coherent --------------------------------------------

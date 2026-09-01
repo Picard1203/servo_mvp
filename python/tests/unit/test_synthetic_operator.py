@@ -30,6 +30,52 @@ class TestQuantizeDeg:
         assert synthetic_operator.quantize_deg(-45.04, 0.06) == -45.06
 
 
+class TestClassifySettleResult:
+    """Tests for classify_settle_result() convergence classification."""
+
+    def test_exact_match_converges(self) -> None:
+        """A measured angle equal to the commanded one always converges."""
+        assert synthetic_operator.classify_settle_result(
+            90.0, 90.0, tolerance_deg=0.1) == "converged"
+
+    def test_within_tolerance_converges(self) -> None:
+        """A small deviation inside the stated tolerance still converges."""
+        assert synthetic_operator.classify_settle_result(
+            90.0, 90.05, tolerance_deg=0.1) == "converged"
+
+    def test_beyond_tolerance_is_short(self) -> None:
+        """The operator's own report: a real shortfall reads as short."""
+        assert synthetic_operator.classify_settle_result(
+            90.0, 89.0, tolerance_deg=0.1) == "short"
+
+    def test_boundary_at_exactly_the_tolerance_converges(self) -> None:
+        """The tolerance boundary itself counts as converged, not short."""
+        assert synthetic_operator.classify_settle_result(
+            90.0, 90.1, tolerance_deg=0.1) == "converged"
+
+
+class TestFindMinimumEffectiveStep:
+    """Tests for find_minimum_effective_step() threshold detection."""
+
+    def test_first_moving_step_wins(self) -> None:
+        """The smallest step that moved is returned, not the largest."""
+        samples = [(0.06, False), (0.12, False), (0.30, True), (0.60, True)]
+        assert synthetic_operator.find_minimum_effective_step(
+            samples) == 0.30
+
+    def test_smallest_step_already_moves(self) -> None:
+        """No stiction at all: even the finest step produced movement."""
+        samples = [(0.06, True), (0.12, True)]
+        assert synthetic_operator.find_minimum_effective_step(
+            samples) == 0.06
+
+    def test_nothing_moved_returns_none(self) -> None:
+        """Every sampled step failed to move: no threshold exists yet."""
+        samples = [(0.06, False), (0.12, False), (3.00, False)]
+        assert synthetic_operator.find_minimum_effective_step(
+            samples) is None
+
+
 class TestMetricsTally:
     """Tests for Metrics class request and stream tracking."""
 

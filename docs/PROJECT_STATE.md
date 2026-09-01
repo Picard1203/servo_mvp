@@ -30,15 +30,17 @@ Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
 (one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-313 Python tests, coverage of app/ gated at 99% (99.64% measured)
+337 Python tests, coverage of app/ gated at 99% (99.65% measured)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
-105 client-behaviour assertions (T12)
+106 client-behaviour assertions (T12)
 Brace balance check: ok
 ```
 
-(as of Session 19, 1 September 2026 — `tools/verify.py` is the source of truth
+(as of Session 20, 1 September 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
+
+**1 September 2026 — Session 20: D40a's three prerequisite fixes landed; D40b's live investigation found the root cause.** D40a (ack surfacing on `command_move`/`command_stop`, fine-approach thread generation-token cancellation and isolation-abort, `None`-guard on a failed position read) fixed and verified — closes D46's first finding. D40b, live on the rig with the operator holding it: false ack ruled out (D40a's own fix confirms every move genuinely acknowledges, shortfall persists regardless); a firmware edge-trigger theory tested directly and also ruled out; `MinStartForce` register (0x18) found completely unconfigured in `sketch/src/`, writing it produced a real but position-inconsistent partial improvement, not yet confirmed via register readback; root cause identified as genuine position-dependent mechanical stiction/backlash in the belt-and-gear drivetrain, not a software or firmware quirk. Full findings, numbers and caveats: `docs/backlog/D.md` D40. Uncovered and fixed along the way: a background-thread teardown race in the test suite (a new fine-approach thread left running past its test into the next test's database close, the same class of segfault the telemetry sampler thread was fixed for once already) — `MotionService` now tracks and joins it, mirroring `TelemetryService.stop_sampler()`. D40c (the convergence retry) and D40d (tuning) remain open for Session 21.
 
 **1 September 2026 — Session 19: mechanical rig hand-testing produced four findings; Session 14's `/twin-review` triaged for the first time; D39 closed.** Rig assembled 31 Aug. Hands-on testing found: angle direction inverted (**D39**, closed this session), moves settling short under load with no self-correction (**D40**, the operator's own top-priority defect, open), the 0.06° step grid refusing typed angles instead of snapping (**R11**), and a request for an extended-travel zone beyond the normal window with confirmation (**R12**, soft ±90°/hard ±95°). `docs/REVIEW_FINDINGS.md` (60+ untriaged findings since Session 14) triaged into the backlog alongside them — **D41–D46, T20, T21** filed, four of the review's HIGHs absorbed directly into the rig findings; the file itself retired (content preserved in the backlog and git history). **D39 fixed and board-confirmed**: `SERVO_DIRECTION` flipped in `python/.env`/`.env.board`; confirmed live at two move sizes, both directions. Applying it surfaced a real, unplanned defect — 8 tests coupled to the live `.env` value of `servo_direction` rather than being direction-agnostic — fixed the same session. `tools/verify.py` unchanged at baseline (313/99.64%/194/105/ok). Sprint capacity and story tracking now live in `docs/sprint/SPRINTS.md`, continuing the sprint that began 30 Aug rather than starting a new one; full plan at `/home/egrisaru/.claude/plans/snuggly-growing-gosling.md`.
 

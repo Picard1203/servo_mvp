@@ -24,6 +24,11 @@ Run examples:
     # 10-minute 3-operator soak (R1 nominal target)
     python3 tools/synthetic_operator.py --host 192.168.10.60 --minutes 10 \\
         --operators 3 --profile mixed --report run2_3op.json
+
+    # Settle-investigation protocol B (minimum effective step), under load
+    python3 tools/synthetic_operator.py --host 192.168.10.60 \\
+        --settle-probe --probe-phase b --probe-target 30.0 \\
+        --probe-loaded --report probe_b_loaded.json
 """
 
 import argparse
@@ -69,6 +74,39 @@ def quantize_deg(deg: float, step: float = DEFAULT_STEP_DEG) -> float:
     """
     multiples = round(deg / step)
     return round(multiples * step, 2)
+
+
+def classify_settle_result(commanded_deg: float, measured_deg: float,
+                           tolerance_deg: float) -> str:
+    """Classifies whether a settled position reached its target.
+
+    Args:
+        commanded_deg (float): The angle that was commanded.
+        measured_deg (float): The angle measured after settle.
+        tolerance_deg (float): Acceptable deviation before calling it short.
+
+    Returns:
+        str: "converged" or "short".
+    """
+    if abs(commanded_deg - measured_deg) <= tolerance_deg:
+        return "converged"
+    return "short"
+
+
+def find_minimum_effective_step(
+        samples: list[tuple[float, bool]]) -> Optional[float]:
+    """Finds the smallest commanded step that produced real movement.
+
+    Args:
+        samples (list[tuple[float, bool]]): Ascending (step_deg, moved) pairs.
+
+    Returns:
+        Optional[float]: The smallest step that moved, or None if none did.
+    """
+    for step_deg, moved in samples:
+        if moved is True:
+            return step_deg
+    return None
 
 
 class Metrics:
@@ -671,6 +709,385 @@ def run_preflight(host: str, port: int) -> bool:
         return False
 
 
+# Settle-probe: default sweep of commanded steps for protocol B,
+# smallest to largest.
+SETTLE_PROBE_STEPS_DEG: tuple[float, ...] = (0.06, 0.12, 0.30, 0.60, 1.20, 3.00)
+
+# Movement only counts as real once it clears sensor and rounding noise.
+SETTLE_PROBE_NOISE_FLOOR_DEG: float = 0.03
+
+# Repeats per direction in the repeatability protocol.
+SETTLE_PROBE_REPEAT_COUNT: int = 3
+
+# Protocol B2: target positions spread across the safe travel range, each
+# far enough from +/-90 that staging and correction offsets stay in range.
+SETTLE_PROBE_SURVEY_TARGETS_DEG: tuple[float, ...] = (-60.0, 0.0, 60.0)
+
+# Realistic staging distance for a large move - matches how an operator
+# actually drives the mechanism, not a sub-degree nudge.
+SETTLE_PROBE_LARGE_MOVE_OFFSET_DEG: float = 35.0
+
+# Re-command repeats: does pressing the identical target again ever
+# self-correct, or is the shortfall consistently stuck.
+SETTLE_PROBE_RECOMMAND_REPEAT_COUNT: int = 3
+
+# Correction-offset sweep tried from a settled shortfall - starts at 0.30,
+# since Protocol B already showed 0.06/0.12 unloaded never move it.
+SETTLE_PROBE_CORRECTION_STEPS_DEG: tuple[float, ...] = (0.30, 0.60, 1.20, 3.00)
+
+# The probe is a single serial client, never concurrent operators, so it can
+# poll faster than POLL_STATE_SECONDS (tuned for the soak's shared-socket
+# budget across several simultaneous operators) without hitting the same
+# ceiling - used successfully across this session's probe and kick-test runs.
+SETTLE_PROBE_POLL_SECONDS: float = 0.5
+
+
+def _probe_get_state(base_url: str) -> Optional[dict[str, Any]]:
+    """Reads the current servo state for the settle probe.
+
+    Args:
+        base_url (str): API base URL.
+
+    Returns:
+        Optional[dict[str, Any]]: The parsed state, or None on failure.
+    """
+    try:
+        req = urllib.request.Request(f"{base_url}/servo/state",
+                                     headers={"Connection": "keep-alive"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _probe_move(base_url: str, target_deg: float) -> tuple[bool, Optional[str]]:
+    """Commands one move for the settle probe, retrying once on a
+    transient connection failure (the relay path's own real ceiling,
+    docs/OPEN_QUESTIONS.md Q2), the same tolerance _request() gives
+    every other action in this file.
+
+    Args:
+        base_url (str): API base URL.
+        target_deg (float): Target output angle in degrees.
+
+    Returns:
+        tuple[bool, Optional[str]]: Accepted flag and refusal reason.
+    """
+    body = json.dumps({"target_deg": target_deg}).encode("utf-8")
+    headers = {"Connection": "keep-alive", "Content-Type": "application/json"}
+    req = urllib.request.Request(f"{base_url}/servo/move", data=body,
+                                 method="POST", headers=headers)
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(req, timeout=10):
+                return True, None
+        except urllib.error.HTTPError as error:
+            reason = None
+            try:
+                err = json.loads(error.read().decode("utf-8"))
+                reason = err.get("reason")
+            except Exception:
+                pass
+            return False, reason
+        except Exception:
+            if attempt == 0:
+                time.sleep(SETTLE_PROBE_POLL_SECONDS)
+                continue
+            return False, "unreachable"
+
+
+def _probe_wait_settle(base_url: str,
+                       timeout: float) -> Optional[dict[str, Any]]:
+    """Polls state until motion stops or the timeout elapses.
+
+    Paces reads at SETTLE_PROBE_POLL_SECONDS rather than tightly - a
+    single failed read is retried rather than treated as settled.
+
+    Args:
+        base_url (str): API base URL.
+        timeout (float): Longest time to wait, in seconds.
+
+    Returns:
+        Optional[dict[str, Any]]: The last state read, or None if every
+            read failed.
+    """
+    deadline = time.monotonic() + timeout
+    state = None
+    while time.monotonic() < deadline:
+        time.sleep(SETTLE_PROBE_POLL_SECONDS)
+        read = _probe_get_state(base_url)
+        if read is not None:
+            state = read
+            if state.get("moving") is not True:
+                return state
+    return state
+
+
+def _run_settle_probe_repeatability(base_url: str, target_deg: float,
+                                    approach_offset_deg: float) -> list[dict]:
+    """Protocol A: approaches one target from below and from above.
+
+    Args:
+        base_url (str): API base URL.
+        target_deg (float): Grid-aligned target angle.
+        approach_offset_deg (float): Distance of the staging point either side.
+
+    Returns:
+        list[dict]: One record per approach.
+    """
+    records: list[dict] = []
+    directions = (("from_below", target_deg - approach_offset_deg),
+                 ("from_above", target_deg + approach_offset_deg))
+    for repeat in range(SETTLE_PROBE_REPEAT_COUNT):
+        for direction, stage_deg in directions:
+            _probe_move(base_url, quantize_deg(stage_deg))
+            _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+            accepted, reason = _probe_move(base_url, target_deg)
+            state = _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+            measured = state.get("output_deg") if state else None
+            delta = (round(measured - target_deg, 3)
+                    if measured is not None else None)
+            records.append({
+                "repeat": repeat + 1, "direction": direction,
+                "accepted": accepted, "reason": reason,
+                "measured_deg": measured, "delta_deg": delta,
+                "reading_valid": state.get("reading_valid") if state
+                else None,
+            })
+            print(f"  [A] repeat {repeat + 1} {direction}: "
+                 f"measured={measured} delta={delta}")
+    return records
+
+
+def _run_settle_probe_minimum_step(base_url: str, base_deg: float) -> dict:
+    """Protocol B: finds the smallest step that reliably produces movement.
+
+    Each step size is tried SETTLE_PROBE_REPEAT_COUNT times, re-settled to
+    the same base position and re-confirmed before every trial - a single
+    sample per step cannot tell a real threshold from a lucky trial, and
+    step size is the only thing allowed to vary between trials.
+
+    Args:
+        base_url (str): API base URL.
+        base_deg (float): Grid-aligned starting target.
+
+    Returns:
+        dict: Per-step trial results and the smallest step that moved on
+            every trial.
+    """
+    records: list[dict] = []
+    reliable: list[tuple[float, bool]] = []
+    for step_deg in SETTLE_PROBE_STEPS_DEG:
+        trials: list[dict] = []
+        moved_count = 0
+        for trial in range(SETTLE_PROBE_REPEAT_COUNT):
+            _probe_move(base_url, base_deg)
+            start_state = _probe_wait_settle(base_url,
+                                             MOVE_SETTLE_TIMEOUT_SECONDS)
+            start_deg = (start_state.get("output_deg") if start_state
+                        else None)
+            target = quantize_deg(base_deg + step_deg)
+            accepted, reason = _probe_move(base_url, target)
+            state = _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+            measured = state.get("output_deg") if state else None
+            moved = (measured is not None and start_deg is not None
+                    and abs(measured - start_deg) > SETTLE_PROBE_NOISE_FLOOR_DEG)
+            if moved is True:
+                moved_count += 1
+            trials.append({"trial": trial + 1, "accepted": accepted,
+                           "reason": reason, "start_deg": start_deg,
+                           "measured_deg": measured, "moved": moved})
+            print(f"  [B] step={step_deg} trial={trial + 1} moved={moved}")
+        is_reliable = moved_count == SETTLE_PROBE_REPEAT_COUNT
+        reliable.append((step_deg, is_reliable))
+        records.append({"step_deg": step_deg, "moved_count": moved_count,
+                        "repeat_count": SETTLE_PROBE_REPEAT_COUNT,
+                        "reliable": is_reliable, "trials": trials})
+    return {"steps": records,
+           "minimum_reliable_step_deg": find_minimum_effective_step(reliable)}
+
+
+def _run_settle_probe_large_move(base_url: str, target_deg: float) -> dict:
+    """One target's survey: a realistic large approach, repeated
+    re-commands of the identical target, then a repeated search for the
+    smallest correction that reliably closes any gap.
+
+    Args:
+        base_url (str): API base URL.
+        target_deg (float): Grid-aligned target angle for this trial.
+
+    Returns:
+        dict: The approach, the re-command repeats, and the correction
+            search, all for this one target.
+    """
+    stage_offset = (-SETTLE_PROBE_LARGE_MOVE_OFFSET_DEG if target_deg >= 0.0
+                    else SETTLE_PROBE_LARGE_MOVE_OFFSET_DEG)
+    stage_deg = quantize_deg(target_deg + stage_offset)
+    _probe_move(base_url, stage_deg)
+    _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+
+    approach_accepted, approach_reason = _probe_move(base_url, target_deg)
+    approach_state = _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+    approach_measured = (approach_state.get("output_deg")
+                        if approach_state else None)
+    print(f"  [B2] target={target_deg} approach from {stage_deg}: "
+         f"measured={approach_measured}")
+
+    recommands = []
+    for attempt in range(SETTLE_PROBE_RECOMMAND_REPEAT_COUNT):
+        accepted, reason = _probe_move(base_url, target_deg)
+        state = _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+        measured = state.get("output_deg") if state else None
+        recommands.append({"attempt": attempt + 1, "accepted": accepted,
+                           "reason": reason, "measured_deg": measured})
+        print(f"  [B2] target={target_deg} re-command {attempt + 1}: "
+             f"measured={measured}")
+
+    corrections: list[dict] = []
+    reliable: list[tuple[float, bool]] = []
+    for step_deg in SETTLE_PROBE_CORRECTION_STEPS_DEG:
+        trials: list[dict] = []
+        moved_count = 0
+        for trial in range(SETTLE_PROBE_REPEAT_COUNT):
+            # Re-run the full staging approach, not a short hop back to
+            # target_deg - a hop from wherever the previous trial's
+            # correction left off does not reproduce the same starting
+            # shortfall, which would leave step size no longer the only
+            # variable between trials.
+            _probe_move(base_url, stage_deg)
+            _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+            _probe_move(base_url, target_deg)
+            start_state = _probe_wait_settle(base_url,
+                                             MOVE_SETTLE_TIMEOUT_SECONDS)
+            start_deg = (start_state.get("output_deg") if start_state
+                        else None)
+            correction_target = quantize_deg(target_deg + step_deg)
+            _probe_move(base_url, correction_target)
+            state = _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+            measured = state.get("output_deg") if state else None
+            moved = (measured is not None and start_deg is not None
+                    and abs(measured - start_deg) > SETTLE_PROBE_NOISE_FLOOR_DEG)
+            if moved is True:
+                moved_count += 1
+            trials.append({"trial": trial + 1, "start_deg": start_deg,
+                           "measured_deg": measured, "moved": moved})
+            print(f"  [B2] target={target_deg} correction={step_deg} "
+                 f"trial={trial + 1} moved={moved}")
+        is_reliable = moved_count == SETTLE_PROBE_REPEAT_COUNT
+        reliable.append((step_deg, is_reliable))
+        corrections.append({"step_deg": step_deg, "moved_count": moved_count,
+                            "reliable": is_reliable, "trials": trials})
+
+    return {
+        "target_deg": target_deg, "stage_deg": stage_deg,
+        "approach": {"accepted": approach_accepted,
+                    "reason": approach_reason,
+                    "measured_deg": approach_measured},
+        "recommands": recommands,
+        "corrections": corrections,
+        "minimum_reliable_correction_deg":
+            find_minimum_effective_step(reliable),
+    }
+
+
+def _run_settle_probe_survey(base_url: str) -> dict:
+    """Protocol B2: the large-move survey across multiple target positions.
+
+    Args:
+        base_url (str): API base URL.
+
+    Returns:
+        dict: One result per surveyed target.
+    """
+    targets = []
+    for target_deg in SETTLE_PROBE_SURVEY_TARGETS_DEG:
+        targets.append(_run_settle_probe_large_move(base_url, target_deg))
+    return {"targets": targets}
+
+
+def _run_settle_probe_recommand(base_url: str, target_deg: float,
+                                approach_offset_deg: float,
+                                tolerance_deg: float) -> dict:
+    """Protocol C: approach fresh, observe a shortfall, then re-command.
+
+    Stages away from the target first and waits it out - re-reading a
+    position the board already happened to be sitting at would only
+    prove that a stale read doesn't change, not that a fresh approach
+    settles short and a second press does not correct it.
+
+    Args:
+        base_url (str): API base URL.
+        target_deg (float): Grid-aligned target angle.
+        approach_offset_deg (float): Distance of the staging point.
+        tolerance_deg (float): Deviation allowed before calling it short.
+
+    Returns:
+        dict: Both attempts' results and their classification.
+    """
+    _probe_move(base_url, quantize_deg(target_deg - approach_offset_deg))
+    _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+
+    attempts = []
+    for attempt in range(2):
+        accepted, reason = _probe_move(base_url, target_deg)
+        state = _probe_wait_settle(base_url, MOVE_SETTLE_TIMEOUT_SECONDS)
+        measured = state.get("output_deg") if state else None
+        result = (classify_settle_result(target_deg, measured, tolerance_deg)
+                  if measured is not None else "unknown")
+        attempts.append({"attempt": attempt + 1, "accepted": accepted,
+                         "reason": reason, "measured_deg": measured,
+                         "result": result})
+        print(f"  [C] attempt {attempt + 1}: accepted={accepted} "
+             f"reason={reason} measured={measured} result={result}")
+    return {"attempts": attempts}
+
+
+def run_settle_probe(host: str, port: int, phase: str, target_deg: float,
+                     loaded: bool, report_path: Optional[str]) -> int:
+    """Runs one D40 settle-investigation protocol against the live board.
+
+    Args:
+        host (str): Board address.
+        port (int): API port.
+        phase (str): Protocol to run: 'a', 'b', or 'c'.
+        target_deg (float): Grid-aligned base target for the protocol.
+        loaded (bool): Whether the rig is held under load for this run.
+        report_path (Optional[str]): Output report path.
+
+    Returns:
+        int: 0 on success, 1 if the board could not be reached.
+    """
+    base_url = f"http://{host}:{port}/api/v1"
+    target_deg = quantize_deg(target_deg)
+    print(f"settle-probe [{phase}]: target={target_deg} loaded={loaded} "
+         f"against {host}:{port}")
+    if _probe_get_state(base_url) is None:
+        print(f"SETTLE-PROBE FAILED: could not reach board at {host}:{port}")
+        return 1
+    time.sleep(SETTLE_PROBE_POLL_SECONDS)
+
+    if phase == "a":
+        result = _run_settle_probe_repeatability(
+            base_url, target_deg, approach_offset_deg=3.0)
+    elif phase == "b":
+        result = _run_settle_probe_minimum_step(base_url, target_deg)
+    elif phase == "c":
+        result = _run_settle_probe_recommand(
+            base_url, target_deg, approach_offset_deg=3.0,
+            tolerance_deg=SETTLE_PROBE_NOISE_FLOOR_DEG)
+    else:
+        result = _run_settle_probe_survey(base_url)
+
+    summary = {"phase": phase, "target_deg": target_deg, "loaded": loaded,
+              "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+              "result": result}
+    if report_path is not None:
+        _write_report(report_path, summary)
+        print(f"settle-probe: report written to {report_path}")
+    print("settle-probe: done.")
+    return 0
+
+
 def run_soak(host: str, port: int, minutes: float, operators: int,
              report_path: Optional[str], checkpoint_minutes: float,
              profile: str, step_deg: float) -> int:
@@ -818,11 +1235,32 @@ def main() -> int:
                         help="interval between status updates (0 to disable)")
     parser.add_argument("--preflight", action="store_true",
                         help="probe board health and datum without running soak")
+    parser.add_argument("--settle-probe", action="store_true",
+                        help="run one D40 settle-investigation protocol, "
+                             "not the soak")
+    parser.add_argument("--probe-phase", choices=["a", "b", "c", "d"],
+                        default=None,
+                        help="settle-probe protocol: a=repeatability, "
+                             "b=minimum effective step, c=re-command, "
+                             "d=large-move survey across multiple targets "
+                             "(ignores --probe-target)")
+    parser.add_argument("--probe-target", type=float, default=30.0,
+                        help="grid-aligned base target for the settle probe")
+    parser.add_argument("--probe-loaded", action="store_true",
+                        help="mark this settle-probe run as taken under "
+                             "hand-held load")
     args = parser.parse_args()
 
     if args.preflight:
         ok = run_preflight(args.host, args.port)
         return 0 if ok else 1
+
+    if args.settle_probe:
+        if args.probe_phase is None:
+            parser.error("--settle-probe requires --probe-phase {a,b,c}")
+        return run_settle_probe(args.host, args.port, args.probe_phase,
+                                args.probe_target, args.probe_loaded,
+                                args.report)
 
     return run_soak(args.host, args.port, args.minutes, args.operators,
                     args.report, args.checkpoint_minutes, args.profile,

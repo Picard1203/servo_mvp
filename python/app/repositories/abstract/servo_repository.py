@@ -21,18 +21,25 @@ class ServoRepository(ABC):
 
     @abstractmethod
     def command_move(self, target_counts: int, speed_counts_s: int,
-                     acceleration: int) -> None:
+                     acceleration: int) -> bool:
         """Starts a move toward an absolute counts target.
 
         Args:
             target_counts (int): Absolute encoder counts target.
             speed_counts_s (int): Speed in counts per second.
             acceleration (int): Servo acceleration parameter (0-254).
+
+        Returns:
+            bool: True when the servo acknowledged the command.
         """
 
     @abstractmethod
-    def command_stop(self) -> None:
-        """Stops motion at the current position."""
+    def command_stop(self) -> bool:
+        """Stops motion at the current position.
+
+        Returns:
+            bool: True when the servo acknowledged the command.
+        """
 
     @abstractmethod
     def configure_range(self, multi_turn: bool, angle_resolution: int) -> None:

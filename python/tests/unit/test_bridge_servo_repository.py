@@ -128,6 +128,28 @@ class TestCommands:
         repo.command_stop()
         assert bridge.calls[-1] == ("servo_stop", "")
 
+    def test_move_returns_true_on_ack(self, bridge, repo):
+        bridge.reply = "ok"
+        assert repo.command_move(1500, 900, 50) is True
+
+    def test_move_returns_false_when_not_acknowledged(self, bridge, repo):
+        """The ack is load-bearing here too: a caller must never believe
+        a move was dispatched on an unconfirmed write."""
+        bridge.reply = "err"
+        assert repo.command_move(1500, 900, 50) is False
+
+    def test_move_returns_false_on_bridge_exception(self, bridge, repo):
+        bridge.raise_on_call = RuntimeError("bridge down")
+        assert repo.command_move(1500, 900, 50) is False
+
+    def test_stop_returns_true_on_ack(self, bridge, repo):
+        bridge.reply = "ok"
+        assert repo.command_stop() is True
+
+    def test_stop_returns_false_when_not_acknowledged(self, bridge, repo):
+        bridge.reply = "err"
+        assert repo.command_stop() is False
+
     def test_set_deadband(self, bridge, repo):
         bridge.reply = "ok"
         repo.set_deadband(0)

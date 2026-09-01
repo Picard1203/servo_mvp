@@ -53,8 +53,8 @@ knowingly over the 85% discipline, the operator's explicit call)
 | CR triage into the backlog | 1 | 1.5h | ~13:05 | not marked | combined ~40m, see note | 19 | Done |
 | Sprint board + this file | 1 | 0.75h | ~13:05 | not marked | combined ~40m, see note | 19 | Done |
 | D39 — direction reversed | 1 | 1.5h | ~13:05 | 13:45 | combined ~40m, see note | 19 | Done |
-| D40a — 3 CR HIGH prerequisites (ack surfacing, thread cancellation, `None`-guard) | | ~0.75h | | | | 20 | To Do |
-| D40b — investigation, operator holding the rig | | 1.25h | | | | 20 | To Do |
+| D40a — 3 CR HIGH prerequisites (ack surfacing, thread cancellation, `None`-guard) | | ~0.75h | 14:47 | 15:44 | 57m | 20 | Done |
+| D40b — investigation, operator holding the rig | | 1.25h | 15:44 | 17:19 | 1h35m | 20 | Done |
 | D40c — convergence retry, config, events, UI state, tests | | ~2h | | | | 21 | To Do |
 | D40d — tuning against hand-held load | | 1.0h | | | | 21 | To Do |
 | D40 total | 5 | ~5h | | | | 20–21 | To Do |

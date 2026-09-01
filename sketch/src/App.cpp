@@ -46,7 +46,8 @@ void App::Begin() {
 
   g_servo_ready = g_controller.Begin(
       config::kMultiTurnEnabled, config::kAngleResolution,
-      config::kDeadbandCounts, config::kTorqueLimit);
+      config::kDeadbandCounts, config::kTorqueLimit,
+      config::kMinStartForce);
 
   Serial.println();
   Serial.println(F("Servo Control - MCU side"));

@@ -14,14 +14,17 @@ class ServoController {
   /// @param bus Bus wrapper for the servo.
   explicit ServoController(ServoBus& bus);
 
-  /// Applies startup configuration: travel range, dead zone, and torque limit.
+  /// Applies startup configuration: travel range, dead zone, torque limit,
+  /// and minimum start force.
   /// @param multi_turn Enable multi-turn absolute positioning.
   /// @param angle_resolution Amplification 1..3 (multi-turn only).
   /// @param deadband_counts Dead-zone width, 0..32.
   /// @param torque_limit Torque ceiling, 0..1000.
+  /// @param min_start_force Minimum PWM force before a move begins, 0..1000.
   /// @return True when the servo answered and every step succeeded.
   bool Begin(bool multi_turn, uint8_t angle_resolution,
-             uint8_t deadband_counts, uint16_t torque_limit);
+             uint8_t deadband_counts, uint16_t torque_limit,
+             uint16_t min_start_force);
 
   /// Reads one coherent snapshot in a single bus round trip.
   /// @return The snapshot; valid is false when the bus did not answer.
@@ -44,6 +47,11 @@ class ServoController {
   /// @param counts Dead-zone width, clamped to 0..32.
   /// @return True on success.
   bool SetDeadband(uint8_t counts);
+
+  /// Writes the minimum start force register.
+  /// @param force Minimum PWM force before a move begins, 0..1000.
+  /// @return True on success.
+  bool SetMinStartForce(uint16_t force);
 
   /// Selects single-turn or multi-turn absolute positioning.
   /// @param multi_turn Enable multi-turn absolute positioning.

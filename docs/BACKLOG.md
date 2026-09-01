@@ -32,11 +32,14 @@ sessions actually spent, not the ones originally planned.
 | **20–21** | Planned. **D40** — the operator's top-priority defect (a move settling short under load, uncorrected by re-commanding): prerequisites, investigation with the operator holding the rig as a temporary fixed point, convergence mechanism, tuning. | yes |
 | **22** | Planned. **R11** (snap-to-nearest), rig protocols 1/2/3/5 under hand-held load — closing what that load genuinely proves for **T17/R2/D35**; current/torque/thermal criteria stay open for the real rig. | yes |
 
-**Carried to the sprint starting Sun 6 Sept** (not dropped, not this
-sprint's Friday — there isn't one): **R12** (extended travel, needs R11
-landed first) and **D41** (firmware safety, must land before the real loaded
-rig day regardless of sprint). **T20** runs via Antigravity, not
-session-bound. See `docs/SPRINTS.md` for the capacity math behind this split.
+**R11 pulled into committed scope 1 Sept**, alongside T20 and the rig
+protocols — real capacity slack opened up once D39 and D40 were retuned
+against the operator's own actuals. **R12 and D41 moved from carry-over to
+stretch the same day** — attempted this sprint if committed scope finishes
+with room, R12 only once R11 is actually done (the ordering constraint is
+unchanged, only the tier moved). Neither is dropped either way: what doesn't
+land this sprint carries to Sun 6 Sept exactly as before. **T20** runs via
+Antigravity, not session-bound. See `docs/SPRINTS.md` for the capacity math.
 
 **Still deferred from the original session-15 triage** — narrower now that
 Session 19 pulled out everything the rig findings needed: **T10**, **T11**
@@ -104,8 +107,8 @@ detail entries above (filed and ranked, not started).
 | R4 | Post-MVP: mechanical restraint servos, unified under Lock | post-MVP |
 | R7 | Handover logistics depend on adapter delivery | delivery-shaping constraint |
 | R8 | Emergency stop | post-MVP · can wait |
-| R11 | Accept any typed angle; snap to nearest, show the delta | open · **sprint stretch, Session 22** |
-| R12 | Extended travel: soft limit ±90°, hard limit ±95°, confirmed between | open · **carry-over to sprint starting 6 Sept** · needs ADR-0012 |
+| R11 | Accept any typed angle; snap to nearest, show the delta | open · **sprint committed, Session 22** |
+| R12 | Extended travel: soft limit ±90°, hard limit ±95°, confirmed between | open · **sprint stretch, after R11 lands** · needs ADR-0012 |
 
 ---
 

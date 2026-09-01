@@ -28,18 +28,20 @@ sessions actually spent, not the ones originally planned.
 | **16** | **DONE, 30 Aug 2026.** **R9 closed** (speed → global, off the operator UI). **R10 closed** (calibration collapses into `app_state`; zeros replaced by full-CRUD saved positions, scope grown mid-session past the original design note). Opportunistic bonus: T6's exception hierarchy restructured (half-done, metadata population left). One new defect filed, D38 (dismissing a stale saved-position's advisory tag). D7's 768px collapse corroborated, not fixed. | no |
 | **17** | **DONE, 30 Aug 2026.** Soak tooling modernized and executed across 5 structured runs (Run 0–4; >70m soak time, >20k samples). R1 software capacity target verified (3 remote + 1 local USB-C). Q9 proven true. D4 11s stall regression verified absent (0 stalls). T9 storage budget measured empirically and closed. Mechanical rig protocol documented in `docs/RIG_TESTING_PROTOCOL.md` ahead of T17. | yes |
 | **18** | **DONE, 30 Aug 2026.** Board DB and logs wiped to a clean state following Session 17 soak suite. Preflight probe confirmed pristine hardware boot, 0 telemetry rows, fresh 32KB schema, unverified datum ready for Rig Day calibration. Closes the experimental development phase. | yes |
+| **19** | **DONE, 1 Sept 2026 (sprint continuation, not a new sprint — began Sun 30 Aug).** Rig assembled 31 Aug produced four hands-on findings; Session 14's `/twin-review` (`docs/REVIEW_FINDINGS.md`) triaged into the backlog for the first time — **D39–D46, T20, T21, R11, R12** filed, four of its HIGHs absorbed directly into the rig findings rather than filed separately. `REVIEW_FINDINGS.md` retired (content preserved in the entries above and in git history). Sprint plan and capacity written to `docs/SPRINTS.md`. **D39** (direction reversed) fixed and board-confirmed. Full sprint plan: `/home/egrisaru/.claude/plans/snuggly-growing-gosling.md`. | yes |
+| **20–21** | Planned. **D40** — the operator's top-priority defect (a move settling short under load, uncorrected by re-commanding): prerequisites, investigation with the operator holding the rig as a temporary fixed point, convergence mechanism, tuning. | yes |
+| **22** | Planned. **R11** (snap-to-nearest), rig protocols 1/2/3/5 under hand-held load — closing what that load genuinely proves for **T17/R2/D35**; current/torque/thermal criteria stay open for the real rig. | yes |
 
-**After session 18, a separate day — mechanical rig assembly and R2's
-hand-turn test (T17), operator/mechanical-team-led, Claude involvement
-light.** Not one of the numbered sessions above; T17's own entry
-(`docs/backlog/T.md`) and protocol (`docs/RIG_TESTING_PROTOCOL.md`) track it.
+**Carried to the sprint starting Sun 6 Sept** (not dropped, not this
+sprint's Friday — there isn't one): **R12** (extended travel, needs R11
+landed first) and **D41** (firmware safety, must land before the real loaded
+rig day regardless of sprint). **T20** runs via Antigravity, not
+session-bound. See `docs/SPRINTS.md` for the capacity math behind this split.
 
-**Deferred to the triage after session 18 (joint, and separately with the
-team lead) — explicitly held, not dropped:** the rest of
-`docs/REVIEW_FINDINGS.md` (originally session 15's full job — only D37 was
-triaged out of it), **T10**, **T11** (originally sessions 16/17's
-job), **T18**, T2, R7. The originally-planned "dry run before the
-demo" (old session 19) is moot — the demo already happened.
+**Still deferred from the original session-15 triage** — narrower now that
+Session 19 pulled out everything the rig findings needed: **T10**, **T11**
+(originally sessions 16/17's job), **T18**, T2, R7, and the D42–D46/T21
+detail entries above (filed and ranked, not started).
 
 ---
 
@@ -69,6 +71,13 @@ demo" (old session 19) is moot — the demo already happened.
 | D35 | Commanded vs. actual servo speed disagree ~1.5–2x | open · medium · not yet investigated |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
 | D38 | A saved position's "earlier reference" tag has no way to dismiss it | open · low · R10 |
+| D40 | A move settles short under load; re-commanding does not correct it | open · high · **sprint, Sessions 20–21** |
+| D41 | Firmware commands real moves off failed reads and malformed payloads | open · high · before real loaded rig day |
+| D42 | Errors that vanish: SSE stream, migration, sqlite writes | open · medium |
+| D43 | Guards that fail open on an invalid read | open · medium |
+| D44 | Operator-facing UI gaps found by the whole-app review | open · medium |
+| D45 | Relay and firmware robustness gaps found by the whole-app review | open · medium |
+| D46 | Backend robustness gaps found by the whole-app review | open · medium (ack-surfacing tracked via D40) |
 
 **Tasks** (full entries: `docs/backlog/T.md`)
 
@@ -82,8 +91,10 @@ demo" (old session 19) is moot — the demo already happened.
 | T10 | Write the recovery runbook, in two halves | open · high |
 | T11 | Write the operations manual | open · high |
 | T13 | Distil the remaining documents | open · opportunistic |
-| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · protocol ready in RIG_TESTING_PROTOCOL.md · scheduled after DB/log cleanup |
+| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · rig assembled 31 Aug · closing what hand-held load proves, Session 22 |
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
+| T20 | Doc-truth sweep from the whole-app review (~25 verified fixes) | open · low · **sprint, Antigravity** |
+| T21 | Constants and dead code with no shared source | open · low |
 
 **R-items** (full entries: `docs/backlog/R.md`)
 
@@ -93,6 +104,8 @@ demo" (old session 19) is moot — the demo already happened.
 | R4 | Post-MVP: mechanical restraint servos, unified under Lock | post-MVP |
 | R7 | Handover logistics depend on adapter delivery | delivery-shaping constraint |
 | R8 | Emergency stop | post-MVP · can wait |
+| R11 | Accept any typed angle; snap to nearest, show the delta | open · **sprint stretch, Session 22** |
+| R12 | Extended travel: soft limit ±90°, hard limit ±95°, confirmed between | open · **carry-over to sprint starting 6 Sept** · needs ADR-0012 |
 
 ---
 
@@ -100,6 +113,7 @@ demo" (old session 19) is moot — the demo already happened.
 
 | | | closed |
 |---|---|---|
+| **D39** | A positive angle turned the mechanism the wrong way | 1 September 2026 · `SERVO_DIRECTION` flipped, board-confirmed both directions; exposed and fixed an 8-test `.env` coupling |
 | **D1** | A move to a negative angle stops at 0 | 7 August 2026 · **Confirmed on hardware, both halves** |
 | **D2** | `capture()` can store a failed read as position 0 | 7 August 2026 · commit `c903182` |
 | **D9** | The display and the motion path used two different baselines | 7 August 2026 · commit `c903182` · **found on hardware** |

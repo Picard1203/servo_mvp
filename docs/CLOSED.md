@@ -12,6 +12,61 @@ file every session has to read.
 
 ---
 
+### D39 — A positive angle turned the mechanism the wrong way
+**Status:** done · 1 September 2026 · rig hand-testing
+
+Commanding a more-positive `output_deg` turned the mechanism left, not
+right. **Confirmed live before the fix, twice after:** before, a move
+4.67°→9.66° raised `output_deg`/`servo_deg` and the operator confirmed the
+shaft turned left. The operator's initial suspicion — a reversed register in
+the driver — was **ruled out**: no register is involved. Direction is
+applied only in Python, `ServoStateStore.counts_from_output_deg()`/
+`._to_output_deg()` (`servo_state.py:212-224,341-353`), from
+`servo_direction` (`.env`, was `1`). The firmware's own direction-aware
+converter (`AngleMath.h`'s `AngleConverter`) is dead code — never wired into
+`App.cpp`/`BridgeApi.cpp`, referenced only by `test_pure_logic.cpp` (T21
+decides its fate).
+
+**Fixed:** `SERVO_DIRECTION` → `-1` in `python/.env` and `.env.board`, one
+line each, no register/firmware change. **Board-confirmed after, twice at
+increasing move sizes, both directions:** +5° and +15° both turned right,
+-14.6° turned left, operator confirming each live.
+
+**No frontend fix needed — checked, not assumed.** The Session 14
+`/twin-review` had flagged `renderZeros()` (`app.js:678`) for ignoring
+`servo_direction`, a literal D9 recurrence. That function no longer exists:
+R10's saved-positions rebuild (30 Aug) replaced it with `renderPositions()`,
+which displays `output_deg` straight from the server, already
+direction-correct. Confirmed by grep: no `servo_direction`/counts math
+remains anywhere in `app.js`. **Existing saved positions are unaffected
+physically** — `SavedPositionService.go()` moves by stored `raw_counts`, not
+recomputed degrees — their displayed labels correctly flip sign.
+
+**A real defect found applying the fix, not anticipated by the plan.** The
+Python test suite reads `python/.env` live via the shared `backend` fixture
+(only `USE_HARDWARE_SERVO` and a few motion-timing values are forced by
+`conftest.py`; `SERVO_DIRECTION` was not). Flipping the board's live default
+broke 8 tests that hardcoded a sign or a specific half of the travel window
+as "the reachable one" — an assumption only true under the old `+1`. Fixed
+by making each direction-agnostic (compute which half is actually
+unreachable rather than assume, or assert magnitude/convergence instead of a
+signed comparison) rather than by hardcoding the new sign, so a future
+direction change won't repeat this. One of the eight was `TestDirection`
+itself: `test_reversed_direction_inverts_counts` compared an explicit
+reversed store against the *ambient* default store, silently assuming the
+ambient default was `+1` — both `TestDirection` tests now construct explicit
+forward/reversed stores instead of depending on live `.env`.
+
+**Verified:** `tools/verify.py` clean at the unchanged baseline
+(313/99.64%/194/105/ok) after the fix — no test count change, since this
+repaired existing coverage rather than adding new. Board-verified live, not
+just in the suite.
+
+**Related:** D9 (the mechanism this recurred), T21 (the dead firmware
+converter's fate), `docs/REVIEW_FINDINGS.md` frontend finding 1 (stale).
+
+---
+
 ### D37 — `NetworkRelay.cpp` had a stray unmatched closing brace, build-breaking
 **Status:** done · 30 August 2026 · found by Session 14's `/twin-review`,
 hit live blocking the client demo

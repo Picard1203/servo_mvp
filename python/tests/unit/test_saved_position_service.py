@@ -36,12 +36,17 @@ class TestCreate:
             service.create("a", "", 20.0)
 
     def test_create_refuses_unreachable_angle(self, service, backend):
-        from app.deps import get_calibration_service
+        from app.deps import get_calibration_service, get_state_store
         # A fresh simulator sits at the bottom of the mechanism's travel,
-        # so calibrating here strands the entire negative half.
+        # so calibrating here strands one whole half - which one depends
+        # on servo_direction, so pick by what's actually unreachable.
         get_calibration_service().calibrate()
+        low, high = get_state_store().reachable_output_range_deg()
+        unreachable = (backend.settings.output_min_deg
+                       if low > backend.settings.output_min_deg
+                       else backend.settings.output_max_deg)
         with pytest.raises(PositionOutOfRangeError):
-            service.create("too far", "", backend.settings.output_min_deg)
+            service.create("too far", "", unreachable)
 
 
 class TestUpdate:

@@ -6,6 +6,99 @@ you're picking up.
 
 ---
 
+### R11 — Accept any typed angle; snap to the nearest step and show the delta
+**Status:** open · **Raised by:** the client, via the operator, rig hand-testing
+1 September 2026
+
+Typing `85` is refused today because it is not an exact multiple of
+`output_step_deg` (0.06°) — the operator is asked to do arithmetic the
+machine should do. New design: accept any typed angle, snap to the nearest
+reachable step under the hood, and show both the requested angle and the
+snapped target with the delta between them in the UI.
+
+**Not a revert of D32 — stated here so it isn't re-litigated.** D32 (closed
+24 August 2026) killed *silent* rewriting: typing `0.08` became `0.06` with
+nothing on screen, and its fix was explicit refusal instead. This is
+*transparent* snapping — the delta is always shown. Same code path, a
+different decision, made with the client in the room this time.
+
+**Design:** snapping happens in one place, the backend
+(`MotionService._validate_step`, `motion_service.py:259-273`, becomes a snap
+instead of a raise), and the response carries the requested angle, the
+snapped angle and the delta. The frontend stops holding its own copy of the
+step constant and displays what it is told — removing, not synchronizing,
+the twin: `nudge()`'s hardcoded `ANGLE_STEP=0.06` (`app.js:21,2151`, the same
+constant family that caused D21 once already — confirmed still live by
+grep, 1 Sept). Session 14's `/twin-review` also flagged `COUNTS_PER_OUTPUT_DEG`
+(`app.js:14`) as a second hardcoded-geometry copy — **checked 1 Sept, no
+longer exists**; R10's saved-positions rebuild removed all client-side
+counts/degree math, so that half of the finding is stale and only
+`ANGLE_STEP` is real work here.
+
+**Ordering constraint: must land before R12.** Snapping changes what a valid
+target *is* — a snapped value can cross R12's soft-limit confirmation
+threshold, so R12 has to be built knowing this behavior exists, not the other
+way round.
+
+**Acceptance:** any typed angle is accepted (within the travel window); the
+UI shows the requested angle, the snapped target, and the delta; the client
+holds no copy of the step size.
+
+**Related:** D21, D32 (the decision this refines, not reverts).
+
+---
+
+### R12 — Extended travel: soft limit ±90°, hard limit ±95°, confirmed in between
+**Status:** open · **Raised by:** the operator, rig hand-testing 1 September
+2026 · decided with the operator: hard limit is **95°**, not 93°
+
+For a special occasion the operator has no way past the current ±90° window,
+and no way to be deliberate about going past it. New three-state model:
+
+- **Soft limit ±90.0°** — normal operating window. Behaves exactly as today,
+  no prompt.
+- **Between soft and hard** — accepted only after an explicit on-screen
+  confirmation, reusing the existing `confirmDlg` modal (`index.html`,
+  already used for calibrate and remove; `app.js:219-243`).
+- **Hard limit ±95.0°** — absolute. Never confirmable, refused the way
+  out-of-travel is refused today.
+
+"Soft limit" and "hard limit" go into `CONTEXT.md`'s glossary and both values
+into config, so the terms mean one thing each across code, UI copy and docs.
+
+**Contradicts ADR-0003 — surfaced, not silently overridden.** ADR-0003 says
+widening the window is "two numbers in `.env`, not a code change" — that
+covers *one* window. This is a layered limit, and ADR-0003's "targets
+outside the window are refused, never clamped" needs a third state.
+**ADR-0012** records the soft/hard model and amends ADR-0003 by reference,
+rather than editing it in place.
+
+**R11 must land first** — see its ordering constraint above.
+
+**Twin-path.** The travel limit is asserted in four places: `MoveRequest`'s
+Pydantic bounds, frozen at import time rather than reading live settings
+(`schemas/servo.py:10` vs. `get_settings()` — Session 14 `/twin-review`,
+verified by clearing the cache and getting a value the schema would accept
+but the service would reject); `MotionService._validate_reachable`; the
+client's hardcoded `ANGLE_MIN`/`ANGLE_MAX` (`app.js:749-753`, same review,
+diverges from the live `output_min_deg`/`output_max_deg` this file already
+reads elsewhere for the position bar); and firmware's
+`IsCountReachable`/`configure_range`. Three of the four do not yet know about
+a middle state. **The firmware limit stays a hard backstop and is not
+widened** — the soft/hard band is a policy layer above it, not a change to
+what the hardware will accept.
+
+**Acceptance:** 89.9° moves silently; 92° prompts for confirmation; 96° is
+refused; declining the prompt issues no move; a value snapped by R11 into the
+confirmation band still prompts.
+
+**Assumed until the real loaded rig:** that ±95° is mechanically safe under
+load — this work proves the software gate, not the mechanism's tolerance.
+
+**Related:** ADR-0003, ADR-0012 (new), R11 (ordering).
+
+---
+
 ### R1 — Determine the real concurrent-operator ceiling
 Target: roughly three remote operators plus one local USB-C session, all
 connected at once without failure. This requirement appears in no other document.

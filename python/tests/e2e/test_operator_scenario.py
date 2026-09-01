@@ -24,26 +24,28 @@ class TestOperatorSession:
                 "/api/v1/servo/state").json()["position_verified"] is True
 
             # 3. commanded move is observable while in flight, then lands
+            # (negative: calibrating at the fresh simulator's physical
+            # reference strands the positive half - see TestTravelLimits)
             response = http.post("/api/v1/servo/move",
-                                 json={"target_deg": 24.0})
+                                 json={"target_deg": -24.0})
             assert response.status_code == 202
             assert wait_until(lambda: http.get(
                 "/api/v1/servo/state").json()["moving"], timeout=2)
             assert wait_until(lambda: (
                 lambda s: not s["moving"]
-                and abs(s["output_deg"] - 24.0) < 0.8)(
+                and abs(s["output_deg"] + 24.0) < 0.8)(
                     http.get("/api/v1/servo/state").json()), timeout=8)
 
             # 4. lock gates movement; unlock triggers settle-wait
             http.post("/api/v1/servo/lock", json={"locked": True})
             refused = http.post("/api/v1/servo/move",
-                                json={"target_deg": 30.0})
+                                json={"target_deg": -30.0})
             assert refused.status_code == 409
             assert refused.json()["reason"] == "locked"
             http.post("/api/v1/servo/lock", json={"locked": False})
             started = time.monotonic()
             accepted = http.post("/api/v1/servo/move",
-                                 json={"target_deg": 30.0})
+                                 json={"target_deg": -30.0})
             assert accepted.status_code == 202
             assert time.monotonic() - started >= \
                 backend.settings.settling_seconds * 0.7
@@ -53,18 +55,18 @@ class TestOperatorSession:
                 "/api/v1/servo/state").json()["moving"], timeout=8)
             position = http.post(
                 "/api/v1/positions",
-                json={"name": "work point", "target_deg": 6.0}).json()
-            assert abs(position["output_deg"] - 6.0) < 0.01
+                json={"name": "work point", "target_deg": -6.0}).json()
+            assert abs(position["output_deg"] + 6.0) < 0.01
             assert http.post(
                 "/api/v1/positions",
-                json={"name": "work point", "target_deg": 10.0}
+                json={"name": "work point", "target_deg": -10.0}
             ).status_code == 409
             assert http.post(
                 f"/api/v1/positions/{position['id']}/go"
             ).json()["accepted"] is True
             assert wait_until(lambda: (
                 lambda s: not s["moving"]
-                and abs(s["output_deg"] - 6.0) < 0.8)(
+                and abs(s["output_deg"] + 6.0) < 0.8)(
                     http.get("/api/v1/servo/state").json()), timeout=8)
 
             # 6. overload -> visible -> recovered

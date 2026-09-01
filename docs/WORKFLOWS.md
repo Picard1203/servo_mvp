@@ -81,7 +81,7 @@ Arduino framework plus relays, sensors and displays.
 
 **What this means for us:** the highest-value move is not installing a generic
 servo skill — it is writing a project-specific one from the knowledge already in
-`PROJECT_STATE.md`, `AUDIT.md` and `RELAY_NOTES.md`. The bench-verified numbers,
+`PROJECT_STATE.md`, `docs/history/AUDIT.md` and `RELAY_NOTES.md`. The bench-verified numbers,
 the six fixed bugs and the five relay rules are exactly the "human-expert"
 content the benchmark found decisive. See W7 below.
 
@@ -120,7 +120,7 @@ produces a plan you throw away.
    alone fixes today's call site; deleting the lying method fixes every call site
    that will ever exist.
 3. **Then `defense-in-depth`** — sweep for other guards applied to one path and
-   not its twin. That pattern is what produced this bug and the six in `AUDIT.md`.
+   not its twin. That pattern is what produced this bug and the six in `docs/history/AUDIT.md`.
 4. Re-check D1 against a mid-travel datum.
 
 Order matters: D1 is D2's symptom, and ADR-0007 means the travel window is the
@@ -146,7 +146,7 @@ debug what you cannot see.
 ### W4 — T1, T6, T7: the mechanical pass
 **Skill:** `writing-plans` here, execute in Antigravity.
 
-- **T1** — apply `CONVENTIONS.md`. Measured gap: 67 `Args:` lines missing
+- **T1** — apply `docs/CONVENTIONS.md`. Measured gap: 67 `Args:` lines missing
   `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list comprehensions,
   2 `break`.
 - **T6** — three-tier exception hierarchy with dotted error codes and metadata.
@@ -226,7 +226,7 @@ Antigravity).
 skill (stress-tests a plan or decision by questioning it relentlessly), used
 once so far: **R2's session opens with it**, on R2's own open design questions
 (operator-visible state when isolated, refuse-vs-queue a move, the new
-`ServoStateResponse` field — see `CLOSED.md`'s R2 entry), per the operator's
+`ServoStateResponse` field — see `docs/history/CLOSED.md`'s R2 entry), per the operator's
 explicit request that R2 be grounded in the docs rather than a prior session's
 paraphrase.
 
@@ -236,7 +236,7 @@ frameworks surveyed was adopted.
 
 **Why written rather than installed.** BMAD-METHOD (51.6k★), Spec-Kit (80k★) and
 metaswarm were all evaluated. Each installs its own document skeleton, which
-would duplicate `BACKLOG.md`, the ADRs and `CONVENTIONS.md` — a direct violation
+would duplicate `BACKLOG.md`, the ADRs and `docs/CONVENTIONS.md` — a direct violation
 of *one fact lives in exactly one file*. metaswarm's blocking quality gate is a
 coverage threshold, and this repository is the standing counter-example to
 coverage as a gate. The same reasoning as W7, and the same evidence:

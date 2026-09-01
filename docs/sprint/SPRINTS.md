@@ -154,7 +154,7 @@ R12 — Soft limit ±90°, hard limit ±95°                             [3]
   - ADR-0012: soft/hard model, amends ADR-0003
   - Backend: live Pydantic bounds, three-state _validate_reachable
   - Frontend: confirm modal reuse, remove hardcoded ANGLE_MIN/MAX
-  - CONTEXT.md: soft limit / hard limit glossary entries
+  - docs/CONTEXT.md: soft limit / hard limit glossary entries
 
 D41 — Firmware commands real moves off failed reads                [2]
   - ReadRawCounts failure signal, guard the 3 callers that use it as "hold"

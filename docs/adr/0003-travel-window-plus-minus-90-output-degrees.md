@@ -17,7 +17,7 @@ being used.
   way, so the multi-turn path does not bit-rot.
 - The datum must sit **mid-travel** (~2048). A datum at count 0 strands the
   entire negative half — the servo clamps at 0 silently while still reporting
-  success. This is the root of backlog D1 and the subject of `AUDIT.md`.
+  success. This is the root of backlog D1 and the subject of `docs/history/AUDIT.md`.
 - Targets outside the window are **refused** as `out_of_travel`, never clamped.
 - No modulus-360 wrapping anywhere: in a multi-turn system −25° and 335° are
   different absolute targets a full output revolution apart, and wrapping would

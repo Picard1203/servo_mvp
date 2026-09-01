@@ -174,13 +174,13 @@ date is a preference; with one it is a plan.
 problem). The explanatory paragraph in between, and every inline comment,
 go — **not deleted outright: relocated with judgment, and only where the
 content is not already written down.** Each is checked against `docs/` (ADR,
-`AUDIT.md`, `CLOSED.md`, or `skills/uno-q-st3215/SKILL.md`) first; genuinely
+`docs/history/AUDIT.md`, `docs/history/CLOSED.md`, or `skills/uno-q-st3215/SKILL.md`) first; genuinely
 missing rationale is added there, distilled — content already covered is
 simply deleted, not duplicated. This is not a naive copy-paste pass; see
 T15's scope for how the Antigravity prompt states it. A docstring that
 cannot fit one honest summary line is a signal worth reporting, weighed
 under single-responsibility — not a rule that forces a split on its own.
 
-`CONVENTIONS.md`'s Docstrings section and C++ section are rewritten to this
+`docs/CONVENTIONS.md`'s Docstrings section and C++ section are rewritten to this
 rule (26 August 2026). T15 unblocked; see its entry for the two-session
 Antigravity split.

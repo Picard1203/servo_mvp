@@ -9,16 +9,16 @@ read in full every session. Full entries moved whole into
 picking up.
 
 Two other files hold the past tense and must not be merged into this one:
-`docs/CLOSED.md` (items that entered this backlog and left it, including the
+`docs/history/CLOSED.md` (items that entered this backlog and left it, including the
 full session-by-session record of the MVP build, sessions 1–10) and
-`docs/AUDIT.md` (defects found before the backlog existed, frozen).
+`docs/history/AUDIT.md` (defects found before the backlog existed, frozen).
 
 ---
 
 # START HERE — the session plan
 
 **Path-to-first-demo milestone (sessions 11–14) closed 26 August 2026** — full
-record in `docs/CLOSED.md`. **"Session" means a Claude Code chat session**
+record in `docs/history/CLOSED.md`. **"Session" means a Claude Code chat session**
 (context-reset unit), not a calendar day — the numbering below reflects
 sessions actually spent, not the ones originally planned.
 
@@ -26,9 +26,9 @@ sessions actually spent, not the ones originally planned.
 |---|---|---|
 | **15** | **DONE, 27–30 Aug 2026.** The demo moved up unexpectedly, ahead of the originally-planned 15–19 sequence — ran anyway. Presenter walkthrough produced live (was 18's job). Hit and fixed a live-blocking bug (**D37**, now closed — part of 15's original triage job; the rest of that triage did not happen, see deferred list below). Client feedback gathered, decided into **R9**/**R10** with the team lead. Backlog reorganized and closed out — **D12**, **D19** also closed (superseded by R10's decision, not deferred). Full account: `docs/PROJECT_STATE.md`. | no |
 | **16** | **DONE, 30 Aug 2026.** **R9 closed** (speed → global, off the operator UI). **R10 closed** (calibration collapses into `app_state`; zeros replaced by full-CRUD saved positions, scope grown mid-session past the original design note). Opportunistic bonus: T6's exception hierarchy restructured (half-done, metadata population left). One new defect filed, D38 (dismissing a stale saved-position's advisory tag). D7's 768px collapse corroborated, not fixed. | no |
-| **17** | **DONE, 30 Aug 2026.** Soak tooling modernized and executed across 5 structured runs (Run 0–4; >70m soak time, >20k samples). R1 software capacity target verified (3 remote + 1 local USB-C). Q9 proven true. D4 11s stall regression verified absent (0 stalls). T9 storage budget measured empirically and closed. Mechanical rig protocol documented in `docs/RIG_TESTING_PROTOCOL.md` ahead of T17. | yes |
+| **17** | **DONE, 30 Aug 2026.** Soak tooling modernized and executed across 5 structured runs (Run 0–4; >70m soak time, >20k samples). R1 software capacity target verified (3 remote + 1 local USB-C). Q9 proven true. D4 11s stall regression verified absent (0 stalls). T9 storage budget measured empirically and closed. Mechanical rig protocol documented in `docs/sprint/RIG_TESTING_PROTOCOL.md` ahead of T17. | yes |
 | **18** | **DONE, 30 Aug 2026.** Board DB and logs wiped to a clean state following Session 17 soak suite. Preflight probe confirmed pristine hardware boot, 0 telemetry rows, fresh 32KB schema, unverified datum ready for Rig Day calibration. Closes the experimental development phase. | yes |
-| **19** | **DONE, 1 Sept 2026 (sprint continuation, not a new sprint — began Sun 30 Aug).** Rig assembled 31 Aug produced four hands-on findings; Session 14's `/twin-review` (`docs/REVIEW_FINDINGS.md`) triaged into the backlog for the first time — **D39–D46, T20, T21, R11, R12** filed, four of its HIGHs absorbed directly into the rig findings rather than filed separately. `REVIEW_FINDINGS.md` retired (content preserved in the entries above and in git history). Sprint plan and capacity written to `docs/SPRINTS.md`. **D39** (direction reversed) fixed and board-confirmed. Full sprint plan: `/home/egrisaru/.claude/plans/snuggly-growing-gosling.md`. | yes |
+| **19** | **DONE, 1 Sept 2026 (sprint continuation, not a new sprint — began Sun 30 Aug).** Rig assembled 31 Aug produced four hands-on findings; Session 14's `/twin-review` (`docs/REVIEW_FINDINGS.md`) triaged into the backlog for the first time — **D39–D46, T20, T21, R11, R12** filed, four of its HIGHs absorbed directly into the rig findings rather than filed separately. `REVIEW_FINDINGS.md` retired (content preserved in the entries above and in git history). Sprint plan and capacity written to `docs/sprint/SPRINTS.md`. **D39** (direction reversed) fixed and board-confirmed. Full sprint plan: `/home/egrisaru/.claude/plans/snuggly-growing-gosling.md`. | yes |
 | **20–21** | Planned. **D40** — the operator's top-priority defect (a move settling short under load, uncorrected by re-commanding): prerequisites, investigation with the operator holding the rig as a temporary fixed point, convergence mechanism, tuning. | yes |
 | **22** | Planned. **R11** (snap-to-nearest), rig protocols 1/2/3/5 under hand-held load — closing what that load genuinely proves for **T17/R2/D35**; current/torque/thermal criteria stay open for the real rig. | yes |
 
@@ -39,7 +39,7 @@ stretch the same day** — attempted this sprint if committed scope finishes
 with room, R12 only once R11 is actually done (the ordering constraint is
 unchanged, only the tier moved). Neither is dropped either way: what doesn't
 land this sprint carries to Sun 6 Sept exactly as before. **T20** runs via
-Antigravity, not session-bound. See `docs/SPRINTS.md` for the capacity math.
+Antigravity, not session-bound. See `docs/sprint/SPRINTS.md` for the capacity math.
 
 **Still deferred from the original session-15 triage** — narrower now that
 Session 19 pulled out everything the rig findings needed: **T10**, **T11**
@@ -112,7 +112,7 @@ detail entries above (filed and ranked, not started).
 
 ---
 
-## Closed — the record is in `docs/CLOSED.md`
+## Closed — the record is in `docs/history/CLOSED.md`
 
 | | | closed |
 |---|---|---|
@@ -131,12 +131,12 @@ detail entries above (filed and ranked, not started).
 | **D3** | The C++ side has no logging | 8 August 2026 · Batch 2 |
 | **D27** | `synthetic_operator.py` does not reproduce `app.js`'s concurrent poll timers | 8 August 2026 · Batch 2 |
 | **D13** | Requests arriving faster than slots free up are refused | 8 August 2026 · ADR-0009 |
-| **D4** | Connection drops after a few commands; requires a page refresh | 11 August 2026 · Session 3 (SSE) — full two-session soak saga kept whole in `CLOSED.md` |
+| **D4** | Connection drops after a few commands; requires a page refresh | 11 August 2026 · Session 3 (SSE) — full two-session soak saga kept whole in `docs/history/CLOSED.md` |
 | **D17** | Position bar can't show the negative half of travel | 23 August 2026 · Session 5 · dynamic range scaling in app.js |
 | **D18** | A failed CSV export navigates the operator out of the application | 11 August 2026 |
 | **D22** | The only export control is fixed at 24 hours | 11 August 2026 · R5's delivery path |
-| **D31** | Telemetry export drops instantly with "controller busy" | 23 August 2026 · real cause was a client-side `ReferenceError`, not the Pydantic hypothesis — see `CLOSED.md` |
-| **D10** | `logger.exception` swallows the exception; recurred as an unexplained sampler crash | 24 August 2026 · Session 6 · real cause was every read on the shared SQLite connection running unlocked, not a zero-table race — see `CLOSED.md` |
+| **D31** | Telemetry export drops instantly with "controller busy" | 23 August 2026 · real cause was a client-side `ReferenceError`, not the Pydantic hypothesis — see `docs/history/CLOSED.md` |
+| **D10** | `logger.exception` swallows the exception; recurred as an unexplained sampler crash | 24 August 2026 · Session 6 · real cause was every read on the shared SQLite connection running unlocked, not a zero-table race — see `docs/history/CLOSED.md` |
 | **D32** | Speed field snaps to the angle's step grid, not its own; typed angle silently rewritten before send | 24 August 2026 · Session 7 (T14) · speed-step enforcement split into D35 rather than shipped unverified |
 | **D33** | Recent Activity timestamps display in UTC, not local time | 24 August 2026 · Session 7 (T14) |
 | **D34** | Angle displays truncate to 1 decimal, losing the 0.06° step | 24 August 2026 · Session 7 (T14) · widened from the move log to every angle readout |
@@ -150,7 +150,7 @@ detail entries above (filed and ranked, not started).
 | **D25** | An overload alarm disappeared once the reading went unknown | 25 August 2026 · Session 8 |
 | **D26** | Suite failed once in ten runs — cause found (sampler thread leak), closed on evidence not proof; reopen fresh if it recurs | 25 August 2026 · Session 8 |
 | **R2** | Motor isolation — board verification found the isolate/un-isolate write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level; UI/refusal gaps closed alongside | 26 August 2026 · hand-turn scenario left open, see T17 |
-| **T1** | `CONVENTIONS.md` gap in `python/app/` (types, control-flow style) closed via T15a | 26 August 2026 · Antigravity, hand-verified against the diff |
+| **T1** | `docs/CONVENTIONS.md` gap in `python/app/` (types, control-flow style) closed via T15a | 26 August 2026 · Antigravity, hand-verified against the diff |
 | **T15** | Code-level documentation strip, both halves (T15a Python, T15b firmware) — Antigravity, hand-verified against the diff both times | 26 August 2026 · T15a needed real correction, T15b held up well |
 | **T16** | `twin-review` restructured for a whole-app pass: fifth lens, scope modes, tool-narrowed dispatch, `REVIEW_FINDINGS.md` output | 26 August 2026 · running it (session 14) still open |
 | **T19** | `ruff` added as an advisory Python lint pass (`python/ruff.toml`), wired into `twin-review`'s backend-chunk lenses | 26 August 2026 · not part of `verify.py`'s gate; baseline 50 findings |

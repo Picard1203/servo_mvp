@@ -7,7 +7,7 @@ diff review that found real content silently deleted despite this file's
 existing Part C:
 - `python/static/*.js` is **removed from scope**. The first run stripped it
   too; every line of that diff turned out to be comment removal with zero
-  other contribution, and `CONVENTIONS.md` has no JavaScript section to
+  other contribution, and `docs/CONVENTIONS.md` has no JavaScript section to
   strip *to* — it was reverted whole. See T18 and `docs/DESIGN_NOTES.md`'s
   final section.
 - Before reporting any file complete, re-read it once more specifically for
@@ -20,7 +20,7 @@ existing Part C:
 STYLE ONLY. No behaviour changes. No test added, removed or edited.
 Do not touch `sketch/`, `python/static/`, `python/tests/`, or `tools/`.
 
-Read `CONVENTIONS.md` in full first — its Docstrings section was rewritten
+Read `docs/CONVENTIONS.md` in full first — its Docstrings section was rewritten
 26 August 2026 and is the authority here. If it disagrees with anything
 below, STOP and report.
 
@@ -86,8 +86,8 @@ search `docs/` for its content.
 - **Not covered** — add it, in distilled form (see `CLAUDE.md` §4: facts,
   decisions, numbers, not narrative), to the matching file:
   - a design or architecture decision → the relevant `docs/adr/` entry
-  - a past defect or its lesson → `docs/AUDIT.md` or the item's entry in
-    `docs/CLOSED.md`
+  - a past defect or its lesson → `docs/history/AUDIT.md` or the item's entry in
+    `docs/history/CLOSED.md`
   - a hardware or servo behaviour → `skills/uno-q-st3215/SKILL.md`
   - anything that fits none of these → `docs/DESIGN_NOTES.md`, creating it
     if it does not exist, one `## <module path>` section per source file
@@ -99,7 +99,7 @@ List every relocation in your report — source `file:line`, destination file.
 
 ## D — the remaining style gaps (`python/app/` only)
 
-Per `CONVENTIONS.md`, and only these:
+Per `docs/CONVENTIONS.md`, and only these:
 
 1. Implicit-truthiness checks (`if x:` where `x` is not already a `bool`) →
    explicit comparison, matching the style already used in the same file.

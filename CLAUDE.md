@@ -51,11 +51,11 @@ Read in this order. Each answers a different question.
 | 3 | `docs/BACKLOG.md` | **What do I do next?** ← the work queue (index only; open `docs/backlog/D.md`/`T.md`/`R.md` for just the item you're picking up) |
 | 3b | `docs/WORKFLOWS.md` | **How do I do it?** ← skill + flow per item |
 | 3c | `docs/OPEN_QUESTIONS.md` | What is blocked on a human answer? ← ask these together |
-| 4 | `CONTEXT.md` | What do the words mean? (glossary only) |
-| 5 | `CONVENTIONS.md` | How must the code look? |
+| 4 | `docs/CONTEXT.md` | What do the words mean? (glossary only) |
+| 5 | `docs/CONVENTIONS.md` | How must the code look? |
 | 6 | `docs/adr/` | Why is it built this way? |
-| 6b | `docs/CLOSED.md` | How was a closed item solved? (the record, not work) |
-| 7 | `docs/AUDIT.md` | What went wrong before? (frozen, historical) |
+| 6b | `docs/history/CLOSED.md` | How was a closed item solved? (the record, not work) |
+| 7 | `docs/history/AUDIT.md` | What went wrong before? (frozen, historical) |
 | 8 | `sketch/src/RELAY_NOTES.md` | Before touching the relay. Non-negotiable. |
 
 **To pick up work: go to `docs/BACKLOG.md` and read the `START HERE` block at
@@ -138,6 +138,13 @@ by App Lab and is a different thing.
 
 - **Read the written reasoning before rewriting anything.** Several bugs came
   from re-deriving solved behaviour instead of porting it.
+- **A small fix with no downside, found while already in the area, gets fixed
+  now, not flagged and deferred.** A stale path, a dead cross-reference, a
+  drifted copy of a file you're already touching — there is no session where
+  finding it again is cheaper than fixing it once. This does not license
+  scope creep: it does not override the next rule below, which is about
+  *substantial* unrelated work, not a one-line correction sitting in the
+  exact file you already have open.
 - **Never bundle unrelated changes into a fix.**
 - **Write every document distilled to its meaning.** Facts, decisions, numbers,
   and the one line that stops a decision being re-litigated. Not narrative, not
@@ -147,15 +154,15 @@ by App Lab and is a different thing.
   table row to a paragraph. Batch doc edits to the end of a task rather than
   rewriting an entry three times.
 - **Say plainly what was actually tested versus assumed.** Near-total line
-  coverage did not prevent any of the six defects in `AUDIT.md` — and the
+  coverage did not prevent any of the six defects in `docs/history/AUDIT.md` — and the
   figure itself turned out to be 99%, quoted as 100% in seven live documents for
   months because nothing measured it (backlog D24). Numbers nobody checks rot
   exactly like comments nobody checks.
-- **Use the glossary's words** (`CONTEXT.md`) in commits, tests and issues —
+- **Use the glossary's words** (`docs/CONTEXT.md`) in commits, tests and issues —
   `timestamp` never `ts`, `count` never `tick`, `datum` never `home`.
 - **If your change contradicts an ADR, surface it** rather than silently
   overriding: _"Contradicts ADR-0002 (no framework) — worth reopening because…"_
-- **Follow `CONVENTIONS.md`.** Where it marks something undecided, ask; do not
+- **Follow `docs/CONVENTIONS.md`.** Where it marks something undecided, ask; do not
   choose silently.
 
 ## 5. Two traps that cost real time

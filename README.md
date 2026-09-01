@@ -49,14 +49,15 @@ suits a pre-commit hook.
 ```
 servo_mvp/
 ├── app.yaml                 required by Arduino App Lab
-├── CLAUDE.md                how to work here — start here
-├── CONTEXT.md               glossary
-├── CONVENTIONS.md           code style
+├── CLAUDE.md                how to work here — start here (must stay at root)
 ├── docs/
+│   ├── CONTEXT.md           glossary
+│   ├── CONVENTIONS.md       code style
 │   ├── PROJECT_STATE.md     where the project is
 │   ├── BACKLOG.md           open defects and tasks
 │   ├── adr/                 why it is built this way
-│   └── AUDIT.md             historical: the bug chain of the first round
+│   ├── history/             CLOSED.md, AUDIT.md — the past tense
+│   └── sprint/              SPRINTS.md, RIG_TESTING_PROTOCOL.md
 ├── python/
 │   ├── app/                 backend
 │   ├── static/              index.html, style.css, app.js

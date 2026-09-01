@@ -7,7 +7,7 @@ Do not touch `python/`, `sketch/tests/`, or `tools/`.
 content must not be weakened, shortened, or moved by this task, even where
 it appears as a comment near code you are otherwise editing.**
 
-Read `CONVENTIONS.md` in full next — its C++ section was extended
+Read `docs/CONVENTIONS.md` in full next — its C++ section was extended
 26 August 2026 with the comment standard this task follows. If it disagrees
 with anything below, STOP and report.
 
@@ -51,7 +51,7 @@ bool SetTorque(bool enabled);
 rationale and the register-128-collision warning in the doc comment. That
 content is relocated per Part C, not deleted.
 
-**Per the researched C++ convention now in `CONVENTIONS.md`: doc comments
+**Per the researched C++ convention now in `docs/CONVENTIONS.md`: doc comments
 belong on the declaration in the header (`.h`), not on the definition in the
 `.cpp`.** Where a function's doc comment is currently duplicated or split
 across both files, keep the header copy in the reduced form above and remove
@@ -82,8 +82,8 @@ search `docs/` and `skills/uno-q-st3215/SKILL.md` for its content.
   - servo, register, or board hardware behaviour →
     `skills/uno-q-st3215/SKILL.md` (its Symptom→Cause table, or a new row)
   - a design or architecture decision → the relevant `docs/adr/` entry
-  - a past defect or its lesson → `docs/AUDIT.md` or the item's entry in
-    `docs/CLOSED.md`
+  - a past defect or its lesson → `docs/history/AUDIT.md` or the item's entry in
+    `docs/history/CLOSED.md`
   - anything that fits none of these → `docs/DESIGN_NOTES.md`, creating it
     if it does not exist, one `## sketch/src/<file>` section per source file
 

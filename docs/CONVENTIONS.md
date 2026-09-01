@@ -59,7 +59,7 @@ the function may be doing too much and splitting it is worth considering.
 
 **No explanatory paragraphs.** No rationale, no mechanism narrative, no
 project history, no incident references, in the docstring. That belongs in
-`docs/` (an ADR, `AUDIT.md`, `CLOSED.md`, or `skills/uno-q-st3215/SKILL.md`
+`docs/` (an ADR, `docs/history/AUDIT.md`, `docs/history/CLOSED.md`, or `skills/uno-q-st3215/SKILL.md`
 for hardware behaviour), in the fuller form it deserves there — not
 compressed into source. **Decided 26 August 2026, replacing the previous
 rule** ("push the explanation into a comment at the relevant line"), which is
@@ -273,7 +273,7 @@ if (reading.valid is True) and (zero.is_datum is False):
 
 - Never single-letter names. Never `a`, `b`, `x`, `i` alone.
 - Name a variable for what it holds: `raw_counts`, not `rc`; `zero_id`, not `zid`.
-- Domain terms come from `CONTEXT.md` — use the canonical term, not a synonym
+- Domain terms come from `docs/CONTEXT.md` — use the canonical term, not a synonym
   listed under `_Avoid_`.
 
 ## Architecture
@@ -347,7 +347,7 @@ not "no `while`".
   August 2026**: the summary plus `@param`/`@return` is all that stays. No
   mechanism narrative, no incident history, no rationale paragraph. That
   content is relocated **only if it is not already written down** — check
-  `docs/adr/`, `AUDIT.md`, `CLOSED.md`, and (for hardware/servo behaviour)
+  `docs/adr/`, `docs/history/AUDIT.md`, `docs/history/CLOSED.md`, and (for hardware/servo behaviour)
   `skills/uno-q-st3215/SKILL.md` first; add it, distilled, only where it is
   genuinely missing, never as a reflex copy. Comments explain *why* a line
   exists when it is not obvious from the code; they never restate *what* the

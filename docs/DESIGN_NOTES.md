@@ -70,7 +70,7 @@ Distilled facts, rationale, and implementation details relocated from source doc
 
 - **`write_lock` guards every statement, reads included**: `Database` holds one `sqlite3.Connection` (`check_same_thread=False`) shared across the sampler thread and API request threads; two threads calling `execute()` on the same connection without a shared lock can hand back a corrupted `sqlite3.Row` — this is **D10**'s actual mechanism. Every repository built on this class must run all its statements through `write_lock`, not just writes.
 - **`telemetry.target_deg` is nullable, no default**: `NULL` means no move has been commanded yet this run; a fabricated `0.0` would misreport a target that was never actually requested.
-- **`telemetry.isolated` is `NOT NULL DEFAULT 0`**, unlike `target_deg`: it is app-held operator intent, not a servo measurement, so a value always exists — same reasoning `locked` already rests on. (Settles the null-handling question R2's original design deliberately left open — see `CLOSED.md`'s R2 entry.)
+- **`telemetry.isolated` is `NOT NULL DEFAULT 0`**, unlike `target_deg`: it is app-held operator intent, not a servo measurement, so a value always exists — same reasoning `locked` already rests on. (Settles the null-handling question R2's original design deliberately left open — see `docs/history/CLOSED.md`'s R2 entry.)
 
 ## python/app/deps.py
 
@@ -151,7 +151,7 @@ Distilled facts, rationale, and implementation details relocated from source doc
 
 ## python/static/app.js
 
-**Not touched by T15a** — this file's comments were reverted to their original state after review. `CONVENTIONS.md` has no JavaScript section yet, so there was no decided convention to strip *to*; stripping proceeded anyway on the first run and lost real content (the twin-path telemetry warning, the D9/D16/D25 rendering-logic rationale, the whole XLSX/OOXML verification history) with almost nothing relocated. **T18** establishes JS conventions first; `app.js` gets its own considered pass against that rule, not a byproduct of the Python one.
+**Not touched by T15a** — this file's comments were reverted to their original state after review. `docs/CONVENTIONS.md` has no JavaScript section yet, so there was no decided convention to strip *to*; stripping proceeded anyway on the first run and lost real content (the twin-path telemetry warning, the D9/D16/D25 rendering-logic rationale, the whole XLSX/OOXML verification history) with almost nothing relocated. **T18** establishes JS conventions first; `app.js` gets its own considered pass against that rule, not a byproduct of the Python one.
 
 ## sketch/src/ (T15b, 26 August 2026)
 

@@ -63,7 +63,7 @@ and no way to be deliberate about going past it. New three-state model:
 - **Hard limit ±95.0°** — absolute. Never confirmable, refused the way
   out-of-travel is refused today.
 
-"Soft limit" and "hard limit" go into `CONTEXT.md`'s glossary and both values
+"Soft limit" and "hard limit" go into `docs/CONTEXT.md`'s glossary and both values
 into config, so the terms mean one thing each across code, UI copy and docs.
 
 **Contradicts ADR-0003 — surfaced, not silently overridden.** ADR-0003 says
@@ -132,7 +132,7 @@ only 49 rejections and no oversubscription signature** — but the same D4
 stall still occurred twice and self-recovered.
 
 **Stale as of 11 August 2026 — do not read this measurement as current.**
-Two things changed since: D4 closed (cause and fix in `docs/CLOSED.md`), and
+Two things changed since: D4 closed (cause and fix in `docs/history/CLOSED.md`), and
 the SSE migration collapsed those 3 poll streams/operator to 1 stream/operator,
 so "9 concurrent streams for 3 operators" no longer describes what `app.js`
 opens. **R1 is not blocked on D4 any more; it is simply unmeasured against
@@ -148,7 +148,7 @@ regardless: the USB-C/Q9 question above.
 - **3 remote + 1 local USB-C (Run 3, 38.4 min sustained)**: 754 requests, **0 transport failures (100% delivery)**, 15,005 SSE frames delivered, 0 D4 stalls, 0 MCU errors.
 - **Q9 Formally Proven**: Local ADB forward (`127.0.0.1:8001`) communicates directly with Linux Uvicorn, bypassing the W5500 completely and consuming 0 relay sockets.
 - **Capacity Law Established**: Nominal sweet spot is 3 remote operators (leaving 3 slots for REST). Boundary is 4 operators (2 slots left). Theoretical edge is 5 operators (1 slot left). Hard lockout at 6 operators (0 slots left).
-- **Status**: Software capacity target (3 remote + 1 local) is **MET and verified on the bench**. Final sign-off under mechanical load scheduled for Rig Day (`../RIG_TESTING_PROTOCOL.md`).
+- **Status**: Software capacity target (3 remote + 1 local) is **MET and verified on the bench**. Final sign-off under mechanical load scheduled for Rig Day (`docs/sprint/RIG_TESTING_PROTOCOL.md`).
 
 ---
 

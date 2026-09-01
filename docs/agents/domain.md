@@ -9,15 +9,15 @@ skills need to know.
 
 ```
 /
-├── CLAUDE.md               the router — read first
-├── CONTEXT.md              glossary ONLY (no status, no decisions, no layout)
-├── CONVENTIONS.md          code style, including undecided items
+├── CLAUDE.md               the router — read first (must stay at root)
 ├── docs/
+│   ├── CONTEXT.md          glossary ONLY (no status, no decisions, no layout)
+│   ├── CONVENTIONS.md      code style, including undecided items
 │   ├── PROJECT_STATE.md    where the project is
 │   ├── BACKLOG.md          open defects and tasks — the work queue
 │   ├── adr/                architecture decision records (0001-slug.md, …)
-│   ├── AUDIT.md            frozen historical record
-│   └── FILE_REGISTRY.md    catalogue of superseded deliverables
+│   ├── history/            CLOSED.md, AUDIT.md — frozen/closed record
+│   └── sprint/             SPRINTS.md, RIG_TESTING_PROTOCOL.md
 ├── python/  sketch/  libraries/  tools/
 ```
 
@@ -35,7 +35,7 @@ Pass this rule into every sub-agent prompt that involves code exploration.
 ## Use the glossary's vocabulary
 
 When naming a domain concept — an issue title, a refactor proposal, a hypothesis,
-a test name — use the term as defined in `CONTEXT.md`'s `## Language` section and
+a test name — use the term as defined in `docs/CONTEXT.md`'s `## Language` section and
 avoid the synonyms under each `_Avoid_` line: `timestamp` never `ts`, `count`
 never `tick`, `datum` never `home`, `Lock` never `e-stop`.
 
@@ -49,7 +49,7 @@ inventing language the project does not use, or there is a real gap — add it.
 ## Decisions
 
 `docs/adr/` holds seven ADRs and is **not** empty. Read the ones touching your
-area before working there. `CONTEXT.md` no longer carries a decisions table —
+area before working there. `docs/CONTEXT.md` no longer carries a decisions table —
 that content moved into the ADRs.
 
 If your output contradicts an ADR, surface it rather than silently overriding:

@@ -5,7 +5,7 @@ web UI served from the board.
 
 **This file is a glossary and nothing else.** Project status lives in
 `docs/PROJECT_STATE.md`, open work in `docs/BACKLOG.md`, decisions in
-`docs/adr/`, code style in `CONVENTIONS.md`.
+`docs/adr/`, code style in `docs/CONVENTIONS.md`.
 
 Use these words in commits, test names, issues and proposals. Prefer them over
 the synonyms listed under each `_Avoid_`.

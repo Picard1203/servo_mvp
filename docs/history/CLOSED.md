@@ -4,7 +4,7 @@
 kept because it is the record, not because it is pending. Nothing in this file
 is work.
 
-`AUDIT.md` is a different thing again: defects found *before* this backlog
+`docs/history/AUDIT.md` is a different thing again: defects found *before* this backlog
 existed, frozen. This file is items that entered the backlog and left it.
 
 Split out of `BACKLOG.md` on 8 August 2026 — closed entries were 25% of the
@@ -310,7 +310,7 @@ exactly as it works today.**
    the `zeros` table, `ZeroReference`, `ZeroRepository`/
    `SqliteZeroRepository` entirely. Rename `ZeroService` →
    `CalibrationService`, `routers/zeros.py` → a one-endpoint calibration
-   router. `CONTEXT.md`'s *Zero reference*/*Baseline* glossary entries
+   router. `docs/CONTEXT.md`'s *Zero reference*/*Baseline* glossary entries
    retire or fold into *Datum* — there's no longer a distinguishable
    genus.
 
@@ -389,7 +389,7 @@ reproduce — which makes D2 the likely root cause rather than a separate bug.
 one count of target. With a datum at 0, the move is *refused* as `out_of_travel`
 rather than silently clamped.
 
-**Related:** D2, and `AUDIT.md` "Datum At Zero Strands The Negative Half".
+**Related:** D2, and `docs/history/AUDIT.md` "Datum At Zero Strands The Negative Half".
 
 ---
 
@@ -429,7 +429,7 @@ call returns `0`, indistinguishable from a genuine reading of zero.
 `calibrate()` guards this correctly and raises `InvalidReadingError`. `capture()`
 does not. **The guard was applied to one of two paths.**
 
-This is the same defect class `AUDIT.md` was written about, through a different
+This is the same defect class `docs/history/AUDIT.md` was written about, through a different
 door: a bus hiccup while an operator saves a named zero stores `raw_counts=0`;
 activating that zero later strands the negative half of travel, producing D1.
 
@@ -474,7 +474,7 @@ the same twin-path bug would have mirrored the readout against the motion path
 under `SERVO_DIRECTION=-1`.
 
 **This is the D2 defect class again**: a rule applied to one path and not its
-twin. Third instance in this repository, counting `AUDIT.md`.
+twin. Third instance in this repository, counting `docs/history/AUDIT.md`.
 
 ---
 
@@ -739,7 +739,7 @@ const raw = e.timestamp != null ? e.timestamp : e.timestamp;
 
 Both branches are the same expression. The comment describes a tolerance for a
 legacy field name that the code does not provide — presumably `ts`, which
-`CONTEXT.md` forbids in favour of `timestamp`.
+`docs/CONTEXT.md` forbids in favour of `timestamp`.
 
 Harmless today, and worth removing rather than fixing: the glossary settled the
 name, so the fallback should not exist. Filed because a comment that describes
@@ -2110,13 +2110,13 @@ starts cold; everything needed is written down below so nothing is rediscovered.
 | **3 — DONE, 11 Aug 2026** | SSE migration, D4 closed | yes |
 | **4 — DONE, 23 Aug 2026** | Sampler 0.5s/retention 30d, R5 (XLSX export) rebuilt from scratch (11 Aug attempt never worked at all), relay chunk-size dispute closed with a cause, D31/D10 closed or advanced with real board evidence. **R5's mechanism works and is cross-app validated — but real UX gaps found live and deferred, see next row.** | yes |
 | **5 — DONE, 23 Aug 2026** | **R5's export, redirected live by the operator**: target angle + servo angle end to end (UI and export), angle-correlated charts, a typed chart-range selector (confirmed live to work), decoded flags, day-sheet and Overview column widths, LCARS styling, per-day summary table. One live regression (chart date-axis) caught and reverted same session. **D10 and R2 stayed out of scope**, as planned — deferred, see row 6. Full detail in R5's entry. | yes — used for a real live walkthrough this session, which is exactly what caught the regression and several width/spacing defects a local render alone had missed |
-| **6 — D10 half DONE, 24 Aug 2026** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** Nothing from Session 6's D10 work is a prerequisite for it, but **Session 8 now runs first** (inserted 24 Aug 2026 by T14's triage, see row 8) so R2 designs against a settled `ServoStateResponse` shape — R2 itself is Session 9, not a direct continuation of this row. | R2: yes, for the operator-visible part |
-| **7 — DONE, 24 Aug 2026** | **T14 closed** — all fourteen unslotted items given a real session (rows above and below) or an explicit reason they don't get one (T13, T15 — see their entries); Closed index gained D3/D27/D13 (moved to `CLOSED.md` but never indexed). **D32, D33, D34 closed the same session** — board-tested, verified (suite 223→226), app restarted and checked live. **D35 opened** (speed-step enforcement postponed, see Session 10) — a board measurement during D32's work found commanded and actual servo speed disagree by ~1.5-2x, so the planned fix was not shipped on an unverified unit-conversion assumption. | yes — used to verify D32/D33/D34 live and to bench-test D35's measurement |
-| **8 — DONE, 25 Aug 2026** | All eight closed: **D24** (coverage gated at 99%, two unexercised guards covered), **D26** (sampler-thread leak found and fixed — segfault reproduced pre-fix at ~1-in-10 to 1-in-20, gone after; closed on evidence, see `CLOSED.md`), **D30** (UTC/local cutoff regression test), **T12** (`check_client_behaviour.js` promoted to a real check, folded into new `tools/verify.py`), **D8** (deploy without `.env` now fails loud), **D29** (`LOG_LEVEL` now real on the Logger461 stand-in), **D23** (`moving`/fault flags null on a failed read, amends ADR-0008), **D25** (a reported alarm survives the reading going unknown; recover disabled-with-reason, not hidden). `ServoStateResponse` shape is now settled for R2. Repo hygiene pass same session: stale soak artifacts and `FILE_REGISTRY.md` removed, `.gitignore` gaps closed. | no — board confirmation of D8/D23/D25 still outstanding, first thing to do when the board is next up |
-| **9 — DONE, 25-26 Aug 2026** | **R2 — motor isolation, CLOSED** (see `CLOSED.md`). Implemented 25 Aug on `feature/motor-isolation`, merged to `dev`. Board verification 26 Aug found two real bugs — `IsolationService`'s write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level — plus three UI/refusal gaps closed alongside on `feature/motor-isolation-fixes`. Hand-turn/multi-turn-under-load scenario left genuinely untested (no rig on the bench) — see **T17**. `/twin-review` deliberately skipped this delivery, deferred to a later whole-app pass (see `T16`). | yes — used for the full board-verification pass |
+| **6 — D10 half DONE, 24 Aug 2026** | **D10 closed** — real cause was a thread-safety gap in the SQLite layer (every unlocked read on the shared connection, not the zero-table race the original writeup guessed), see `docs/history/CLOSED.md`. **Batch 4's motor isolation (R2)** remains — pulled out of Session 5 by the operator, 23 Aug 2026, to keep that session scoped to the export. **Before planning R2: a `/grilling` pass on R2's open design questions** (operator-visible state/label when isolated, refuse-vs-queue a move while isolated, the new `ServoStateResponse` field, the ADR the reboot-latch decision still wants — see R2's entry) **grounded in the docs, not in a prior session's paraphrase — requested by the operator, 24 Aug 2026.** Nothing from Session 6's D10 work is a prerequisite for it, but **Session 8 now runs first** (inserted 24 Aug 2026 by T14's triage, see row 8) so R2 designs against a settled `ServoStateResponse` shape — R2 itself is Session 9, not a direct continuation of this row. | R2: yes, for the operator-visible part |
+| **7 — DONE, 24 Aug 2026** | **T14 closed** — all fourteen unslotted items given a real session (rows above and below) or an explicit reason they don't get one (T13, T15 — see their entries); Closed index gained D3/D27/D13 (moved to `docs/history/CLOSED.md` but never indexed). **D32, D33, D34 closed the same session** — board-tested, verified (suite 223→226), app restarted and checked live. **D35 opened** (speed-step enforcement postponed, see Session 10) — a board measurement during D32's work found commanded and actual servo speed disagree by ~1.5-2x, so the planned fix was not shipped on an unverified unit-conversion assumption. | yes — used to verify D32/D33/D34 live and to bench-test D35's measurement |
+| **8 — DONE, 25 Aug 2026** | All eight closed: **D24** (coverage gated at 99%, two unexercised guards covered), **D26** (sampler-thread leak found and fixed — segfault reproduced pre-fix at ~1-in-10 to 1-in-20, gone after; closed on evidence, see `docs/history/CLOSED.md`), **D30** (UTC/local cutoff regression test), **T12** (`check_client_behaviour.js` promoted to a real check, folded into new `tools/verify.py`), **D8** (deploy without `.env` now fails loud), **D29** (`LOG_LEVEL` now real on the Logger461 stand-in), **D23** (`moving`/fault flags null on a failed read, amends ADR-0008), **D25** (a reported alarm survives the reading going unknown; recover disabled-with-reason, not hidden). `ServoStateResponse` shape is now settled for R2. Repo hygiene pass same session: stale soak artifacts and `FILE_REGISTRY.md` removed, `.gitignore` gaps closed. | no — board confirmation of D8/D23/D25 still outstanding, first thing to do when the board is next up |
+| **9 — DONE, 25-26 Aug 2026** | **R2 — motor isolation, CLOSED** (see `docs/history/CLOSED.md`). Implemented 25 Aug on `feature/motor-isolation`, merged to `dev`. Board verification 26 Aug found two real bugs — `IsolationService`'s write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level — plus three UI/refusal gaps closed alongside on `feature/motor-isolation-fixes`. Hand-turn/multi-turn-under-load scenario left genuinely untested (no rig on the bench) — see **T17**. `/twin-review` deliberately skipped this delivery, deferred to a later whole-app pass (see `T16`). | yes — used for the full board-verification pass |
 | **10 — opportunistic, any time after 7** | **D28** (MCU boot-time `mcu_log` notify race — needs a flash to fix or confirm) + **D35** (commanded vs. actual speed disagree by ~1.5-2x, found bench-testing D32 this session — needs `PRESENT_SPEED` register-level readback, not just wall-clock timing). D32 itself closed this session (24 Aug) — its speed-step-enforcement piece split into D35 rather than shipped on an unverified assumption. Low severity, no dependency on anything above; ride along with any session that already has the board up. | yes |
 
-**T14 (`CLOSED.md`) has the full reasoning behind this slotting** if it is
+**T14 (`docs/history/CLOSED.md`) has the full reasoning behind this slotting** if it is
 ever needed again — this row is just a pointer to the outcome.
 
 **The venv is at `.venv/` in the working copy** — the suite runs, no setup.
@@ -2132,7 +2132,7 @@ findings cap.
 ## Session 1, Batch 1 — DONE, 8 August 2026
 
 D14, D15, D16, D20, D21 closed. Suite 193 → 198; native checks and the bridge
-contract unmoved (nothing in `sketch/` changed). Detail in `docs/CLOSED.md`.
+contract unmoved (nothing in `sketch/` changed). Detail in `docs/history/CLOSED.md`.
 
 `/twin-review` on the diff found a hole in D15's fix (Enter bypassed the
 guard), a CSS regression it introduced, two false-notice bugs, and eight untrue
@@ -2157,7 +2157,7 @@ sitting closes all four.
 ## Session 1, Batch 2 — DONE, 8 August 2026
 
 D3, D13 closed. Suite 198 → 207; native checks 164 → 194; bridge contract gains
-`mcu_log` (MCU → Linux) and still agrees. Detail in `docs/CLOSED.md`.
+`mcu_log` (MCU → Linux) and still agrees. Detail in `docs/history/CLOSED.md`.
 
 New: a `DiagLog` singleton (`sketch/src/DiagLog.h/.cpp`) — a bounded ring
 buffer (`LogRing.h`, its own native tests) fed by `NetworkRelay`, `ServoBus`
@@ -2188,13 +2188,13 @@ expose the port at all, per ADR-0001) returned
 around kept-alive persistent connections (fixing a bigger, related fidelity
 gap: the old `urllib`-based version opened a fresh connection on *every*
 poll, not just missing the concurrent-timer pattern) and now reproduces
-`app.js`'s three independent timers exactly. Detail in `docs/CLOSED.md`.
+`app.js`'s three independent timers exactly. Detail in `docs/history/CLOSED.md`.
 
 **D28 raised, real not hypothetical**: the boot-time `mcu.relay.ready`
 notify was lost on the actual board — confirmed by its total absence after
 several minutes of uptime. Likely a startup race (Python registers the
 `mcu_log` handler after the MCU has already sent it), likely confined to
-boot-time events only. See `docs/CLOSED.md`'s D3 entry and D28 in this file
+boot-time events only. See `docs/history/CLOSED.md`'s D3 entry and D28 in this file
 for the detail and the two possible next steps.
 
 ## Session 2 — The soak — IN PROGRESS
@@ -2379,7 +2379,7 @@ decision — **T12**.
 
 | | Item | Size | Outcome |
 |---|---|---|---|
-| 5 | **D3** C++ side has no logging | M | done — `DiagLog` ring + `mcu_log` Bridge notify; both counters now visible; detail in `docs/CLOSED.md` |
+| 5 | **D3** C++ side has no logging | M | done — `DiagLog` ring + `mcu_log` Bridge notify; both counters now visible; detail in `docs/history/CLOSED.md` |
 | 6 | **D13** decision: is six slots enough? | M | done (decided) — **ADR-0009**: stays at 6, real lever unmeasured until Session 2 |
 
 D13's decision is recorded in `docs/adr/0009-connection-ceiling.md`: the wall
@@ -2456,7 +2456,7 @@ not collide with real fixes. High volume, low reasoning — the Antigravity spli
 - **D19** — needs a reachability answer first; see its entry.
 - **R3, R4, R8** — post-MVP by decision, not by omission.
 
-**T14 closed, 24 August 2026 (full record in `CLOSED.md`) — every item that had
+**T14 closed, 24 August 2026 (full record in `docs/history/CLOSED.md`) — every item that had
 no batch now has one, or an explicit reason it doesn't.** The fourteen from the
 23 August audit (D8, D23, D24, D25, D26, D28, D29, D30, T12, T13, D32, T15,
 D33, D34): nine are slotted, in Session 8 or Session 10 above; **D32, D33 and
@@ -2470,7 +2470,7 @@ cut line in `PROJECT_STATE.md` says what ships anyway.
 
 ---
 
-### T1 — Apply `CONVENTIONS.md` across the codebase
+### T1 — Apply `docs/CONVENTIONS.md` across the codebase
 **Status:** done · 26 August 2026 · via T15a's Antigravity run, hand-corrected same session
 
 Measured gap in `python/app/`: 67 `Args:` lines missing `(type)`, 4
@@ -2493,7 +2493,7 @@ The MVP was written "dirty" on purpose. Measured gap in `python/app/`: 67 `Args:
 lines missing `(type)`, 4 implicit-truthiness checks, 3 `while True`, 3 list
 comprehensions, 2 `break`, 0 `continue`, 0 `X | None` unions.
 
-**Acceptance:** the gap table in `CONVENTIONS.md` reads zero across the board,
+**Acceptance:** the gap table in `docs/CONVENTIONS.md` reads zero across the board,
 and the suite (207 tests as of Batch 2) still passes.
 
 ---
@@ -2514,7 +2514,7 @@ session's own torque-inversion fix comment) and `servo_state.py`'s
 name). Restored to `docs/DESIGN_NOTES.md`, with the two safety-critical
 cases kept as one-line inline pointers (the operator's call, not a blanket
 exception). `python/static/app.js` was reverted whole — its entire diff was
-comment removal with zero other contribution, and `CONVENTIONS.md` has no
+comment removal with zero other contribution, and `docs/CONVENTIONS.md` has no
 JavaScript section to strip against; that was a scoping mistake, not a
 judgment failure, and waits for **T18**.
 
@@ -2552,23 +2552,23 @@ code, so verbose in-code narrative is paid for out of the same token budget as
 the actual work, every time.
 
 **This contradicts current, deliberate policy, and that must be resolved
-first, not silently overridden either way:** `CONVENTIONS.md` (Docstrings,
+first, not silently overridden either way:** `docs/CONVENTIONS.md` (Docstrings,
 ~L30) currently says the opposite — "if a docstring needs three sentences of
 prose to explain the mechanism, the explanation belongs in a comment at the
 relevant line, not in the docstring" — and the repo's own defect history
-(`AUDIT.md`, D2, D9) is full of cases where exactly this kind of in-line
+(`docs/history/AUDIT.md`, D2, D9) is full of cases where exactly this kind of in-line
 "why" comment (e.g. `_baseline_counts`'s note about the 212.7°-on-90°
 incident) is what stopped the same mistake recurring nearby. A wholesale
 "move it to docs/" pass needs an explicit decision on which of those two
 failure modes the project would rather risk, not just a style pass.
 
-**Scope, once decided:** a full-repo pass — `CONVENTIONS.md`'s own Docstrings
+**Scope, once decided:** a full-repo pass — `docs/CONVENTIONS.md`'s own Docstrings
 section rewritten first if the decision changes it, then every docstring and
 inline comment in `python/app/` and `sketch/src/` brought into line, with any
 genuinely load-bearing rationale relocated to the matching `docs/adr/` entry,
-`AUDIT.md`, or `CLOSED.md` record rather than deleted.
+`docs/history/AUDIT.md`, or `docs/history/CLOSED.md` record rather than deleted.
 
-**Related:** T1 (mechanical `CONVENTIONS.md` gaps, different axis), CLAUDE.md
+**Related:** T1 (mechanical `docs/CONVENTIONS.md` gaps, different axis), CLAUDE.md
 §4's "write every document distilled" rule (same cost, different location).
 
 ---
@@ -2621,14 +2621,14 @@ Raised alongside T16: the user has a personally-refined ruff standard on the
 air-gapped network, unexportable; the closest reachable copy was found in
 `~/Coding Projects/Krusty-Crab/pyproject.toml` (most recent of three near-
 identical copies across `Eyal-FastAPI-Project`, `Krusty-Crab`, `Krusty-Crab-
-backup` — the same lineage `CONVENTIONS.md` itself was derived from).
+backup` — the same lineage `docs/CONVENTIONS.md` itself was derived from).
 
 **Adapted, not copied verbatim** — two real corrections against this repo:
 - `[lint.pydocstyle] convention = "google"` added; the source config never
   set it, so `D`-rules would not actually validate the Google format
-  `CONVENTIONS.md` declares.
+  `docs/CONVENTIONS.md` declares.
 - `UP` (pyupgrade) deliberately **not** selected — it would push
-  `Optional[X]` toward `X | None`, the opposite of `CONVENTIONS.md`'s Types
+  `Optional[X]` toward `X | None`, the opposite of `docs/CONVENTIONS.md`'s Types
   rule. Dropped the Krusty-Crab-specific `[project]` table, its per-file
   `logging/__init__.py` ignore (no such module here), and the misplaced
   `fixable = ["ALL"]` (nested under `per-file-ignores`, a no-op in the
@@ -2637,13 +2637,13 @@ backup` — the same lineage `CONVENTIONS.md` itself was derived from).
 **Advisory only, not part of `tools/verify.py`'s gate** (per the operator) —
 runs against `python/app/`, baseline is 50 findings (`ruff check python/app
 --config python/ruff.toml --statistics`), all plausible (13 `D107`
-undocumented `__init__`, matching `CONVENTIONS.md`'s own noted gap; 11 `D104`
+undocumented `__init__`, matching `docs/CONVENTIONS.md`'s own noted gap; 11 `D104`
 undocumented packages; 10 `ARG001` unused arguments; the rest cleanup-shaped).
-**Where ruff and `CONVENTIONS.md` disagree, `CONVENTIONS.md` wins** — stated
-in both `CONVENTIONS.md` and the skill.
+**Where ruff and `docs/CONVENTIONS.md` disagree, `docs/CONVENTIONS.md` wins** — stated
+in both `docs/CONVENTIONS.md` and the skill.
 
 Wired into `twin-review` (lenses 1, 4, 5) as a pre-pass for the backend
 chunk — narrows what needs LLM judgment, same principle T16 already applied.
 `ruff` added to `python/requirements-dev.txt`; config at `python/ruff.toml`.
 
-**Related:** T16, CONVENTIONS.md.
+**Related:** T16, docs/CONVENTIONS.md.

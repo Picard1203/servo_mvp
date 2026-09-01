@@ -116,6 +116,7 @@ detail entries above (filed and ranked, not started).
 
 | | | closed |
 |---|---|---|
+| **T22** | Reorganize docs: `CONTEXT.md`/`CONVENTIONS.md` into `docs/`, `CLOSED.md`/`AUDIT.md` into `docs/history/`, sprint docs into `docs/sprint/` | 1 September 2026 · `CLAUDE.md` stays at root |
 | **D39** | A positive angle turned the mechanism the wrong way | 1 September 2026 · `SERVO_DIRECTION` flipped, board-confirmed both directions; exposed and fixed an 8-test `.env` coupling |
 | **D1** | A move to a negative angle stops at 0 | 7 August 2026 · **Confirmed on hardware, both halves** |
 | **D2** | `capture()` can store a failed read as position 0 | 7 August 2026 · commit `c903182` |

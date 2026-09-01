@@ -12,6 +12,33 @@ file every session has to read.
 
 ---
 
+### T22 — Move CONTEXT.md and CONVENTIONS.md into docs/, group history and sprint docs
+**Status:** done · 1 September 2026 · raised by the operator, mid-sprint
+
+Root-level docs and loose `docs/` files reorganized: `CONTEXT.md` and
+`CONVENTIONS.md` into `docs/`; `CLOSED.md`/`AUDIT.md` into `docs/history/`
+(both explicitly the backlog's past tense); `RIG_TESTING_PROTOCOL.md`/
+`SPRINTS.md` into `docs/sprint/` (this sprint's own operational planning).
+`CLAUDE.md` stays at the project root — Claude Code auto-discovers and
+loads it from there every session; moving it would have stopped that
+entirely, the opposite of the goal.
+
+Every cross-reference across the project's own docs and skills updated to a
+full path from the repo root, standardized rather than left as a mix of
+bare filenames and relative dots — none were real markdown links to begin
+with, so this was string substitution, not relative-path math. The two
+ASCII tree diagrams (`README.md`, `docs/agents/domain.md`) redrawn by hand,
+not blindly substituted, since a tree represents structure. Found and fixed
+along the way: the repo's own tracked `skills/deliver/SKILL.md` had drifted
+from the live installed copy since 25 August, missing the plan-mode
+adoption and the same-day timestamping rule — resynced.
+
+**Verified:** `tools/verify.py` unchanged at baseline (313/99.64%/194/105/ok)
+before and after — pure documentation move, no functional code path
+referenced any of these files.
+
+---
+
 ### D39 — A positive angle turned the mechanism the wrong way
 **Status:** done · 1 September 2026 · rig hand-testing
 

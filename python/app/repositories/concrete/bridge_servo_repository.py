@@ -6,8 +6,10 @@ from typing import Optional
 
 from Logger461 import logger
 
-from app.models.entities import TelemetrySnapshot
+from app.models.entities import TelemetrySnapshot, TuningRegisters
 from app.repositories.abstract.servo_repository import ServoRepository
+
+_TUNING_FIELDS = 7
 
 _SIGN_BIT = 15
 
@@ -191,6 +193,67 @@ class BridgeServoRepository(ServoRepository):
         if reply not in ("0", "1"):
             return None
         return int(reply)
+
+    def read_tuning_registers(self) -> Optional[TuningRegisters]:
+        """Reads the position-loop tuning registers directly.
+
+        Returns:
+            Optional[TuningRegisters]: The registers, or None if read failed.
+        """
+        raw = self._call("servo_read_tuning", "")
+        parts = raw.split(",") if raw else []
+        if len(parts) < _TUNING_FIELDS:
+            return None
+        try:
+            if parts[0] != "1":
+                return None
+            return TuningRegisters(
+                position_p=int(parts[1]),
+                position_d=int(parts[2]),
+                position_i=int(parts[3]),
+                min_start_force=int(parts[4]),
+                cw_dead_zone=int(parts[5]),
+                ccw_dead_zone=int(parts[6]))
+        except ValueError:
+            return None
+
+    def write_tuning_registers(
+            self, position_p: Optional[int] = None,
+            position_d: Optional[int] = None,
+            position_i: Optional[int] = None,
+            min_start_force: Optional[int] = None,
+            cw_dead_zone: Optional[int] = None,
+            ccw_dead_zone: Optional[int] = None) -> bool:
+        """Writes any subset of the position-loop tuning registers directly.
+
+        Args:
+            position_p (Optional[int]): P gain, or None to leave it alone.
+            position_d (Optional[int]): D gain, or None to leave it alone.
+            position_i (Optional[int]): I gain, or None to leave it alone.
+            min_start_force (Optional[int]): Minimum start force, or None.
+            cw_dead_zone (Optional[int]): CW dead zone, or None.
+            ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+
+        Returns:
+            bool: True when every requested write was acknowledged.
+        """
+        fields = (position_p, position_d, position_i, min_start_force,
+                 cw_dead_zone, ccw_dead_zone)
+        payload = ",".join(str(-1 if field is None else field)
+                           for field in fields)
+        return self._command("servo_write_tuning", payload)
+
+    def read_present_speed_counts_s(self) -> Optional[int]:
+        """Reads the present-speed register directly.
+
+        Returns:
+            Optional[int]: Signed counts per second, or None if read failed.
+        """
+        reply = self._call("servo_read_speed", "")
+        try:
+            return int(reply)
+        except ValueError:
+            return None
 
     def _call(self, name: str, payload: str) -> str:
         """Invokes a Bridge function, converting failures into empty results.

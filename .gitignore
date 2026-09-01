@@ -27,6 +27,11 @@ python/.env
 soak*.json
 soak_report*.txt
 
+# Fine-approach trial CSVs (tools/fine_approach_trial.py) — raw measurement
+# data for the D40c tuning campaign, not source; the campaign's conclusions
+# are recorded in docs/backlog/D.md instead.
+archive/
+
 # Arduino App Lab build and runtime cache.
 #
 # Created on the board by `arduino-app-cli app start` / the App Lab Run

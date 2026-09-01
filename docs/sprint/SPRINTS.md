@@ -55,9 +55,9 @@ knowingly over the 85% discipline, the operator's explicit call)
 | D39 — direction reversed | 1 | 1.5h | ~13:05 | 13:45 | combined ~40m, see note | 19 | Done |
 | D40a — 3 CR HIGH prerequisites (ack surfacing, thread cancellation, `None`-guard) | | ~0.75h | 14:47 | 15:44 | 57m | 20 | Done |
 | D40b — investigation, operator holding the rig | | 1.25h | 15:44 | 17:19 | 1h35m | 20 | Done |
-| D40c — convergence retry, config, events, UI state, tests | | ~2h | | | | 21 | To Do |
-| D40d — tuning against hand-held load | | 1.0h | | | | 21 | To Do |
-| D40 total | 5 | ~5h | | | | 20–21 | To Do |
+| D40c — activate and harden the existing anti-backlash fine approach (travel-limit clamp, overshoot resized to measured data, event diagnostics, tuning-register read/write, PRESENT_SPEED read, MinStartForce tuning campaign) | | ~2h | 18:53 | 23:20 | 4h27m | 21 | Done |
+| D40d — verify MinStartForce=150 holds under hand-held load; retune only if it does not | | 1.0h | | | | 22 | To Do |
+| D40 total | 5 | ~5h | | | | 20–22 | In Progress |
 | R11 — snap to nearest + delta | 2 | 3.0h | | | | 22 | To Do |
 | Rig protocols 1/2/3/5, hand-held | 1 | 1.5h | | | | 22 | To Do |
 | T20 — doc-truth sweep (Antigravity, parallel — not counted against the 13.25h above) | 1 | 1.5h | | | | — | To Do |
@@ -102,6 +102,18 @@ the parts with actual evidence behind the change. **The header's "5 ≈
 enough to move a scale used sprint-wide; revisit the anchor line itself only
 after a second point-5 story confirms the same shape, not on this one.
 
+**D40c actual, 4h27m against a 2h estimate — an unexplained-mismatch case,
+stated plainly rather than silently absorbed.** The estimate covered the
+code (clamp, readback, register write, PRESENT_SPEED read); the overrun is
+real hardware iteration the estimate did not price in: a genuine
+measurement-tool bug found and fixed twice on real hardware (a settle race,
+then a debounce too short for a slow hunt), and — the actual scope driver —
+a live tuning campaign (three MinStartForce values, a dead-zone detour, a
+real oscillation found and root-caused at the travel extremes) that the
+original estimate filed under D40d, not D40c. Confirms the point-scale note
+above: physical-clock-gated work does not compress, and this session's own
+scope grew to include what was meant to be D40d's territory.
+
 **R12's ordering constraint is unchanged even though its sprint tier moved
 (see Stretch below).** It was never carried because of a feared overrun — it
 was carried because R11 must land first: snapping changes what a valid
@@ -143,6 +155,8 @@ D40 — A move settles short under load; re-commanding doesn't correct it  [5]
   - Fix: None-guard start_deg in _needs_fine_approach
   - Investigate: which of the 3 candidates, operator holding the load
   - Build: bounded convergence retry, config-gated
+    (superseded 1 Sept — the mechanism kept is activating and tuning the
+    already-existing fine approach, not a new retry; see D40's own entry)
   - Tune: tolerance + attempt count against hand-held load
 
 R11 — Accept any typed angle; snap to nearest, show the delta     [2]

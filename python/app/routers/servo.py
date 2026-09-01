@@ -20,10 +20,14 @@ from app.schemas.servo import (
     LockResponse,
     MoveAcceptedResponse,
     MoveRequest,
+    PresentSpeedResponse,
     RecoverResponse,
     ServoStateResponse,
     StopResponse,
     TorqueRegisterResponse,
+    TuningRegistersResponse,
+    TuningRegistersWriteRequest,
+    TuningRegistersWriteResponse,
 )
 from app.services.calibration_service import CalibrationService
 from app.services.isolation_service import IsolationService
@@ -144,6 +148,69 @@ def get_torque_register(servo: ServoDep) -> TorqueRegisterResponse:
     """
     return TorqueRegisterResponse(
         torque_register=servo.read_torque_register())
+
+
+@router.get("/diagnostics/tuning_registers",
+            response_model=TuningRegistersResponse)
+def get_tuning_registers(servo: ServoDep) -> TuningRegistersResponse:
+    """Reads the servo's position-loop tuning registers directly.
+
+    Args:
+        servo (ServoRepository): Injected servo repository.
+
+    Returns:
+        TuningRegistersResponse: The registers, all None if the read failed.
+    """
+    registers = servo.read_tuning_registers()
+    if registers is None:
+        return TuningRegistersResponse(
+            position_p=None, position_d=None, position_i=None,
+            min_start_force=None, cw_dead_zone=None, ccw_dead_zone=None)
+    return TuningRegistersResponse(
+        position_p=registers.position_p,
+        position_d=registers.position_d,
+        position_i=registers.position_i,
+        min_start_force=registers.min_start_force,
+        cw_dead_zone=registers.cw_dead_zone,
+        ccw_dead_zone=registers.ccw_dead_zone)
+
+
+@router.get("/diagnostics/present_speed", response_model=PresentSpeedResponse)
+def get_present_speed(servo: ServoDep) -> PresentSpeedResponse:
+    """Reads the servo present-speed register directly.
+
+    Args:
+        servo (ServoRepository): Injected servo repository.
+
+    Returns:
+        PresentSpeedResponse: Signed counts per second, or None on failure.
+    """
+    return PresentSpeedResponse(
+        present_speed_counts_s=servo.read_present_speed_counts_s())
+
+
+@router.post("/diagnostics/tuning_registers",
+            response_model=TuningRegistersWriteResponse)
+def post_tuning_registers(
+        request: TuningRegistersWriteRequest,
+        servo: ServoDep) -> TuningRegistersWriteResponse:
+    """Writes any subset of the servo's position-loop tuning registers.
+
+    Args:
+        request (TuningRegistersWriteRequest): Fields to write; unset
+            fields are left alone.
+        servo (ServoRepository): Injected servo repository.
+
+    Returns:
+        TuningRegistersWriteResponse: Whether every write was acknowledged.
+    """
+    written = servo.write_tuning_registers(
+        position_p=request.position_p, position_d=request.position_d,
+        position_i=request.position_i,
+        min_start_force=request.min_start_force,
+        cw_dead_zone=request.cw_dead_zone,
+        ccw_dead_zone=request.ccw_dead_zone)
+    return TuningRegistersWriteResponse(written=written)
 
 
 @router.post("/recover", response_model=RecoverResponse)

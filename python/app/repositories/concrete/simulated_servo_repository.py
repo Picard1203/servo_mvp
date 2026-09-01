@@ -5,10 +5,20 @@ from math import copysign
 from threading import Lock, Thread
 from time import sleep
 
-from app.models.entities import TelemetrySnapshot
+from app.models.entities import TelemetrySnapshot, TuningRegisters
 
 _TICK_SECONDS = 0.05
 _KT_KGCM_PER_A = 11.0
+
+# STS3215 factory defaults - this simulator never writes these registers,
+# so it reports what an untouched servo actually ships with (bench-sourced,
+# see skills/uno-q-st3215/SKILL.md), not zeros.
+_FACTORY_POSITION_P = 32
+_FACTORY_POSITION_D = 32
+_FACTORY_POSITION_I = 0
+_FACTORY_MIN_START_FORCE = 0
+_FACTORY_CW_DEAD_ZONE = 1
+_FACTORY_CCW_DEAD_ZONE = 1
 
 
 class SimulatedServoRepository:
@@ -26,6 +36,12 @@ class SimulatedServoRepository:
         _angle_resolution (int): Multi-turn resolution amplification factor.
         _torque_enabled (bool): Simulated drive torque engagement state.
         _running (bool): Background simulation loop execution flag.
+        _position_p (int): Simulated position-loop P gain register.
+        _position_d (int): Simulated position-loop D gain register.
+        _position_i (int): Simulated position-loop I gain register.
+        _min_start_force (int): Simulated minimum start force register.
+        _cw_dead_zone (int): Simulated CW dead-zone register.
+        _ccw_dead_zone (int): Simulated CCW dead-zone register.
     """
 
     def __init__(self) -> None:
@@ -40,6 +56,12 @@ class SimulatedServoRepository:
         self._angle_resolution: int = 1
         self._torque_enabled: bool = True
         self._running: bool = True
+        self._position_p: int = _FACTORY_POSITION_P
+        self._position_d: int = _FACTORY_POSITION_D
+        self._position_i: int = _FACTORY_POSITION_I
+        self._min_start_force: int = _FACTORY_MIN_START_FORCE
+        self._cw_dead_zone: int = _FACTORY_CW_DEAD_ZONE
+        self._ccw_dead_zone: int = _FACTORY_CCW_DEAD_ZONE
         Thread(target=self._run, daemon=True).start()
 
     # Test-only affordance, not part of ServoRepository - see docs/DESIGN_NOTES.md.
@@ -154,6 +176,66 @@ class SimulatedServoRepository:
         """
         with self._lock:
             return 1 if self._torque_enabled else 0
+
+    def read_tuning_registers(self) -> TuningRegisters:
+        """Returns the tuning registers as last written, or factory default.
+
+        Returns:
+            TuningRegisters: Simulated position-loop tuning registers.
+        """
+        with self._lock:
+            return TuningRegisters(
+                position_p=self._position_p,
+                position_d=self._position_d,
+                position_i=self._position_i,
+                min_start_force=self._min_start_force,
+                cw_dead_zone=self._cw_dead_zone,
+                ccw_dead_zone=self._ccw_dead_zone)
+
+    def write_tuning_registers(
+            self, position_p=None, position_d=None, position_i=None,
+            min_start_force=None, cw_dead_zone=None,
+            ccw_dead_zone=None) -> bool:
+        """Records any subset of the position-loop tuning registers.
+
+        Args:
+            position_p (Optional[int]): P gain, or None to leave it alone.
+            position_d (Optional[int]): D gain, or None to leave it alone.
+            position_i (Optional[int]): I gain, or None to leave it alone.
+            min_start_force (Optional[int]): Minimum start force, or None.
+            cw_dead_zone (Optional[int]): CW dead zone, or None.
+            ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+
+        Returns:
+            bool: Always True on simulated hardware.
+        """
+        with self._lock:
+            if position_p is not None:
+                self._position_p = position_p
+            if position_d is not None:
+                self._position_d = position_d
+            if position_i is not None:
+                self._position_i = position_i
+            if min_start_force is not None:
+                self._min_start_force = min_start_force
+            if cw_dead_zone is not None:
+                self._cw_dead_zone = cw_dead_zone
+            if ccw_dead_zone is not None:
+                self._ccw_dead_zone = ccw_dead_zone
+        return True
+
+    def read_present_speed_counts_s(self) -> int:
+        """Returns the simulated present speed, signed toward the target.
+
+        Returns:
+            int: Signed counts per second, 0 when settled.
+        """
+        with self._lock:
+            delta = self._target - self._counts
+            if abs(delta) <= self._deadband_counts:
+                return 0
+            signed = copysign(self._speed_counts_s, delta)
+            return round(signed)
 
     def simulate_overload(self) -> None:
         """Trips the simulated overload fault."""

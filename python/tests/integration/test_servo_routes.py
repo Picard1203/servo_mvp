@@ -148,6 +148,40 @@ class TestIsolate:
             "/api/v1/servo/diagnostics/torque_register"
         ).json()["torque_register"] == 0)
 
+    def test_tuning_registers_reports_the_servos_position_loop_settings(
+            self, client):
+        """GET /api/v1/servo/diagnostics/tuning_registers - the readback
+        this delivery exists to add, D40b's own gap."""
+        body = client.get(
+            "/api/v1/servo/diagnostics/tuning_registers").json()
+        assert body["position_p"] == 32
+        assert body["position_d"] == 32
+        assert body["position_i"] == 0
+        assert body["min_start_force"] == 0
+        assert body["cw_dead_zone"] == 1
+        assert body["ccw_dead_zone"] == 1
+
+    def test_present_speed_is_zero_when_settled(self, client):
+        """GET /api/v1/servo/diagnostics/present_speed - grounds D40c's
+        creep-speed benchmark in what the servo actually reports."""
+        assert client.get(
+            "/api/v1/servo/diagnostics/present_speed"
+        ).json()["present_speed_counts_s"] == 0
+
+    def test_write_tuning_registers_is_reflected_in_the_next_read(
+            self, client):
+        """POST /api/v1/servo/diagnostics/tuning_registers - the
+        measurement-campaign write path, echoed back by the existing GET."""
+        write_response = client.post(
+            "/api/v1/servo/diagnostics/tuning_registers",
+            json={"position_p": 16, "min_start_force": 50})
+        assert write_response.json()["written"] is True
+        body = client.get(
+            "/api/v1/servo/diagnostics/tuning_registers").json()
+        assert body["position_p"] == 16
+        assert body["min_start_force"] == 50
+        assert body["position_d"] == 32
+
 
 class TestCalibrate:
     """POST /api/v1/servo/calibrate."""

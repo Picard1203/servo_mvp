@@ -2674,3 +2674,88 @@ chunk — narrows what needs LLM judgment, same principle T16 already applied.
 `ruff` added to `python/requirements-dev.txt`; config at `python/ruff.toml`.
 
 **Related:** T16, docs/CONVENTIONS.md.
+
+---
+
+### D35 — Commanded speed and actual speed disagree by roughly 1.5-2x
+**Status:** CLOSED · 1 September 2026 · Session 21 · **Severity:** medium
+
+**Resolution:** not a register-semantics bug. `PRESENT_SPEED` (0x3A, added
+this session) was sampled live throughout real moves at three commanded
+speeds (30/15/9 output °/s). At 9 and 15 °/s the measured speed matched the
+documented conversion (1 `GoalSpeed` unit ≈ 1 encoder count/s, scaled by the
+belt ratio) almost exactly — 9 °/s → ~150 counts/s, 15 °/s → ~225–250
+counts/s, both within a few percent of the formula's prediction. At 30 °/s,
+measured speed only reached the formula's ~500 counts/s prediction on long
+moves (60°+); short moves (30–45°) topped out at 200–300 — a plain
+acceleration ramp-up limit (not enough travel distance to reach cruise
+speed before decelerating), not a register discrepancy. The original
+"1.5–2.3x faster" reading came from wall-clock elapsed-time-over-distance,
+which is inflated by exactly this acceleration ramp and, once fine approach
+shipped, its two-leg overshoot-and-return structure — neither of which
+`PRESENT_SPEED` is sensitive to. **The belt-ratio hypothesis does not hold**:
+the documented conversion needed no correction factor once measured
+correctly.
+
+**Related:** D40 (closed the same session, from the same board time — the
+speed benchmark was D40c's own step 1), D32 (the speed-step enforcement this
+was blocking can now use the documented conversion as-is), R9 (the 30 °/s
+default this measurement was suspected of undermining stands unchanged).
+
+**Original report follows.**
+
+**Status:** open, not yet investigated · **Severity:** medium · **Found:**
+24 August 2026, bench-testing D32's proposed speed-step enforcement
+
+**The measurement.** Board-tested (not simulated): commanded a move of
+17.92° (90.07° → 72.06°) at `speed_dps: 1.8`. Settled somewhere between
+t=4.4s (still moving) and t=6.58s (settled) — actual average speed
+**2.7-4.1 deg/s against a commanded 1.8**, roughly **1.5x to 2.3x faster**
+than asked. This is why D32's speed-step enforcement (reusing `output_step_deg`
+for speed, on the theory that 1 `GoalSpeed` unit = 1 encoder count/s, same as
+position) was pulled from that item and postponed here instead of shipped on
+an unverified assumption.
+
+**Ruled out, both cheaply and concretely:**
+- **Python-side inconsistency between the position and speed conversions.**
+  `ServoStateStore.counts_from_output_deg()` and
+  `.counts_speed_from_output_speed()` (`servo_state.py:186-210`) read the
+  identical `self._servo_deg_per_output_deg` / `self._counts_per_servo_deg`
+  set once in `__init__` — they cannot disagree with each other within this
+  codebase.
+- **Firmware-side double conversion.** `AngleMath.h:56-64`
+  (`CountsPerSecondFromOutputSpeed()`) exists and independently reapplies the
+  belt ratio, which would explain a faster-than-commanded result — but
+  `BridgeApi.cpp`'s `HandleServoMove` never calls it; it passes the
+  Python-computed `speed_counts_per_second` straight through to
+  `ServoController::Move()` and on to `WritePosEx`. **Worth its own small
+  finding: this firmware function is written, header-only tested, and
+  unreachable from the live command path** — either dead code or a sign
+  something was meant to call it and doesn't.
+- **Fine-approach overshoot or acceleration ramp.** Both can only add time,
+  never remove it, so neither explains a *faster* result.
+
+**Not yet ruled out — the operator's suspicion, and the leading hypothesis:**
+the belt ratio (44/30 = **1.4667**) sits almost exactly at the low end of the
+measured ratio range, and its square (**2.1511**) sits near the high end. Both
+are consistent with the crude timing bounds above. This points at the
+servo's own `GoalSpeed` register (0x2E) not actually sharing position's
+encoder-count LSB the way `ServoRegisters.h:57`'s `// step/s` comment and the
+shared register-block/packet-format evidence suggested — i.e., the codebase's
+pipeline is internally consistent (see above), but the *assumption* that 1
+`GoalSpeed` unit is worth exactly one position-encoder-count/s may itself be
+wrong by a belt-ratio-shaped factor, applied once or twice somewhere between
+the register's real meaning and this project's model of it.
+
+**Next step:** a tighter bench test — command a few different `GoalSpeed`
+values, read `PRESENT_SPEED` (register 0x3A, not currently exposed by the
+API) during the move rather than inferring from elapsed wall-clock time, and
+correlate against known real angular distance over a precisely-timed window.
+The official Feetech memory-table PDF (`feetechrc.com`, password-gated) would
+settle this outright if it can be obtained. **Blocks:** the speed-step half
+of D32's enforcement.
+
+**Related:** D32 (the postponed enforcement this measurement blocks), R9
+(closed 30 August 2026 — the global move speed it fixed at 30 deg/s
+commanded depends on this measurement; resolving D35 may show that figure
+needs revisiting).

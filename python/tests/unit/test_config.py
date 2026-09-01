@@ -16,6 +16,8 @@ class TestSettings:
         assert 1 <= settings.angle_resolution <= 3
         assert settings.servo_deadband_counts == 0
         assert 0 <= settings.default_acceleration <= settings.max_acceleration
+        assert settings.fine_approach_final_speed_dps is None
+        assert settings.fine_approach_final_acceleration is None
 
     def test_environment_overrides(self, monkeypatch, backend):
         from app.core.config import get_settings

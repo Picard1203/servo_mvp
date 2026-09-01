@@ -20,6 +20,12 @@ uint16_t ClampMinStartForce(uint16_t force) {
   return force > units::kMaxTorqueLimit ? units::kMaxTorqueLimit : force;
 }
 
+uint8_t ClampByteRegister(int16_t value) {
+  if (value < 0) return 0;
+  if (value > 255) return 255;
+  return static_cast<uint8_t>(value);
+}
+
 uint8_t ClampAmplification(uint8_t amplification) {
   if (amplification < 1) return 1;
   if (amplification > units::kMaxAmplification) {
@@ -178,6 +184,64 @@ bool ServoController::SetTorque(bool enabled) {
 
 int ServoController::ReadTorqueRegister() {
   return bus_.ReadByte(reg::kTorqueSwitch);
+}
+
+TuningSnapshot ServoController::ReadTuningRegisters() {
+  TuningSnapshot snapshot;
+  const int p = bus_.ReadByte(reg::kPositionP);
+  const int d = bus_.ReadByte(reg::kPositionD);
+  const int i = bus_.ReadByte(reg::kPositionI);
+  const int min_start_force = bus_.ReadWord(reg::kMinStartForce);
+  const int cw = bus_.ReadByte(reg::kCwDeadZone);
+  const int ccw = bus_.ReadByte(reg::kCcwDeadZone);
+  if (p < 0 || d < 0 || i < 0 || min_start_force < 0 || cw < 0 || ccw < 0) {
+    return snapshot;
+  }
+  snapshot.position_p = static_cast<uint8_t>(p);
+  snapshot.position_d = static_cast<uint8_t>(d);
+  snapshot.position_i = static_cast<uint8_t>(i);
+  snapshot.min_start_force = static_cast<uint16_t>(min_start_force);
+  snapshot.cw_dead_zone = static_cast<uint8_t>(cw);
+  snapshot.ccw_dead_zone = static_cast<uint8_t>(ccw);
+  snapshot.valid = true;
+  return snapshot;
+}
+
+bool ServoController::WriteTuningRegisters(int16_t p, int16_t d, int16_t i,
+                                           int16_t min_start_force,
+                                           int16_t cw, int16_t ccw) {
+  bool ok = true;
+  if (p >= 0) {
+    ok = bus_.WriteEepromByte(reg::kPositionP, ClampByteRegister(p)) && ok;
+  }
+  if (d >= 0) {
+    ok = bus_.WriteEepromByte(reg::kPositionD, ClampByteRegister(d)) && ok;
+  }
+  if (i >= 0) {
+    ok = bus_.WriteEepromByte(reg::kPositionI, ClampByteRegister(i)) && ok;
+  }
+  if (min_start_force >= 0) {
+    const uint16_t clamped =
+        ClampMinStartForce(static_cast<uint16_t>(min_start_force));
+    ok = bus_.WriteEepromWord(reg::kMinStartForce,
+                              static_cast<int16_t>(clamped)) && ok;
+  }
+  if (cw >= 0) {
+    ok = bus_.WriteEepromByte(reg::kCwDeadZone, ClampDeadband(
+        static_cast<uint8_t>(ClampByteRegister(cw)))) && ok;
+  }
+  if (ccw >= 0) {
+    ok = bus_.WriteEepromByte(reg::kCcwDeadZone, ClampDeadband(
+        static_cast<uint8_t>(ClampByteRegister(ccw)))) && ok;
+  }
+  return ok;
+}
+
+int32_t ServoController::ReadPresentSpeed() {
+  const int raw = bus_.ReadWord(reg::kPresentSpeed);
+  if (raw < 0) return 0;
+  return SignMagnitude::Decode(static_cast<uint16_t>(raw),
+                               units::kPositionSignBit);
 }
 
 }  // namespace servo

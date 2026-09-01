@@ -96,6 +96,67 @@ class TorqueRegisterResponse(BaseModel):
     torque_register: Optional[int]
 
 
+class PresentSpeedResponse(BaseModel):
+    """Diagnostic read of the servo present-speed register.
+
+    Attributes:
+        present_speed_counts_s (Optional[int]): Signed counts per second,
+            or None if the read failed.
+    """
+
+    present_speed_counts_s: Optional[int]
+
+
+class TuningRegistersResponse(BaseModel):
+    """Diagnostic read of the servo's position-loop tuning registers.
+
+    Attributes:
+        position_p (Optional[int]): Proportional gain register, or None.
+        position_d (Optional[int]): Derivative gain register, or None.
+        position_i (Optional[int]): Integral gain register, or None.
+        min_start_force (Optional[int]): Minimum start-force register.
+        cw_dead_zone (Optional[int]): Clockwise dead-zone register.
+        ccw_dead_zone (Optional[int]): Counter-clockwise dead-zone register.
+    """
+
+    position_p: Optional[int]
+    position_d: Optional[int]
+    position_i: Optional[int]
+    min_start_force: Optional[int]
+    cw_dead_zone: Optional[int]
+    ccw_dead_zone: Optional[int]
+
+
+class TuningRegistersWriteRequest(BaseModel):
+    """Diagnostic write of any subset of the position-loop tuning registers.
+
+    Attributes:
+        position_p (Optional[int]): P gain, or None to leave it alone.
+        position_d (Optional[int]): D gain, or None to leave it alone.
+        position_i (Optional[int]): I gain, or None to leave it alone.
+        min_start_force (Optional[int]): Minimum start force, or None.
+        cw_dead_zone (Optional[int]): CW dead zone, or None.
+        ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+    """
+
+    position_p: Optional[int] = None
+    position_d: Optional[int] = None
+    position_i: Optional[int] = None
+    min_start_force: Optional[int] = None
+    cw_dead_zone: Optional[int] = None
+    ccw_dead_zone: Optional[int] = None
+
+
+class TuningRegistersWriteResponse(BaseModel):
+    """Acknowledgement of a tuning-register diagnostic write.
+
+    Attributes:
+        written (bool): True when every requested write was acknowledged.
+    """
+
+    written: bool
+
+
 class CalibrationResponse(BaseModel):
     """Result of capturing the datum.
 

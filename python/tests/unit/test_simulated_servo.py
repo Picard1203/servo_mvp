@@ -121,6 +121,42 @@ class TestTorque:
         sim.set_torque(True)
         assert sim.read_torque_register() == 1
 
+    def test_read_tuning_registers_reports_factory_defaults(self, sim):
+        """Nothing in this repository writes these registers - it must
+        report what an untouched servo actually ships with, not zeros."""
+        registers = sim.read_tuning_registers()
+        assert registers.position_p == 32
+        assert registers.position_d == 32
+        assert registers.position_i == 0
+        assert registers.min_start_force == 0
+        assert registers.cw_dead_zone == 1
+        assert registers.ccw_dead_zone == 1
+
+    def test_write_tuning_registers_updates_the_written_fields(self, sim):
+        assert sim.write_tuning_registers(position_p=16, min_start_force=50) \
+            is True
+        registers = sim.read_tuning_registers()
+        assert registers.position_p == 16
+        assert registers.min_start_force == 50
+
+    def test_write_tuning_registers_leaves_unset_fields_alone(self, sim):
+        sim.write_tuning_registers(position_p=16)
+        registers = sim.read_tuning_registers()
+        assert registers.position_d == 32
+        assert registers.position_i == 0
+        assert registers.cw_dead_zone == 1
+        assert registers.ccw_dead_zone == 1
+
+    def test_read_present_speed_is_zero_when_settled(self, sim):
+        assert sim.read_present_speed_counts_s() == 0
+
+    def test_read_present_speed_is_signed_toward_the_target(self, sim):
+        sim.set_deadband(1)
+        sim.command_move(4000, 2000, 50)
+        assert wait_until(lambda: sim.read_present_speed_counts_s() > 0)
+        sim.command_move(-4000, 2000, 50)
+        assert wait_until(lambda: sim.read_present_speed_counts_s() < 0)
+
 
 class TestRangeConfiguration:
     """configure_range records the travel-range mode."""

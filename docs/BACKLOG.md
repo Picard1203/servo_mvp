@@ -30,8 +30,8 @@ sessions actually spent, not the ones originally planned.
 | **18** | **DONE, 30 Aug 2026.** Board DB and logs wiped to a clean state following Session 17 soak suite. Preflight probe confirmed pristine hardware boot, 0 telemetry rows, fresh 32KB schema, unverified datum ready for Rig Day calibration. Closes the experimental development phase. | yes |
 | **19** | **DONE, 1 Sept 2026 (sprint continuation, not a new sprint — began Sun 30 Aug).** Rig assembled 31 Aug produced four hands-on findings; Session 14's `/twin-review` (`docs/REVIEW_FINDINGS.md`) triaged into the backlog for the first time — **D39–D46, T20, T21, R11, R12** filed, four of its HIGHs absorbed directly into the rig findings rather than filed separately. `REVIEW_FINDINGS.md` retired (content preserved in the entries above and in git history). Sprint plan and capacity written to `docs/sprint/SPRINTS.md`. **D39** (direction reversed) fixed and board-confirmed. Full sprint plan: `/home/egrisaru/.claude/plans/snuggly-growing-gosling.md`. | yes |
 | **20** | **DONE, 1 Sept 2026.** **D40a** — three CR-flagged HIGH prerequisites fixed and verified: ack surfacing on `command_move`/`command_stop`, fine-approach thread generation-token cancellation and isolation-abort, `None`-guard on a failed position read. **D40b** — live investigation with the operator holding the rig: false ack ruled out, firmware edge-triggering tested directly and ruled out, `MinStartForce` register found unconfigured and partially fixed, root cause identified as genuine position-dependent mechanical stiction/backlash in the belt-and-gear drivetrain. Full findings and caveats: `docs/backlog/D.md` D40. | yes |
-| **21** | Planned. **D40c/D40d** — the bounded convergence retry design D40b's findings feed into, then tuning against hand-held load. | yes |
-| **22** | Planned. **R11** (snap-to-nearest), rig protocols 1/2/3/5 under hand-held load — closing what that load genuinely proves for **T17/R2/D35**; current/torque/thermal criteria stay open for the real rig. | yes |
+| **21** | **DONE, 1 Sept 2026.** **D40c** — fine approach activated (was built, never switched on), hardened (re-opened and re-closed D40a's ack-surfacing gap on the fine-approach path), register readback and a live tuning campaign added: `MinStartForce` swept 0→150, closing at every one of 55 real moves within 0.00-0.03°, including a real oscillation found and fixed at the travel extremes. **D35 closed as a side effect** (`PRESENT_SPEED` sampling resolved the commanded-vs-actual speed question). Full findings: `docs/backlog/D.md` D40, `docs/history/CLOSED.md` D35. All numbers unloaded. | yes |
+| **22** | Planned. **D40d** — verify `MinStartForce=150` holds under hand-held load. **R11** (snap-to-nearest), rig protocols 1/2/3/5 under hand-held load — closing what that load genuinely proves for **T17/R2**; current/torque/thermal criteria stay open for the real rig. | yes |
 
 **R11 pulled into committed scope 1 Sept**, alongside T20 and the rig
 protocols — real capacity slack opened up once D39 and D40 were retuned
@@ -72,10 +72,9 @@ detail entries above (filed and ranked, not started).
 | D6 | App load time is sometimes slow (chunk-size half closed) | open · medium |
 | D7 | UI not verified on small operator screens | open · medium |
 | D28 | MCU boot-time `mcu_log` notify lost to a startup race | open · low |
-| D35 | Commanded vs. actual servo speed disagree ~1.5–2x | open · medium · not yet investigated |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
 | D38 | A saved position's "earlier reference" tag has no way to dismiss it | open · low · R10 |
-| D40 | A move settles short under load; re-commanding does not correct it | open · high · **sprint, Sessions 20–21** |
+| D40 | A move settles short under load; re-commanding does not correct it | open · high · D40a-c done, D40d remains · **sprint, Sessions 20–22** |
 | D41 | Firmware commands real moves off failed reads and malformed payloads | open · high · before real loaded rig day |
 | D42 | Errors that vanish: SSE stream, migration, sqlite writes | open · medium |
 | D43 | Guards that fail open on an invalid read | open · medium |
@@ -117,6 +116,7 @@ detail entries above (filed and ranked, not started).
 
 | | | closed |
 |---|---|---|
+| **D35** | Commanded vs. actual servo speed disagree ~1.5–2x | 1 September 2026 · not a register bug — resolved by measuring `PRESENT_SPEED` correctly, see `docs/history/CLOSED.md` |
 | **T22** | Reorganize docs: `CONTEXT.md`/`CONVENTIONS.md` into `docs/`, `CLOSED.md`/`AUDIT.md` into `docs/history/`, sprint docs into `docs/sprint/` | 1 September 2026 · `CLAUDE.md` stays at root |
 | **D39** | A positive angle turned the mechanism the wrong way | 1 September 2026 · `SERVO_DIRECTION` flipped, board-confirmed both directions; exposed and fixed an 8-test `.env` coupling |
 | **D1** | A move to a negative angle stops at 0 | 7 August 2026 · **Confirmed on hardware, both halves** |

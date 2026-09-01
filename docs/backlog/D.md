@@ -68,26 +68,118 @@ set aside once the unloaded data already supported the mechanical-stiction
 conclusion. Position P/D/I gain registers (0x15–0x17), also never configured,
 were noted as a further lead but not tested.
 
-**Proposed mechanism for D40c:** a bounded convergence retry that escalates
-rather than uses one fixed offset — a single value fails at the stiffest
-position measured. Start near 0.3–0.6°, escalate to at least 1.2° on
-continued failure (the −60° floor above), bounded attempt count, abort on no
-progress between attempts or on overload, recording an event either way.
-Config-gated, default off until board-validated. `fine_approach` stays a
-separate switch — whether its direction gate needs generalizing is still
-open, not exercised this session.
+**D40c — fine approach activated and hardened, register readback/write and
+PRESENT_SPEED added, a MinStartForce tuning campaign run, all this session
+(21), all unloaded.**
+
+1. **The anti-backlash "fine approach" (overshoot past the target, return
+   from one consistent direction) already existed in `motion_service.py` but
+   had never been switched on** (`FINE_APPROACH_ENABLED=false` in both
+   `.env` files) — D40b's whole investigation, and its mechanical-stiction
+   conclusion, ran with it off. Switched on, made bidirectional (was
+   downward-only), overshoot resized from bench data, travel-limit clamped.
+2. **Turning it on re-opened D40a's own defect on a second path.** The
+   overshoot and final legs called `command_move` and discarded the
+   acknowledgement, so a servo that never took the first step of a fine-
+   approach move was still reported `servo.move.accepted` — the identical
+   shape D40a fixed on the direct path, missed on this one, covered by
+   nothing because the test suite pins `FINE_APPROACH_ENABLED=false`
+   globally. Fixed: both legs now check their ack; `accepted` is recorded
+   only once the overshoot leg is confirmed, and a failed leg records
+   `servo.move.failed` naming which leg, never a false accept.
+3. **Register readback (0x15–0x1B) closes D40b's own unverified-write
+   gap.** Baseline read live: `P=32 D=32 I=0 MinStartForce=0 CW=0 CCW=0`.
+   D40b's fix wrote `MinStartForce=0` at boot — the readback confirms that
+   write genuinely lands, but `0` **is** the register's factory default, so
+   writing it changes nothing about servo behaviour. Whatever improvement
+   D40b measured cannot have come from that write specifically; D40b's own
+   caveats already point at the likelier explanation (a mid-session datum
+   recalibration confounding the before/after comparison). Dead zones read
+   `0`, not the servo's own factory `1` — a *different* register this
+   firmware does write nonzero-effectively at boot, confirming the write
+   path itself works and ruling the silent-write-failure hypothesis out for
+   good. A matching **write** endpoint was added so campaign values could be
+   tried live, one Bridge round trip, no reflash per value — the value
+   actually kept gets written into `Config.h` afterward, same as always
+   intended.
+4. **D35 resolved as a side effect, closed in `docs/history/CLOSED.md`** —
+   `PRESENT_SPEED` (0x3A) is now read and was sampled live throughout real
+   moves at three commanded speeds.
+5. **The measurement tool itself (`tools/fine_approach_trial.py`, new) had
+   two real bugs, both caught by comparing its numbers against what the
+   operator directly observed on the rig, both fixed:** an event-timestamp
+   comparison that used microsecond precision against the server's second-
+   precision timestamps (a same-second event could sort as "older" than the
+   read that should have matched it); and a settle check that trusted the
+   first `moving == false` poll, which can land in a brief pause between two
+   corrective micro-moves rather than the true final position. Fixed with a
+   debounce requiring both `moving == false` **and** an unchanged
+   `output_deg`, sustained continuously, before a reading counts as final.
+6. **Baseline accuracy, N=5 at −60°/0°/60°, `MinStartForce=0`
+   (unloaded):** mean |error| 0.39–0.47°, ~0.9° peak spread, and a clear
+   **bistable** signature — each target alternated between two fixed nearby
+   resting points repeat to repeat, not random noise. This is the real,
+   N=5 noise floor; the earlier N=2 hint from this session's own manual
+   testing (0.72°) was directional only.
+7. **`MinStartForce` sweep — 0 → 50 → 100 → 150, isolated one variable at a
+   time, N=5 per value at the anchor targets, then the full 11-target set
+   (0/30/45/60/75/90° and negatives) at the value kept.** 100 alone dropped
+   mean error to 0.01–0.03° at every anchor and made every repeat land
+   identically — an 8–10× improvement over baseline, confirmed genuine once
+   the tool's settle-detection bug (above) was fixed.
+8. **A genuine hardware finding at the travel extremes, not a tuning
+   artifact.** At `MinStartForce=100`, ±90° (and, less severely, 75°) never
+   settled — the shaft kept trembling between two positions roughly 0.06°
+   apart indefinitely, stopping only when a new command interrupted it.
+   Matches a textbook stiction-driven limit cycle (small correction can't
+   break static friction, force builds, it slips and overshoots, repeat) and
+   independently, this exact servo's own documented behaviour ("the servo
+   exhibits jitter or oscillation when the arm is extended" — Robo9 STS3215
+   bench testing). Load, or effective load, means more of exactly this
+   leverage — **D40d must watch for this specifically, not just re-measure
+   accuracy.** Two independent fixes were tried and compared, live, watching
+   the shaft directly rather than trusting a single poll: restoring the
+   dead zone to the servo's factory default of `1` (currently `0`, this
+   firmware's own boot write) stopped the oscillation at both 90° and 75°
+   but cost accuracy (~0.13° landed, coarser than elsewhere); raising
+   `MinStartForce` to **150** with the dead zone left at `0` also stopped it
+   cleanly **and** kept the tight accuracy.
+9. **`MinStartForce=150`, dead zone unchanged at `0`, is the result kept.**
+   Full 11-target sweep, N=5 each, unloaded: **every single repeat landed
+   identically at every target**, mean error 0.00–0.03° everywhere,
+   including ±90° and ±75° — no oscillation observed across repeated
+   15-second holds. Written into `Config.h::kMinStartForce` as the
+   permanent boot value (was `0`), confirmed by a fresh flash + reboot +
+   readback reproducing `150`. Register is `0`–`1000`; `150` is 15% of
+   range, not a value pushing any limit — **safe to retune again if a
+   future problem surfaces**, the same live-write-then-lock-into-`Config.h`
+   process this session used, no code change needed for the trial itself.
+10. **Creep speed (`fine_approach_final_speed_dps`, config-only override,
+    built and unit-tested this session) was not needed.** `MinStartForce`
+    alone reached the encoder's own resolution floor; the setting stays
+    unset (`None`, today's behaviour unchanged) and is available for D40d
+    if a hand-held load changes the picture.
+
+**Caveat repeated deliberately: every number in D40c is unloaded.** D40b
+already recorded that mistake once (its own testing was unloaded, the
+loaded comparison set aside) — D40d exists specifically to check whether
+`MinStartForce=150` holds with the operator's hand on the mechanism, not to
+re-run the tuning campaign from scratch.
 
 **Twin-path:** `move_to()` and `move_to_counts()` both funnel through the
-same D40a-fixed `_command()`, so the saved-position "go" path is covered by
-the same fix, not a separate one.
+same D40a/D40c-fixed `_command()`, so the saved-position "go" path is
+covered by the same fixes, not separate ones. Item 2's ack-drop fix is
+itself the twin-path finding for D40c (§2 above).
 
 **Acceptance:** a move converges to its target within a stated tolerance, or
 reports plainly that it could not — never silently settles short while
-reporting success. D40a and D40b done; D40c (the retry) and D40d (tuning)
-remain open, Session 21.
+reporting success. D40a, D40b and D40c done; D40d (verify under hand-held
+load) remains open, Session 22.
 
 **Related:** D46 (its first finding closed by D40a), ADR-0008 (the anti-pattern
-D40a's ack-surfacing mirrors on the write side).
+D40a's ack-surfacing mirrors on the write side, now closed on both the
+direct and fine-approach paths), D35 (closed the same session, from this
+campaign's own speed-benchmark data — see `docs/history/CLOSED.md`).
 
 ---
 
@@ -312,65 +404,6 @@ steady-state notifies are not affected, whichever is cheaper to establish
 first.
 
 **Related:** D3, `docs/adr/0009-connection-ceiling.md`.
-
----
-
-### D35 — Commanded speed and actual speed disagree by roughly 1.5-2x
-**Status:** open, not yet investigated · **Severity:** medium · **Found:**
-24 August 2026, bench-testing D32's proposed speed-step enforcement
-
-**The measurement.** Board-tested (not simulated): commanded a move of
-17.92° (90.07° → 72.06°) at `speed_dps: 1.8`. Settled somewhere between
-t=4.4s (still moving) and t=6.58s (settled) — actual average speed
-**2.7-4.1 deg/s against a commanded 1.8**, roughly **1.5x to 2.3x faster**
-than asked. This is why D32's speed-step enforcement (reusing `output_step_deg`
-for speed, on the theory that 1 `GoalSpeed` unit = 1 encoder count/s, same as
-position) was pulled from that item and postponed here instead of shipped on
-an unverified assumption.
-
-**Ruled out, both cheaply and concretely:**
-- **Python-side inconsistency between the position and speed conversions.**
-  `ServoStateStore.counts_from_output_deg()` and
-  `.counts_speed_from_output_speed()` (`servo_state.py:186-210`) read the
-  identical `self._servo_deg_per_output_deg` / `self._counts_per_servo_deg`
-  set once in `__init__` — they cannot disagree with each other within this
-  codebase.
-- **Firmware-side double conversion.** `AngleMath.h:56-64`
-  (`CountsPerSecondFromOutputSpeed()`) exists and independently reapplies the
-  belt ratio, which would explain a faster-than-commanded result — but
-  `BridgeApi.cpp`'s `HandleServoMove` never calls it; it passes the
-  Python-computed `speed_counts_per_second` straight through to
-  `ServoController::Move()` and on to `WritePosEx`. **Worth its own small
-  finding: this firmware function is written, header-only tested, and
-  unreachable from the live command path** — either dead code or a sign
-  something was meant to call it and doesn't.
-- **Fine-approach overshoot or acceleration ramp.** Both can only add time,
-  never remove it, so neither explains a *faster* result.
-
-**Not yet ruled out — the operator's suspicion, and the leading hypothesis:**
-the belt ratio (44/30 = **1.4667**) sits almost exactly at the low end of the
-measured ratio range, and its square (**2.1511**) sits near the high end. Both
-are consistent with the crude timing bounds above. This points at the
-servo's own `GoalSpeed` register (0x2E) not actually sharing position's
-encoder-count LSB the way `ServoRegisters.h:57`'s `// step/s` comment and the
-shared register-block/packet-format evidence suggested — i.e., the codebase's
-pipeline is internally consistent (see above), but the *assumption* that 1
-`GoalSpeed` unit is worth exactly one position-encoder-count/s may itself be
-wrong by a belt-ratio-shaped factor, applied once or twice somewhere between
-the register's real meaning and this project's model of it.
-
-**Next step:** a tighter bench test — command a few different `GoalSpeed`
-values, read `PRESENT_SPEED` (register 0x3A, not currently exposed by the
-API) during the move rather than inferring from elapsed wall-clock time, and
-correlate against known real angular distance over a precisely-timed window.
-The official Feetech memory-table PDF (`feetechrc.com`, password-gated) would
-settle this outright if it can be obtained. **Blocks:** the speed-step half
-of D32's enforcement.
-
-**Related:** D32 (the postponed enforcement this measurement blocks), R9
-(closed 30 August 2026 — the global move speed it fixed at 30 deg/s
-commanded depends on this measurement; resolving D35 may show that figure
-needs revisiting).
 
 ---
 

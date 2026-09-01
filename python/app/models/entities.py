@@ -99,6 +99,27 @@ class TelemetrySnapshot:
 
 
 @dataclass(slots=True, frozen=True)
+class TuningRegisters:
+    """Diagnostic read of the servo's position-loop tuning registers.
+
+    Attributes:
+        position_p (int): Proportional gain register (0x15).
+        position_d (int): Derivative gain register (0x16).
+        position_i (int): Integral gain register (0x17).
+        min_start_force (int): Minimum start-force register (0x18).
+        cw_dead_zone (int): Clockwise dead-zone register (0x1A).
+        ccw_dead_zone (int): Counter-clockwise dead-zone register (0x1B).
+    """
+
+    position_p: int
+    position_d: int
+    position_i: int
+    min_start_force: int
+    cw_dead_zone: int
+    ccw_dead_zone: int
+
+
+@dataclass(slots=True, frozen=True)
 class ServoStateView:
     """Coherent snapshot of servo, lock, and baseline state.
 

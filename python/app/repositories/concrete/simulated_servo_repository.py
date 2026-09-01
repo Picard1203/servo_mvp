@@ -83,24 +83,33 @@ class SimulatedServoRepository:
         )
 
     def command_move(self, target_counts: int, speed_counts_s: int,
-                     acceleration: int) -> None:
+                     acceleration: int) -> bool:
         """Starts a move toward an absolute counts target.
 
         Args:
             target_counts (int): Absolute encoder counts target.
             speed_counts_s (int): Speed in counts per second.
             acceleration (int): Servo acceleration parameter (0-254).
+
+        Returns:
+            bool: Always True on simulated hardware.
         """
         with self._lock:
             self._target = float(target_counts)
             self._speed_counts_s = float(max(1, speed_counts_s))
             self._acceleration = acceleration
             self._overload = False
+        return True
 
-    def command_stop(self) -> None:
-        """Stops motion at the current position."""
+    def command_stop(self) -> bool:
+        """Stops motion at the current position.
+
+        Returns:
+            bool: Always True on simulated hardware.
+        """
         with self._lock:
             self._target = self._counts
+        return True
 
     def configure_range(self, multi_turn: bool, angle_resolution: int) -> None:
         """Records the range configuration.

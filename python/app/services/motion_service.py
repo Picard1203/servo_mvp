@@ -1,5 +1,6 @@
 """Movement orchestration: lock gate, settle-wait, and fault recovery."""
 
+import sqlite3
 from threading import Thread
 from time import monotonic, sleep
 from typing import Optional
@@ -9,6 +10,7 @@ from Logger461 import logger
 from app.core.config import Settings
 from app.core.events import EventService
 from app.core.exceptions import (
+    CommandNotAcknowledgedError,
     IsolatedError,
     LockedAndIsolatedError,
     LockedError,
@@ -28,6 +30,7 @@ class MotionService:
         _state (ServoStateStore): Shared servo state store.
         _events (EventService): Event service for recording audit events.
         _settings (Settings): Application configuration settings.
+        _move_generation (int): Counter bumped on each dispatched move.
     """
 
     def __init__(self, servo: ServoRepository, state: ServoStateStore,
@@ -36,6 +39,7 @@ class MotionService:
         self._state: ServoStateStore = state
         self._events: EventService = events
         self._settings: Settings = settings
+        self._move_generation: int = 0
 
     def move_to(self, target_deg: float,
                 acceleration: Optional[int] = None) -> None:
@@ -118,16 +122,25 @@ class MotionService:
 
         self._state.set_target(target_deg)
 
+        from_deg = round(start_deg, 2) if start_deg is not None else None
+
+        self._move_generation += 1
+        generation = self._move_generation
+
         if self._needs_fine_approach(start_deg, target_deg) is True:
             Thread(target=self._fine_approach,
-                   args=(target_deg, target_counts, speed_counts,
-                         acceleration),
+                   args=(generation, target_deg, target_counts,
+                         speed_counts, acceleration),
                    daemon=True).start()
         else:
-            self._servo.command_move(target_counts, speed_counts,
-                                     acceleration)
+            acked = self._servo.command_move(target_counts, speed_counts,
+                                             acceleration)
+            if acked is False:
+                self._raise_not_acknowledged(
+                    "servo.move.failed",
+                    f"move to {target_deg:.2f} deg was not acknowledged",
+                    {"target_deg": target_deg})
 
-        from_deg = round(start_deg, 2) if start_deg is not None else None
         self._events.record("servo.move.accepted",
                             f"move to {target_deg:.2f} deg",
                             {"from_deg": from_deg,
@@ -140,8 +153,15 @@ class MotionService:
                            "acceleration": acceleration})
 
     def stop(self) -> None:
-        """Stops the current move at the present position."""
-        self._servo.command_stop()
+        """Stops the current move at the present position.
+
+        Raises:
+            CommandNotAcknowledgedError: If the servo did not acknowledge.
+        """
+        acked = self._servo.command_stop()
+        if acked is False:
+            self._raise_not_acknowledged(
+                "servo.stop.failed", "stop was not acknowledged", {})
         self._state.mark_target_stale()
         deg = self._state.current_output_deg()
         at_deg = round(deg, 2) if deg is not None else None
@@ -174,60 +194,100 @@ class MotionService:
 
         Raises:
             InvalidReadingError: When current position is unknown.
+            CommandNotAcknowledgedError: If the servo did not acknowledge.
         """
         counts = self._state.read_counts()
-        self._servo.command_move(
+        acked = self._servo.command_move(
             counts, self._state.counts_speed_from_output_speed(
                 self._settings.default_speed_dps),
             self._settings.default_acceleration)
+        if acked is False:
+            self._raise_not_acknowledged(
+                "servo.recover.failed", "recover was not acknowledged",
+                {"at_counts": counts})
         self._events.record("servo.fault.recovered",
                             "overload fault cleared by re-command", {})
         logger.info("overload fault cleared by re-command",
                     metadata={"event": "servo.fault.recovered"},
                     extra={"at_counts": counts})
 
-    def _needs_fine_approach(self, start_deg: float,
+    def _raise_not_acknowledged(self, event: str, message: str,
+                                metadata: dict) -> None:
+        """Records and raises a non-acknowledgement, never a false success.
+
+        Args:
+            event (str): Event name for the audit log and event stream.
+            message (str): Human-readable failure message.
+            metadata (dict): Structured context for both.
+
+        Raises:
+            CommandNotAcknowledgedError: Always.
+        """
+        self._events.record(event, message, metadata)
+        logger.error(message, metadata={"event": event}, extra=metadata)
+        raise CommandNotAcknowledgedError(message, metadata=metadata)
+
+    def _needs_fine_approach(self, start_deg: Optional[float],
                              target_deg: float) -> bool:
         """Decides whether the anti-backlash approach applies.
 
         Args:
-            start_deg (float): Current output angle.
+            start_deg (Optional[float]): Current output angle, or None.
             target_deg (float): Requested output angle.
 
         Returns:
-            bool: True when fine approach is enabled and target is below start.
+            bool: True when enabled and target is below start.
         """
+        if start_deg is None:
+            return False
         return ((self._settings.fine_approach_enabled is True)
                 and (target_deg < start_deg))
 
-    def _fine_approach(self, target_deg: float, target_counts: int,
-                       speed_counts: int, acceleration: int) -> None:
+    def _fine_approach(self, generation: int, target_deg: float,
+                       target_counts: int, speed_counts: int,
+                       acceleration: int) -> None:
         """Runs the two-leg consistent-direction approach.
 
         Args:
+            generation (int): Move generation this thread was started for.
             target_deg (float): Requested output angle.
             target_counts (int): Final absolute counts target.
             speed_counts (int): Speed in counts per second.
             acceleration (int): Servo acceleration parameter.
         """
-        overshoot_deg = (target_deg
-                         - self._settings.fine_approach_overshoot_deg)
-        overshoot_counts = self._state.counts_from_output_deg(overshoot_deg)
-        self._servo.command_move(overshoot_counts, speed_counts,
-                                 acceleration)
-        deadline = (monotonic()
-                    + self._settings.fine_approach_timeout_seconds)
-        is_moving = True
-        while (monotonic() < deadline) and (is_moving is True):
-            sleep(0.05)
-            is_moving = (self._servo.read_snapshot().moving is True)
-        self._servo.command_move(target_counts, speed_counts, acceleration)
-        logger.debug("fine approach: final leg commanded",
-                     metadata={"event": "servo.move.fine_approach"},
-                     extra={"target_deg": target_deg})
-        self._events.record("servo.move.fine_approach",
-                            f"fine approach to {target_deg:.2f} deg",
-                            {"overshoot_deg": round(overshoot_deg, 2)})
+        try:
+            overshoot_deg = (target_deg
+                             - self._settings.fine_approach_overshoot_deg)
+            overshoot_counts = self._state.counts_from_output_deg(
+                overshoot_deg)
+            self._servo.command_move(overshoot_counts, speed_counts,
+                                     acceleration)
+            deadline = (monotonic()
+                        + self._settings.fine_approach_timeout_seconds)
+            is_moving = True
+            while (monotonic() < deadline) and (is_moving is True):
+                sleep(0.05)
+                is_moving = (self._servo.read_snapshot().moving is True)
+            if generation != self._move_generation:
+                logger.debug("fine approach: superseded, final leg skipped",
+                             metadata={"event": "servo.move.fine_approach"})
+                return
+            if self._state.is_isolated_intent() is True:
+                logger.debug("fine approach: isolated, final leg skipped",
+                             metadata={"event": "servo.move.fine_approach"})
+                return
+            self._servo.command_move(target_counts, speed_counts,
+                                     acceleration)
+            logger.debug("fine approach: final leg commanded",
+                         metadata={"event": "servo.move.fine_approach"},
+                         extra={"target_deg": target_deg})
+            self._events.record("servo.move.fine_approach",
+                                f"fine approach to {target_deg:.2f} deg",
+                                {"overshoot_deg": round(overshoot_deg, 2)})
+        except (sqlite3.OperationalError, ValueError):
+            logger.exception(
+                "fine approach failed",
+                metadata={"event": "servo.move.fine_approach_error"})
 
     def _validate_reachable(self, target_deg: float) -> None:
         """Refuses targets the servo would silently clamp.

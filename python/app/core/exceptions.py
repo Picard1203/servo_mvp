@@ -126,3 +126,9 @@ class StepError(ValidationException, code="STEP"):
     """Raised when a commanded angle violates the configured step size."""
 
     reason = "step"
+
+
+class CommandNotAcknowledgedError(ServoAppException, code="COMMAND_NOT_ACKNOWLEDGED"):
+    """Raised when the servo did not acknowledge a dispatched command."""
+
+    reason = "command_not_acknowledged"

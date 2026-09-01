@@ -1,11 +1,13 @@
 """MotionService: validation, gating, settle-wait, fine approach, recover."""
 
+import sqlite3
 import time
+from dataclasses import replace
 
 import pytest
 
-from app.core.exceptions import (IsolatedError, LockedError, MovingError,
-                                 StepError)
+from app.core.exceptions import (CommandNotAcknowledgedError, IsolatedError,
+                                 LockedError, MovingError, StepError)
 from tests.conftest import wait_until
 
 
@@ -176,6 +178,40 @@ class TestAcceleration:
         assert sim._acceleration == 99
 
 
+class TestCommandAck:
+    """A command the servo never acknowledged is never reported as
+    accepted - the write-side twin of ADR-0008's rule for reads."""
+
+    def test_unacknowledged_move_raises(self, motion, sim, monkeypatch):
+        monkeypatch.setattr(sim, "command_move", lambda *a, **k: False)
+        with pytest.raises(CommandNotAcknowledgedError):
+            motion.move_to(12.0)
+
+    def test_unacknowledged_move_does_not_report_accepted(
+            self, motion, backend, sim, monkeypatch):
+        monkeypatch.setattr(sim, "command_move", lambda *a, **k: False)
+        with pytest.raises(CommandNotAcknowledgedError):
+            motion.move_to(12.0)
+        events = [e.event for e in _events(backend)]
+        assert "servo.move.accepted" not in events
+        assert "servo.move.failed" in events
+
+    def test_acknowledged_move_still_reports_accepted(self, motion, backend):
+        motion.move_to(12.0)
+        events = [e.event for e in _events(backend)]
+        assert "servo.move.accepted" in events
+
+    def test_unacknowledged_stop_raises(self, motion, sim, monkeypatch):
+        monkeypatch.setattr(sim, "command_stop", lambda *a, **k: False)
+        with pytest.raises(CommandNotAcknowledgedError):
+            motion.stop()
+
+    def test_unacknowledged_recover_raises(self, motion, sim, monkeypatch):
+        monkeypatch.setattr(sim, "command_move", lambda *a, **k: False)
+        with pytest.raises(CommandNotAcknowledgedError):
+            motion.recover()
+
+
 class TestFineApproach:
     """Consistent-direction anti-backlash approach."""
 
@@ -214,6 +250,107 @@ class TestFineApproach:
         motion.move_to(18.0)   # upward from 0: no overshoot leg
         events = [e.event for e in _events(backend)]
         assert "servo.move.fine_approach" not in events
+
+    def test_unknown_start_position_skips_fine_approach(
+            self, monkeypatch, backend, sim):
+        """A failed read must not crash the backlash decision - it has no
+        information to decide with, so it declines rather than guesses
+        (ADR-0008's rule, applied to a decision instead of a display)."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        monkeypatch.setattr(get_state_store(), "current_output_deg",
+                            lambda: None)
+        motion = get_motion_service()
+        motion.move_to(12.0)   # must not raise TypeError
+        events = [e.event for e in _events(backend)]
+        assert "servo.move.fine_approach" not in events
+        assert "servo.move.accepted" in events
+
+    def test_second_move_during_approach_supersedes_the_stale_thread(
+            self, monkeypatch, backend, sim):
+        """The thread must never override a more recent command once it
+        finally wakes up - the exact "second press does nothing, and the
+        old target comes back anyway" shape from the operator's report."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        monkeypatch.setattr(backend.settings,
+                            "fine_approach_timeout_seconds", 0.2)
+        from app.deps import get_motion_service, get_state_store
+        motion = get_motion_service()
+        store = get_state_store()
+        sim.set_deadband(1)
+        motion.move_to(30.0)
+        assert wait_until(lambda: not sim.read_snapshot().moving, timeout=6)
+        motion.move_to(12.0)   # downward: spawns the fine-approach thread
+        motion.move_to(18.0)   # supersedes it before the thread's deadline
+        assert wait_until(
+            lambda: abs(store.current_output_deg() - 18.0) < 0.3, timeout=8)
+        time.sleep(0.5)   # let the stale thread's deadline pass and fire
+        assert abs(store.current_output_deg() - 18.0) < 0.3
+
+    def test_isolating_during_approach_aborts_the_final_leg(
+            self, monkeypatch, backend, sim):
+        """A guard that fails open on a state change mid-flight: isolating
+        must stop the stale thread from writing a goal position that
+        torque is about to be restored into. Forces the thread to stay in
+        its wait loop for a fixed, generous window instead of racing real
+        servo settle timing against the main thread's isolate call."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        monkeypatch.setattr(backend.settings,
+                            "fine_approach_timeout_seconds", 0.5)
+        from app.deps import (get_isolation_service, get_motion_service,
+                              get_state_store)
+        monkeypatch.setattr(get_state_store(), "current_output_deg",
+                            lambda: 30.0)
+        motion = get_motion_service()
+
+        calls = []
+        real_command_move = sim.command_move
+        real_read_snapshot = sim.read_snapshot
+
+        def _recording(target_counts, speed_counts_s, acceleration):
+            calls.append(target_counts)
+            return real_command_move(target_counts, speed_counts_s,
+                                     acceleration)
+
+        monkeypatch.setattr(sim, "command_move", _recording)
+        monkeypatch.setattr(
+            sim, "read_snapshot",
+            lambda: replace(real_read_snapshot(), moving=True))
+
+        motion.move_to(12.0)   # downward: spawns the fine-approach thread
+        get_isolation_service().set_isolated(True)   # well inside the window
+        time.sleep(0.8)   # let the thread's deadline pass and try to fire
+
+        assert len(calls) == 1   # only the overshoot leg, never the final one
+
+    def test_locked_datum_read_inside_the_thread_is_logged_not_swallowed(
+            self, monkeypatch, backend, sim):
+        """The documented real risk on this filesystem (CLAUDE.md 6):
+        SQLite cannot take its own lock on the CIFS mount. Only the
+        overshoot leg's own conversion sees it, so the synchronous
+        dispatch path (already exercised, unaffected) must still work -
+        this proves the failure surfaces from inside the thread."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        target_deg = 12.0
+        overshoot_deg = (target_deg
+                        - backend.settings.fine_approach_overshoot_deg)
+        real_counts_from_output_deg = store.counts_from_output_deg
+
+        def _flaky(output_deg):
+            if output_deg == overshoot_deg:
+                raise sqlite3.OperationalError("database is locked")
+            return real_counts_from_output_deg(output_deg)
+
+        monkeypatch.setattr(store, "counts_from_output_deg", _flaky)
+        logged = []
+        monkeypatch.setattr("app.services.motion_service.logger.exception",
+                            lambda *a, **k: logged.append(a))
+        motion = get_motion_service()
+        motion.move_to(target_deg)   # downward: spawns the thread
+        assert wait_until(lambda: len(logged) > 0, timeout=4)
 
 
 def _events(backend):

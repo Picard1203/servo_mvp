@@ -122,20 +122,27 @@ class BridgeServoRepository(ServoRepository):
             return self._empty_snapshot()
 
     def command_move(self, target_counts: int, speed_counts_s: int,
-                     acceleration: int) -> None:
+                     acceleration: int) -> bool:
         """Starts a move toward an absolute counts target.
 
         Args:
             target_counts (int): Absolute encoder counts target.
             speed_counts_s (int): Speed in counts per second.
             acceleration (int): Servo acceleration parameter (0-254).
+
+        Returns:
+            bool: True when the servo acknowledged the command.
         """
         payload = f"{target_counts},{speed_counts_s},{acceleration}"
-        self._command("servo_move", payload)
+        return self._command("servo_move", payload)
 
-    def command_stop(self) -> None:
-        """Stops motion at the current position."""
-        self._command("servo_stop", "")
+    def command_stop(self) -> bool:
+        """Stops motion at the current position.
+
+        Returns:
+            bool: True when the servo acknowledged the command.
+        """
+        return self._command("servo_stop", "")
 
     def set_deadband(self, counts: int) -> None:
         """Configures the servo dead-zone width.
@@ -204,12 +211,15 @@ class BridgeServoRepository(ServoRepository):
                          extra={"function": name, "error": str(exc)})
             return ""
 
-    def _command(self, name: str, payload: str) -> None:
+    def _command(self, name: str, payload: str) -> bool:
         """Invokes a Bridge function and logs a non-ok acknowledgement.
 
         Args:
             name (str): Bridge function name.
             payload (str): Request payload string.
+
+        Returns:
+            bool: True when the Bridge replied "ok".
         """
         with self._lock:
             reply = self._call(name, payload)
@@ -218,6 +228,8 @@ class BridgeServoRepository(ServoRepository):
             logger.warning("servo command not acknowledged",
                            metadata={"event": "servo.command.rejected"},
                            extra={"function": name, "reply": reply})
+            return False
+        return True
 
     @staticmethod
     def _empty_snapshot() -> TelemetrySnapshot:

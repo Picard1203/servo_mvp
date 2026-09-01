@@ -180,6 +180,17 @@ console.log("\nD14 - a refused connection reads as something to act on");
   check("a 5xx reads as a fault, distinct from a refusal",
         /reported a fault/.test(lastToast().message), lastToast().message);
 
+  /* a mapped reason renders its own wording even at 5xx, not the
+     generic fault fallback above */
+  toasts.length = 0;
+  const notAcked = new Error("move to 90.00 deg was not acknowledged");
+  notAcked.status = 500;
+  notAcked.reason = "command_not_acknowledged";
+  ctx.sayError(notAcked);
+  check("an unacknowledged command tells the operator nothing moved",
+        /did not confirm the command/.test(lastToast().message) &&
+        /nothing moved/.test(lastToast().message), lastToast().message);
+
   /* ---------- D16: nothing is rendered as measured ---------- */
   console.log("\nD16 - a failed read renders no measurements");
   const good = {

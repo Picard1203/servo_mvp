@@ -307,6 +307,8 @@ const REFUSALS = {
   stale_position: "someone else changed this position — reloading it now",
   invalid_reading: "refused — the servo did not answer, so its position "
                  + "is not known",
+  command_not_acknowledged: "the servo did not confirm the command — "
+                          + "nothing moved",
   unreachable: "the controller is busy or did not answer — wait a moment "
              + "and try again",
 };

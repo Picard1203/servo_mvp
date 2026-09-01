@@ -5,6 +5,242 @@ Full entries for every open `D`-numbered item. Indexed one line each in
 
 ---
 
+### D40 — A move settles short under load and re-commanding the same target does not correct it
+**Status:** open · **Severity:** high · **Found:** rig hand-testing, 1
+September 2026 · **the operator's own top-priority defect**
+
+Under load, a move to e.g. 90° can settle at ~89°. Pressing 90° again produces
+no corrective step. Commanding several degrees further does reach the target.
+The operator cannot trust that the number on screen is the number achieved.
+
+**Ruled out, read from code, this session.** No stale-target short-circuit
+exists in `MotionService.move_to()`/`_command()` — every call reaches
+`command_move()` unconditionally, so the second press *is* dispatched.
+`servo_deadband_counts` is `0` on the board's live `.env`, so no software dead
+zone is swallowing it.
+
+**Three live candidates, in the order the investigation should test them:**
+1. **Acked as success but never executed** — `_command()`
+   (`bridge_servo_repository.py:207-220`) only logs a warning on a non-`"ok"`
+   Bridge reply and returns success regardless (Session 14 `/twin-review`,
+   backend finding 1, HIGH — verified with a stubbed `"err"` reply). "Press 90
+   again, nothing happens" is exactly what a false `202 {"accepted": true}`
+   looks like.
+2. **Static friction under load** — the servo's own controller may not break
+   stiction for a residual of a few counts, but can for a larger error.
+   Matches "a few degrees further works."
+3. **Direction-dependent backlash** — an anti-backlash mechanism already
+   exists (`fine_approach_enabled`, off by default, never board-tuned) but is
+   one-directional: `_needs_fine_approach()` (`motion_service.py:189-201`)
+   only fires when `target_deg < start_deg`. If the shortfall bites on
+   *increasing* moves, it cannot help as written.
+
+**Prerequisites before `fine_approach` is ever flipped on** — both live code
+waiting on that flag, both Session 14 `/twin-review` HIGHs:
+- No `None`-guard on `start_deg`: `current_output_deg()` returns `None` on an
+  invalid read, `_needs_fine_approach()` does `target_deg < start_deg`
+  unguarded. **Verified**: reproduces `TypeError` at `motion_service.py:177`.
+- The fine-approach thread (`motion_service.py:98-102`) has no cancellation
+  and unconditionally issues its *original* target after sleeping up to 30s —
+  a second `move_to()` call during that sleep is silently overridden
+  afterward — and its body is unguarded, so any exception inside it
+  (including the one above) is swallowed by `threading` with no trace.
+
+**Proposed mechanism:** a bounded convergence retry — after settle, if
+|measured − target| exceeds a tolerance, re-command with an offset large
+enough to break stiction, up to N attempts, aborting on overload or on no
+progress between attempts, recording an event either way. Config-gated,
+default off until board-validated. `fine_approach` stays a separate switch —
+it addresses backlash direction, not residual error; whether its direction
+gate needs generalizing is answered by the investigation above, not assumed.
+
+**Twin-path:** `move_to()` and `move_to_counts()` are the two entry points,
+and `move_to_counts()` is what every saved-position "go" uses — D2's shape
+(`calibrate()` fixed, `capture()` not) if the mechanism only reaches one.
+
+**Acceptance:** a move converges to its target within a stated tolerance, or
+reports plainly that it could not — never silently settles short while
+reporting success. Reproduced and tuned with the operator holding the rig as
+a temporary fixed point (the real pipe is not yet connected to it); tolerance
+and attempt-count values are re-tuned once it is.
+
+**Related:** D46 (the false-ack finding this investigation checks first),
+ADR-0008 (the anti-pattern this mirrors on the Python side).
+
+---
+
+### D41 — Firmware commands real moves off failed reads and malformed payloads
+**Status:** open · **Severity:** high · **Found:** Session 14 `/twin-review`
+(`docs/REVIEW_FINDINGS.md`, firmware findings 2–4), triaged 1 September 2026
+
+ADR-0008's anti-pattern (fixed on the Python side) reproduced in firmware,
+confirmed independently by multiple lenses:
+- `ReadRawCounts()` returns `0` on a failed position read with no failure
+  signal, and three callers — `Stop()`, `SetTorque(true)`, `ClearFault()`
+  (`ServoController.cpp:68-71,95-102,140-145,151-165`) — use the result as
+  "hold here" and dispatch it through `Move()`, which acks success
+  regardless. A bus glitch during Stop or torque-enable can silently command
+  the servo toward position 0 while reporting success.
+- `ReadSnapshot()` doesn't validate its 6 individual reads before marking the
+  snapshot `valid=true` (`:43-66`) — a failed status-byte read defaults
+  `faults` to all-`false` ("no faults") rather than unknown, while `valid`
+  stays `true`.
+- An empty/malformed `servo_move` Bridge payload silently commands a move to
+  counts 0 and acks `"ok"` — `FieldAt`'s fallback for a missing field is `0`
+  (`BridgeApi.cpp:25-40,53-63`), and 0 is a legal target.
+
+**Must land before the real loaded rig day**, regardless of which sprint it
+falls in — a bus glitch driving the servo toward count 0 is a physical event
+once there is real load and an enclosure, not just a reporting bug.
+
+**Acceptance:** a failed read is never dispatched as a move target; a
+malformed payload is refused, not silently defaulted; `ReadSnapshot()`
+reflects per-field validity the way the Python side already does.
+
+**Related:** ADR-0008.
+
+---
+
+### D42 — Errors that vanish: SSE stream, migration, sqlite writes
+**Status:** open · **Severity:** medium · **Found:** Session 14 `/twin-review`,
+triaged 1 September 2026
+
+Four findings, one family — a failure the operator or a developer needs to
+see is silently absorbed:
+- SSE stream generator swallows every exception with no logging
+  (`routers/stream.py:93-94`) — found independently by three lenses.
+  `TelemetryService._run()` handles the identical situation with
+  `logger.exception(...)` (`telemetry_service.py:131-133`); this is the
+  operator's primary live view and it can go stale with zero server-side
+  trace.
+- `_migrate()` swallows every `sqlite3.OperationalError`, not just "duplicate
+  column" (`db/database.py:100-104`) — including "database is locked"
+  (documented as real and reproduced on this mount, `CLAUDE.md` §6) — with no
+  logging, so a genuinely failed migration is indistinguishable from an
+  already-applied one.
+- No sqlite exception handling anywhere in the concrete repositories — a
+  "database is locked" occurrence surfaces as a generic unmapped 500, unlike
+  every other error in the API.
+- `diagnostics/torque_register` returns ambiguous `null` on any failure, no
+  distinct status for "bus didn't answer" vs. "unexpected value."
+
+**Acceptance:** each of the four either logs and surfaces its failure
+distinguishably, or the entry says why the current behavior is fine.
+
+---
+
+### D43 — Guards that fail open on an invalid read
+**Status:** open · **Severity:** medium · **Found:** Session 14 `/twin-review`,
+triaged 1 September 2026
+
+Three findings, one family — the one moment state is least certain is when a
+safety check silently assumes the safe answer:
+- `set_lock()`'s move-guard fails open on an invalid read —
+  `read_snapshot().moving is True` is `False` whenever the read is invalid,
+  because `_empty_snapshot()` hardcodes `moving=False`
+  (`motion_service.py:139-141`, `bridge_servo_repository.py:230`).
+- `snapshot()` blanks all telemetry/faults to `None` on a single invalid
+  read, no hysteresis between a one-tick miss and a sustained fault
+  (`servo_state.py:256-290`) — same shape as D11 ("shouted OFFLINE at one
+  dropped packet").
+- `calibrate()`'s off-centre warning re-derives reachability independently of
+  the canonical per-side check, using a symmetric `half_window` instead of
+  `ServoStateStore.is_reachable()` (`zero_service.py:139-152`) — **verified**
+  to disagree on an asymmetric window (`-30`/`90`). The `servo.calibrated`
+  event never records the off-centre condition even when it warns.
+
+**Acceptance:** each guard reflects genuine uncertainty rather than a
+hardcoded safe default; `calibrate()`'s check agrees with the canonical one
+by construction (shared code), not by coincidence.
+
+**Related:** D11.
+
+---
+
+### D44 — Operator-facing UI gaps found by the whole-app review
+**Status:** open · **Severity:** medium · **Found:** Session 14
+`/twin-review`, triaged 1 September 2026
+
+Eight frontend findings, none individually large, batched as one item:
+alarm banner can show a measured position **and** "(last known — position
+unknown)" simultaneously, because `faultIsStale` gates on `!measured` instead
+of `!known` (`app.js:523,610`); 5 of 6 fault types have no recovery control
+or remedy text, only overload gets "Clear fault & resume" (`:565,605-624`,
+D12-shaped); a date-range error ("start must be earlier than end") is
+misrouted through `sayError()` and shows as generic "controller busy"
+(`:1959-1961`); the speed nudge has no bound and a rejected out-of-range
+speed reaches the operator as raw backend text with no field name
+(`:2070-2079,744-753`); exporting a zero-sample range downloads a
+structurally valid, silently empty `.xlsx` (`:2030-2068`); the
+connecting-state LED shows the same green as confirmed-healthy
+(`index.html:15`); an empty Recent Activity feed renders as a blank panel
+with no placeholder (`:726-740`); `servoRatio === 0` treated the same as "no
+ratio" in export (`:935`, defensive-only).
+
+**Acceptance:** each either gets a fix or the entry records why it's fine as
+is; no bulk close without touching each one.
+
+**Related:** D12.
+
+---
+
+### D45 — Relay and firmware robustness gaps found by the whole-app review
+**Status:** open · **Severity:** medium · **Found:** Session 14
+`/twin-review`, triaged 1 September 2026
+
+Six firmware findings, batched: `NetworkRelay::Poll()`'s bulk-read loop
+`return`s (not `continue`s) on a lock timeout inside a `for` over slots 0..5,
+deterministically starving the same higher-numbered slots every pass
+(`:155-167`) — a plausible second mechanism for SSE disturbance during a
+large export, distinct from the known 256-byte overflow (D6); `WriteToClient`
+holds `chip_lock_` across `client.write()`, and Python's `bridge_relay.py`
+serializes all replies through one global lock too — a stalled peer could
+stall every client (partially unverified: the vendored Ethernet library
+isn't in this checkout); `WriteByte`/`WriteWord` have zero retries and zero
+diagnostic logging unlike every read path (`ServoBus.cpp:58-64`); `Move()`'s
+`WritePosEx` failure path logs nothing while the harmless out-of-range
+refusal logs clearly (`ServoController.cpp:73-93`) — inverted
+signal-to-noise; `DiagLog::Push` in the write-timeout path isn't
+rate-limited and can overrun the 32-entry ring during exactly the high-load
+condition it exists to diagnose (relevant to T9); a half-configured boot
+reports "ready" identically to a fully good one — config-write failures
+(torque limit, angle range) log nothing and don't affect `get_status`
+(`App.cpp:29,47,58-59`).
+
+**Acceptance:** each either gets a fix or the entry records why it's fine as
+is.
+
+**Related:** D6, T9.
+
+---
+
+### D46 — Backend robustness gaps found by the whole-app review
+**Status:** open · **Severity:** medium (one finding HIGH — see D40) ·
+**Found:** Session 14 `/twin-review`, triaged 1 September 2026
+
+Four findings, batched: three operator-facing controls (`/servo/move`,
+`/servo/stop`, `/servo/isolate`) report success without hardware
+acknowledgement — `_command()` (`bridge_servo_repository.py:207-220`) only
+warns on a non-`"ok"` reply, never raises (**verified**, HIGH — this is D40's
+first investigation candidate, tracked there, not duplicated here);
+`BridgeServoRepository`'s hardware import has no `except ImportError` unlike
+three identical sites, so `use_hardware_servo=True` without the `arduino`
+package crashes startup instead of degrading (mirror image of D8);
+Pydantic validation errors (e.g. a bad `speed_dps`) return FastAPI's default
+`422 {"detail": [...]}` shape while every domain error returns
+`{"detail": "...", "reason": "..."}` — the error an operator is most likely
+to actually trigger looks different from every other one; `move_to()` blocks
+synchronously up to `settling_seconds` (1.5s) before responding when a
+lock-state change happened recently — a button press produces nothing for
+over a second.
+
+**Acceptance:** each either gets a fix or the entry records why it's fine as
+is.
+
+**Related:** D8, D40 (the ack-surfacing fix tracked there).
+
+---
+
 ---
 
 ### D36 — Several tests construct their own `Database` and never close it

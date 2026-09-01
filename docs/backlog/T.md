@@ -5,6 +5,64 @@ Full entries for every open `T`-numbered item. Indexed one line each in
 
 ---
 
+### T20 — Doc-truth sweep from the whole-app review
+**Status:** open · **Severity:** low · **Raised by:** Session 14
+`/twin-review`, triaged 1 September 2026 · **Antigravity-shaped**
+
+~25 VERIFIED stale citations, counts and dead references, one mechanical
+pass, no judgment calls: `README.md` quotes "211 Python tests" twice (current
+293+); `CONVENTIONS.md`'s gap table still lists 67 missing-type gaps etc.
+though T1 (closed) fixed all of it — verified zero matches by grep;
+`docs/backlog/T.md` self-contradicts on `telemetry_retention_days` (30 vs.
+"corrected... 60"; three other docs agree it's 30); `skills/uno-q-st3215/
+SKILL.md:194` tells a future developer the working relay chunk value is 256,
+which is now confirmed a structural overflow — the shipped value is 224;
+`CONVENTIONS.md:364` cites "164 native tests" (now 194); `docs/agents/
+domain.md` references a deleted `docs/FILE_REGISTRY.md` and says "seven
+ADRs" (10 exist); `docs/WORKFLOWS.md:263` instructs bare `pytest # 207`,
+which fails per `CLAUDE.md`'s own PATH note; ADR-0004 states "186 tests"
+unqualified (now 293+); plus ~15 stale line-number/section citations across
+`ADR-0009`, `R.md`, `CLOSED.md`, `RELAY_NOTES.md`, `README.md` (full list:
+`docs/REVIEW_FINDINGS.md`, retired — see git history at the commit that
+removed it, or this item's own working notes).
+
+**Acceptance:** every citation above corrected to the real current value or
+path; no new prose added, only facts fixed.
+
+---
+
+### T21 — Constants and dead code with no shared source
+**Status:** open · **Severity:** low · **Raised by:** Session 14
+`/twin-review`, triaged 1 September 2026
+
+Five findings, one family — a value or a converter exists twice with nothing
+enforcing agreement: `kCountsPerTurn` defined independently in `Config.h` and
+`ServoRegisters.h` (agree today, no shared source); `_ISOLATED_INTENT_KEY =
+"isolated"` defined as two independent literals (`servo_state.py:18`,
+`isolation_service.py:15`); `NetworkRelay.h`'s `chunk_bytes_` field is stored
+but never read — `Poll()` hardcodes `config::kRelayChunkBytes` instead;
+`was_up_[8]` is a hardcoded array size decoupled from
+`config::kMaxRelaySockets` (latent out-of-bounds if the ceiling is ever
+raised past 8); `SignMagnitude::Decode`/`Encode` duplicated in C++ and
+Python, called by neither production path.
+
+**The one with a decision attached: `AngleMath.h`'s `AngleConverter`.** Dead
+in production — never included by `App.cpp`/`BridgeApi.cpp`, referenced only
+by `test_pure_logic.cpp` — while Python holds its own independent copy of the
+same geometry and direction constants (D39 found and fixed the live copy;
+the on-target smoke test still only validates the dead firmware copy, so it
+cannot catch drift in the copy that actually matters). **Decide:** wire it
+in as the real conversion path, or delete it and its test — leaving it as an
+untested, unreachable second implementation is the worse of the two options.
+
+**Acceptance:** each of the five either gets a shared source or the entry
+records why duplication is fine; the `AngleConverter` decision is made, not
+left standing.
+
+**Related:** D39.
+
+---
+
 ### T13 — Distil the remaining documents
 **Status:** open · **Severity:** medium · **Raised by:** the operator, 8 August 2026
 

@@ -58,7 +58,9 @@ class TestSamplerObservesMotion:
         assert len(rows) >= 4
         moving_values = {row.moving for row in rows}
         assert moving_values == {True, False}   # saw motion AND rest
-        assert rows[-1].output_deg > rows[0].output_deg
+        # closer to the target at the end than at the start - direction-
+        # agnostic, since which sign is "increasing" depends on config
+        assert abs(rows[-1].output_deg - 42.0) < abs(rows[0].output_deg - 42.0)
 
 
 class TestFaultVisibleInSampledHistory:

@@ -227,10 +227,16 @@ class TestOutOfTravelSurfaced:
 
     def test_returns_422_with_reason(self, backend, client):
         # Calibrate at the current position, which for a fresh simulator
-        # sits at the bottom of the mechanism's travel.
+        # sits at the bottom of the mechanism's travel, stranding one whole
+        # half - which one depends on servo_direction.
+        from app.deps import get_state_store
         client.post("/api/v1/servo/calibrate")
+        low, high = get_state_store().reachable_output_range_deg()
+        unreachable = (backend.settings.output_min_deg
+                       if low > backend.settings.output_min_deg
+                       else backend.settings.output_max_deg)
         response = client.post("/api/v1/servo/move",
-                               json={"target_deg": -90.0})
+                               json={"target_deg": unreachable})
         assert response.status_code == 422
         assert response.json()["reason"] == "out_of_travel"
         assert "reachable range" in response.json()["detail"]

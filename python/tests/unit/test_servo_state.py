@@ -17,8 +17,9 @@ class TestConversions:
     def test_full_output_turn_exceeds_one_servo_turn(self, backend):
         from app.deps import get_state_store
         store = get_state_store()
-        counts_360 = store.counts_from_output_deg(360.0)
-        assert counts_360 > backend.settings.counts_per_turn  # 528 servo deg
+        # 360 output deg is 528 servo deg either sign of direction -
+        # check unreachability rather than a signed counts comparison.
+        assert store.is_reachable(360.0) is False
 
     def test_speed_conversion_minimum_one(self, backend):
         from app.deps import get_state_store
@@ -246,7 +247,8 @@ class TestOneBaseline:
         store = get_state_store()
         centre = backend.settings.counts_per_turn // 2
         assert store.output_deg_from_counts(centre) == 0.0
-        assert store.output_deg_from_counts(0) < -100.0
+        # far outside the normal +/-90 range either sign of direction
+        assert abs(store.output_deg_from_counts(0)) > 100.0
 
 
 class TestDirection:
@@ -257,33 +259,39 @@ class TestDirection:
     residual under one count is the hardware grid, not an error.
     """
 
-    def test_forward_direction_roundtrip(self, backend):
-        from app.deps import get_state_store
-        store = get_state_store()
-        counts = store.counts_from_output_deg(30.0)
-        assert counts > 0
-        assert abs(store.output_deg_from_counts(counts) - 30.0) < 0.06
-
-    def test_reversed_direction_inverts_counts(self, backend):
+    def _store_with_direction(self, backend, direction):
         from app.services.servo_state import ServoStateStore
         from app.deps import get_app_state_repository, get_servo_repository
-        reversed_store = ServoStateStore(
+        return ServoStateStore(
             servo=get_servo_repository(),
             app_state=get_app_state_repository(),
             settling_seconds=backend.settings.settling_seconds,
             counts_per_turn=backend.settings.counts_per_turn,
             servo_deg_per_output_deg=backend.settings.servo_deg_per_output_deg,
-            servo_direction=-1)
-        forward = reversed_store.counts_from_output_deg(30.0)
+            servo_direction=direction)
+
+    def test_forward_direction_roundtrip(self, backend):
+        # Built explicitly rather than via the ambient get_state_store():
+        # that store's sign follows the live SERVO_DIRECTION setting, which
+        # this test must not depend on to mean "forward".
+        store = self._store_with_direction(backend, 1)
+        counts = store.counts_from_output_deg(30.0)
+        assert counts > 0
+        assert abs(store.output_deg_from_counts(counts) - 30.0) < 0.06
+
+    def test_reversed_direction_inverts_counts(self, backend):
+        forward_store = self._store_with_direction(backend, 1)
+        reversed_store = self._store_with_direction(backend, -1)
+        forward = forward_store.counts_from_output_deg(30.0)
+        reversed_ = reversed_store.counts_from_output_deg(30.0)
         # The baseline is the centre of travel, so "mirrored" means the
         # OFFSET from the baseline flips sign, not the absolute count.
         centre = backend.settings.counts_per_turn // 2
-        assert forward < centre
+        assert forward > centre
+        assert reversed_ < centre
         # and it still round-trips: sign applied on both conversions
-        assert abs(reversed_store.output_deg_from_counts(forward) - 30.0) < 0.06
-        from app.deps import get_state_store
-        assert (get_state_store().counts_from_output_deg(30.0) - centre
-                == -(forward - centre))
+        assert abs(reversed_store.output_deg_from_counts(reversed_) - 30.0) < 0.06
+        assert (forward - centre) == -(reversed_ - centre)
 
     def test_negative_angles_are_in_range(self, backend):
         from app.deps import get_state_store

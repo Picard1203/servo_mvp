@@ -313,13 +313,16 @@ class TestTravelLimits:
         from app.core.exceptions import OutOfTravelError as OutOfTravel
         from app.deps import get_calibration_service, get_state_store
         # Calibrate at the very bottom of travel, as a failed read once
-        # did, and the negative half becomes physically unreachable.
+        # did, and one half becomes physically unreachable - which half
+        # depends on servo_direction, so pick by sign rather than assume.
         get_calibration_service().calibrate()
         store = get_state_store()
         low, high = store.reachable_output_range_deg()
-        assert low > backend.settings.output_min_deg
+        unreachable = (backend.settings.output_min_deg if low > backend.settings.output_min_deg
+                      else backend.settings.output_max_deg)
+        assert low > backend.settings.output_min_deg or high < backend.settings.output_max_deg
         with pytest.raises(OutOfTravel):
-            motion.move_to(backend.settings.output_min_deg)
+            motion.move_to(unreachable)
 
     def test_reachable_range_is_symmetric_from_the_centre(self, backend,
                                                           motion):

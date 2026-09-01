@@ -11,18 +11,18 @@ Full entries for every open `T`-numbered item. Indexed one line each in
 
 ~25 VERIFIED stale citations, counts and dead references, one mechanical
 pass, no judgment calls: `README.md` quotes "211 Python tests" twice (current
-293+); `CONVENTIONS.md`'s gap table still lists 67 missing-type gaps etc.
+293+); `docs/CONVENTIONS.md`'s gap table still lists 67 missing-type gaps etc.
 though T1 (closed) fixed all of it — verified zero matches by grep;
 `docs/backlog/T.md` self-contradicts on `telemetry_retention_days` (30 vs.
 "corrected... 60"; three other docs agree it's 30); `skills/uno-q-st3215/
 SKILL.md:194` tells a future developer the working relay chunk value is 256,
 which is now confirmed a structural overflow — the shipped value is 224;
-`CONVENTIONS.md:364` cites "164 native tests" (now 194); `docs/agents/
+`docs/CONVENTIONS.md:364` cites "164 native tests" (now 194); `docs/agents/
 domain.md` references a deleted `docs/FILE_REGISTRY.md` and says "seven
 ADRs" (10 exist); `docs/WORKFLOWS.md:263` instructs bare `pytest # 207`,
 which fails per `CLAUDE.md`'s own PATH note; ADR-0004 states "186 tests"
 unqualified (now 293+); plus ~15 stale line-number/section citations across
-`ADR-0009`, `R.md`, `CLOSED.md`, `RELAY_NOTES.md`, `README.md` (full list:
+`ADR-0009`, `R.md`, `docs/history/CLOSED.md`, `RELAY_NOTES.md`, `README.md` (full list:
 `docs/REVIEW_FINDINGS.md`, retired — see git history at the commit that
 removed it, or this item's own working notes).
 
@@ -68,11 +68,11 @@ left standing.
 
 Docs are re-ingested at the start of every session, so their length is a
 recurring tax on the work. Started 8 August 2026: closed items moved to
-`docs/CLOSED.md` and Batch 1's own entries cut, taking `BACKLOG.md` from 15,223
+`docs/history/CLOSED.md` and Batch 1's own entries cut, taking `BACKLOG.md` from 15,223
 words to ~10,600.
 
 **Not yet done.** The remaining bloat is in entries written before this rule
-(`D4` and `D22`, both previously listed here, were moved to `docs/CLOSED.md`
+(`D4` and `D22`, both previously listed here, were moved to `docs/history/CLOSED.md`
 whole on 23 August 2026 rather than distilled in place — relocation, not this
 item's kind of work; `D13` was already closed and moved before this table was
 last checked, and was never actually bloat in *this* file at all. Both classes
@@ -85,7 +85,7 @@ of drift removed from this table accordingly):
 | `T11` | 425 |
 | `D10`, `D8`, `T10`, `D5`, `T9` | ~300 each |
 
-Also worth a pass: `docs/WORKFLOWS.md` (1,754) and `CONVENTIONS.md` (1,350).
+Also worth a pass: `docs/WORKFLOWS.md` (1,754) and `docs/CONVENTIONS.md` (1,350).
 
 **Do it opportunistically** — distil an entry when you are already working on
 that item, not as a sweep of its own. A sweep costs the tokens it is meant to
@@ -102,7 +102,7 @@ rule itself is in `CLAUDE.md` §4.
 ### T17 — Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested
 **Status:** open · **Raised by:** the operator, 26 August 2026, closing out R2
 
-R2 (motor isolation, closed — see `CLOSED.md`) confirmed torque actually cuts
+R2 (motor isolation, closed — see `docs/history/CLOSED.md`) confirmed torque actually cuts
 and restores correctly, verified at the register level. One scenario from its
 board-verification list stayed genuinely untested: whether the servo can be
 freely hand-turned while isolated, and whether multi-turn position tracking
@@ -133,7 +133,7 @@ pure software stress test, no rig involved). Rig assembly and the actual
 hand-turn test happen on a separate day, operator/mechanical-team-led,
 after the soak session and the DB/log cleanup close out. Close T17 once
 the hand-turn scenario is actually tested, not just once the rig exists.
-Full testing protocol prepared: `../RIG_TESTING_PROTOCOL.md`.
+Full testing protocol prepared: `docs/sprint/RIG_TESTING_PROTOCOL.md`.
 
 ---
 
@@ -330,7 +330,7 @@ writes, landing accuracy and stop-hold — the things a host cannot check.
 T15/Q10 discussion · **Scheduled:** after the client demo, unless brought
 forward
 
-**The front end was never given conventions.** `CONVENTIONS.md` covers
+**The front end was never given conventions.** `docs/CONVENTIONS.md` covers
 Python and C++ only. `python/static/app.js` is 2,140 lines in one file with
 no JSDoc, no module boundaries; `style.css` (342 lines) and `index.html`
 (164 lines) have no comment or structure rules either. This is why T15's
@@ -340,7 +340,7 @@ pass.
 
 **Two halves:**
 
-1. **Write the missing `CONVENTIONS.md` section** — JSDoc in the same shape
+1. **Write the missing `docs/CONVENTIONS.md` section** — JSDoc in the same shape
    already used elsewhere (one-line summary, typed `@param`/`@returns`, no
    explanatory paragraphs, matching the Python/C++ rule decided under Q10),
    plus comment rules for CSS and HTML.
@@ -356,7 +356,7 @@ feature changes load order and module boundaries in code the client will be
 looking at during the demo. That is judgment work with a live board check
 behind it, not a pattern-matched style pass — the opposite of T15a/T15b.
 
-**Acceptance:** `CONVENTIONS.md` covers JS/CSS/HTML; `app.js` is split into
+**Acceptance:** `docs/CONVENTIONS.md` covers JS/CSS/HTML; `app.js` is split into
 feature modules with no behaviour change, confirmed live on the board
 (`/operator-lens` pass); `tools/check_client_behaviour.js` still passes
 unmodified.

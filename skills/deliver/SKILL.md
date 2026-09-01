@@ -33,12 +33,9 @@ pointed at them. Pass this rule to every sub-agent you dispatch.
 
 ## Phase 0 — Orient (cheap, no approval needed)
 
-1. **Read the backlog entry verbatim.** `docs/BACKLOG.md` is the index of all
-   open work; find the item there, then open its full entry in
-   `docs/backlog/D.md`, `T.md`, or `R.md` (whichever letter it starts with) —
-   read only that one file, not all three. The entry's *Original report
-   follows* section is usually where the real reasoning lives — read it, do
-   not skim to the acceptance line.
+1. **Read the backlog entry verbatim.** `docs/BACKLOG.md` is the only list of open
+   work. The entry's *Original report follows* section is usually where the real
+   reasoning lives — read it, do not skim to the acceptance line.
 2. **Read the flow** if the entry names one (`WORKFLOWS.md` W1–W7).
 3. **Check for an ADR that governs it** (`docs/adr/`). If your change contradicts
    one, say so out loud — *"Contradicts ADR-000N because…"* — and do not silently
@@ -59,26 +56,45 @@ that does not match its own documentation.
 
 ## Phase 1 — Plan, then STOP
 
-Use the `writing-plans` skill for the mechanics. The plan must state, in this
-order and in plain language:
+**Plan inside Claude Code's plan mode** (`EnterPlanMode`, then
+`ExitPlanMode` to present) — do not present the plan as chat prose instead.
+Adopted 25 August 2026: a chat-prose plan on this batch described fixes
+without explaining the problems, which made it unreviewable by anyone not
+already holding the code in their head; the plan-mode file forced the
+problem-first structure below and made the approval a real gate. Phase 0's
+baseline commands run **before** entering plan mode — plan mode forbids
+changing the system, and that includes running the verification commands.
 
-1. **What the operator will be able to do afterwards that they cannot do now** —
-   or, for a defect, what stops happening. If you cannot write this sentence, the
-   item is not understood yet.
-2. **Which files change**, with paths.
-3. **What gets tested, and what is only assumed.** Say it plainly. 99% line
-   coverage did not prevent the six defects in `AUDIT.md`, nor D9, where the
+Use the `writing-plans` skill for the mechanics inside the plan file. Every
+item in the plan must state, **in this order and in plain language a
+non-programmer stakeholder could act on**:
+
+1. **What is wrong right now, described in plain language before any fix is
+   mentioned** — what the operator or reader actually sees or experiences
+   today, not the name of the broken function. A reviewer who has not read
+   the code must be able to tell whether the plan solves their actual
+   problem from this sentence alone.
+2. **What the operator will be able to do afterwards that they cannot do now**
+   — or, for a defect, what stops happening. If you cannot write this
+   sentence, the item is not understood yet.
+3. **Which files change**, with paths.
+4. **What gets tested, and what is only assumed.** Say it plainly. 99% line
+   coverage did not prevent the six defects in `docs/history/AUDIT.md`, nor D9, where the
    correct rule and its violation sat twelve lines apart in one file, both
    covered, both green.
-4. **The twin-path question, answered**: *where is this rule's twin, and does it
+5. **The twin-path question, answered**: *where is this rule's twin, and does it
    know?* Four defects in this repository are the same defect — a rule applied to
-   one path and not its mirror (`AUDIT.md`'s originals, D2's `calibrate()` but not
+   one path and not its mirror (`docs/history/AUDIT.md`'s originals, D2's `calibrate()` but not
    `capture()`, D9's two baselines, D10's production logger and its test stub).
    Answer this in the plan, not after the review.
-5. **Anything that needs the board**, listed separately — see Phase 3.
-6. **The numbers you expect afterwards**, so a change in them is visible.
+6. **Anything that needs the board**, listed separately — see Phase 3.
+7. **The numbers you expect afterwards**, so a change in them is visible.
 
-**Then stop and present it.** This is the only checkpoint. Wait for go-ahead.
+Use `AskUserQuestion` inside plan mode to settle a real judgment call before
+writing the final plan — do not silently pick one and only mention it in
+passing.
+
+**Then call `ExitPlanMode`.** This is the only checkpoint. Wait for go-ahead.
 
 ---
 
@@ -87,14 +103,29 @@ order and in plain language:
 On go-ahead, execute the whole plan without further prompting. Use
 `executing-plans` for batching and checkpoint discipline.
 
+- **If `docs/sprint/SPRINTS.md` exists, this item is in an active sprint — mark its
+  Start time there before the branch is even created.** Get a real clock
+  time (ask the operator, or `date`), not a wall-clock guess from session
+  start — deductions in the sprint's own capacity table (meals, cleaning,
+  any declared-absent window) are not working time and starting from
+  session-start-minus-nothing double-counts them. This was skipped once
+  (1 Sept 2026, D39) and produced a wrong retro that had to be corrected
+  twice in the same session, once for exactly this reason.
+- **First action, before any edit: create the feature branch.**
+  `git checkout -b feature/<name> dev`, named for what the item does (see
+  `docs/CONVENTIONS.md`'s Git section for the naming rule — one branch per
+  feature, not per session). This was written down once already and
+  ignored for 16 days because nothing enforced it (24 Aug 2026, T15); it is
+  enforced here now so it does not need to be remembered by hand. Merge
+  back into `dev` with `--no-ff` as the last step of Phase 5's commit, not
+  before — the branch is where the work happens, not a label added after.
 - **Test-first where the code is testable.** Use the `tdd` skill. RED must
   actually fail for the stated reason before you write GREEN.
 - **Never bundle unrelated changes into a fix.** If you spot something else,
-  add it as a new entry in the right detail file (`docs/backlog/D.md`/`T.md`/
-  `R.md`) and a one-line row in `BACKLOG.md`'s index, then carry on.
-- **Use the glossary's words** (`CONTEXT.md`): `timestamp` never `ts`, `count`
+  write it into `BACKLOG.md` as a new item and carry on.
+- **Use the glossary's words** (`docs/CONTEXT.md`): `timestamp` never `ts`, `count`
   never `tick`, `datum` never `home`. In code, tests, commits and the backlog.
-- **Follow `CONVENTIONS.md`.** Where it marks something undecided, ask rather
+- **Follow `docs/CONVENTIONS.md`.** Where it marks something undecided, ask rather
   than choosing silently.
 - **Before touching `sketch/src/`, read `sketch/src/RELAY_NOTES.md`.**
   Non-negotiable. In particular rule 7: the W5500 is one chip on one SPI bus
@@ -116,15 +147,18 @@ adb shell arduino-app-cli app start user:servo_mvp   # ~16s warm, ~7min cold
 adb shell arduino-app-cli app logs  user:servo_mvp
 ```
 
-The working copy is usually an **sshfs mount of the board**, so edits are already
-there — but `python/.env` must exist on the board or `use_hardware_servo` defaults
+The working copy is usually a **network mount of the board** (CIFS/Samba as of
+25 August 2026 — check `CLAUDE.md` §6, the protocol has already changed once),
+so edits are already there — but `python/.env` must exist on the board or
+`use_hardware_servo` defaults
 to false and the simulator runs while the UI moves convincingly (backlog D8).
 Confirm `servo.backend backend=hardware` in the log before believing any hardware
 observation.
 
 Board runs are worth doing at `LOG_LEVEL=DEBUG` for the duration and INFO
-afterwards. **Watch for D10's unexplained sampler exception on every run** — the
-logging that lost it is fixed, so next time it will name itself.
+afterwards. Exceptions in the sampler now name themselves in the log (D10,
+closed) — read the JSONL record itself rather than a summary of it if one
+appears; a paraphrase of a traceback is not the traceback.
 
 ---
 
@@ -143,20 +177,42 @@ graphify update .
 
 ## Phase 5 — Record, or it is not done
 
-1. **Update the entry in its detail file** (`docs/backlog/D.md`/`T.md`/`R.md`).
-   An item is not done until its entry says so, with the date and what
-   closed it. Keep the original report below a *Original report follows*
-   line — the reasoning is the record. If it is fully closed, cut the whole
-   entry and paste it into `docs/CLOSED.md`, then update its one-line row in
-   `BACKLOG.md`'s index (move it from the open table to the Closed index
-   table there).
-2. **Doc-truth sweep.** One fact lives in exactly one file. If the change moved a
+1. **If `docs/sprint/SPRINTS.md` exists, mark this item's End time there, next to
+   the Start from Phase 2** — same rule: a real clock time, not a guess.
+   This is what makes the file's own estimate-vs-actual column real instead
+   of aspirational; skipping it here is the same mistake as skipping it at
+   the start, just discovered later.
+2. **Update the `BACKLOG.md` entry, then move it to `docs/history/CLOSED.md` if it is
+   fully done.** An item is not done until its entry says so, with the date and
+   what closed it. Keep the original report below a *Original report follows*
+   line — the reasoning is the record. A fully closed item does not stay in
+   `BACKLOG.md`: cut the whole entry (status line through the closing `---`)
+   and paste it into `docs/history/CLOSED.md`, matching the format already there (`**Status:**
+   CLOSED · <date> · **Severity:** ...`, narrative, then the preserved *Original
+   report follows* block). Add one row to `BACKLOG.md`'s own Closed index table
+   pointing at it. This is for the next session's token budget as much as
+   correctness — `BACKLOG.md` is re-read in full every session, `docs/history/CLOSED.md` is
+   read on demand; a closed item left in the working file is paid for again
+   every time regardless. Leave an item only half-closed (a mechanism fixed but
+   a sub-part still open, a decision still pending) in `BACKLOG.md`, updated in
+   place — don't move it until every part of it is actually done.
+3. **Doc-truth sweep.** One fact lives in exactly one file. If the change moved a
    number or a path, find every copy and fix them together; two copies of one
    fact is a defect, not a housekeeping matter.
-3. **Feed the skill.** If the item taught something general about this hardware,
+4. **Feed the skill.** If the item taught something general about this hardware,
    add it to `skills/uno-q-st3215/SKILL.md`. The docs explain *this* project; the
    skill travels to the next one.
-4. **State plainly what was tested and what was assumed.**
+5. **State plainly what was tested and what was assumed.**
+6. **Commit on the feature branch from Phase 2, then merge into `dev`.**
+   Message follows `docs/CONVENTIONS.md`'s Git section — plain English, grounded in
+   the actual diff, no backlog codes, no hyphens in the prose, `add <thing> to
+   <place>` / `fix <issue> in <place>` / `refactor <thing> in <place>`, never
+   Conventional-Commits style. Stage only the files this item actually
+   touched — review what's staged before committing, same as any commit in
+   this repo. Then `git checkout dev && git merge --no-ff feature/<name>`.
+   A `deliver` run reaching Phase 5 means it was approved and verified; commit
+   and merge it as part of finishing, not as a separate step the user has to
+   remember to ask for.
 
 ---
 

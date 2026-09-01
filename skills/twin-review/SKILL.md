@@ -13,7 +13,7 @@ applied to one path and not to its twin.**
 
 | | the rule | the twin that did not know |
 |---|---|---|
-| `AUDIT.md` | the originals | — |
+| `docs/history/AUDIT.md` | the originals | — |
 | D2 | `calibrate()` raised on an invalid reading | `capture()` stored `0` |
 | D9 | motion used a mid-travel baseline | display used `0` — 212.7° of wrong movement |
 | D10 | production `exception()` dropped the traceback | the test stub dropped it identically |
@@ -32,7 +32,7 @@ error with no "twin" shape needs lens 5.
 
 **Coverage.** Do not report a coverage number as a verdict, and do not accept one
 as evidence. This project gates `app/` at 99% line coverage (`tools/verify.py`).
-That did not prevent the six defects in `AUDIT.md`, and it did not prevent D9,
+That did not prevent the six defects in `docs/history/AUDIT.md`, and it did not prevent D9,
 where the correct rule and its violation sat twelve lines apart in the same
 file — the correct one carrying a six-line docstring explaining precisely why a
 baseline of 0 is wrong, and the other doing it anyway. Both covered. Both green.
@@ -57,17 +57,17 @@ the chunks this repo already has, and dispatch lens × chunk:
 | Backend | `python/app/` |
 | Firmware | `sketch/src/` |
 | Frontend | `python/static/` |
-| Docs | `docs/`, `CLAUDE.md`, `CONTEXT.md`, `CONVENTIONS.md`, `docs/adr/` |
+| Docs | `docs/`, `CLAUDE.md`, `docs/CONTEXT.md`, `docs/CONVENTIONS.md`, `docs/adr/` |
 
 **Backend chunk has a deterministic pre-pass: `ruff`.** `python/ruff.toml`
-encodes the machine-checkable subset of `CONVENTIONS.md` (typing, docstring
+encodes the machine-checkable subset of `docs/CONVENTIONS.md` (typing, docstring
 shape, unused imports/args, import order). Run
 `../.venv/bin/ruff check python/app --config python/ruff.toml` before
 dispatching any reviewer at that chunk — advisory only, not part of
 `tools/verify.py`'s gate, so a nonzero exit is informational, not a blocker.
-**Where ruff and `CONVENTIONS.md` disagree, `CONVENTIONS.md` wins** — the
+**Where ruff and `docs/CONVENTIONS.md` disagree, `docs/CONVENTIONS.md` wins** — the
 config was adapted from a general personal standard, not written for this
-repo, and CONVENTIONS.md is the authority (e.g. `UP` is deliberately not
+repo, and docs/CONVENTIONS.md is the authority (e.g. `UP` is deliberately not
 selected: it would push `Optional[X]` toward `X | None`, the opposite of this
 repo's Types rule).
 
@@ -202,7 +202,7 @@ For `python/app/`'s own docstrings, `ruff check --select D` checks the Google
 convention directly (`[lint.pydocstyle] convention = "google"` in
 `python/ruff.toml`) — missing `Attributes:`, a missing `__init__` docstring,
 a summary that isn't one line. It does not check the type-in-parens or
-no-explanatory-paragraph rules (`CONVENTIONS.md` goes further than pydocstyle
+no-explanatory-paragraph rules (`docs/CONVENTIONS.md` goes further than pydocstyle
 there); those still need a reviewer's eye.
 
 ### 5. General correctness

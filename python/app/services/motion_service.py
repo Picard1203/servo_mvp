@@ -141,21 +141,33 @@ class MotionService:
         generation = self._move_generation
 
         if self._needs_fine_approach(start_deg, target_deg) is True:
+            direction = 1 if target_deg > start_deg else -1
             self._fine_approach_thread = Thread(
                 target=self._fine_approach,
                 args=(generation, target_deg, target_counts, speed_counts,
-                      acceleration),
+                      acceleration, direction, from_deg),
                 daemon=True)
             self._fine_approach_thread.start()
-        else:
-            acked = self._servo.command_move(target_counts, speed_counts,
-                                             acceleration)
-            if acked is False:
-                self._raise_not_acknowledged(
-                    "servo.move.failed",
-                    f"move to {target_deg:.2f} deg was not acknowledged",
-                    {"target_deg": target_deg})
+            return
 
+        acked = self._servo.command_move(target_counts, speed_counts,
+                                         acceleration)
+        if acked is False:
+            self._raise_not_acknowledged(
+                "servo.move.failed",
+                f"move to {target_deg:.2f} deg was not acknowledged",
+                {"target_deg": target_deg})
+        self._record_accepted(target_deg, from_deg, acceleration)
+
+    def _record_accepted(self, target_deg: float, from_deg: Optional[float],
+                         acceleration: int) -> None:
+        """Records the single 'move accepted' event and its log line.
+
+        Args:
+            target_deg (float): Output angle the move was accepted for.
+            from_deg (Optional[float]): Output angle the move started from.
+            acceleration (int): Acceleration parameter used.
+        """
         self._events.record("servo.move.accepted",
                             f"move to {target_deg:.2f} deg",
                             {"from_deg": from_deg,
@@ -238,9 +250,20 @@ class MotionService:
         Raises:
             CommandNotAcknowledgedError: Always.
         """
+        self._record_failure(event, message, metadata)
+        raise CommandNotAcknowledgedError(message, metadata=metadata)
+
+    def _record_failure(self, event: str, message: str,
+                        metadata: dict) -> None:
+        """Records a failure event and logs it at error level.
+
+        Args:
+            event (str): Event name for the audit log and event stream.
+            message (str): Human-readable failure message.
+            metadata (dict): Structured context for both.
+        """
         self._events.record(event, message, metadata)
         logger.error(message, metadata={"event": event}, extra=metadata)
-        raise CommandNotAcknowledgedError(message, metadata=metadata)
 
     def _needs_fine_approach(self, start_deg: Optional[float],
                              target_deg: float) -> bool:
@@ -251,16 +274,17 @@ class MotionService:
             target_deg (float): Requested output angle.
 
         Returns:
-            bool: True when enabled and target is below start.
+            bool: True when enabled and the target differs from the start.
         """
         if start_deg is None:
             return False
         return ((self._settings.fine_approach_enabled is True)
-                and (target_deg < start_deg))
+                and (target_deg != start_deg))
 
     def _fine_approach(self, generation: int, target_deg: float,
                        target_counts: int, speed_counts: int,
-                       acceleration: int) -> None:
+                       acceleration: int, direction: int,
+                       from_deg: Optional[float]) -> None:
         """Runs the two-leg consistent-direction approach.
 
         Args:
@@ -269,20 +293,38 @@ class MotionService:
             target_counts (int): Final absolute counts target.
             speed_counts (int): Speed in counts per second.
             acceleration (int): Servo acceleration parameter.
+            direction (int): +1 if the move is upward, -1 if downward.
+            from_deg (Optional[float]): Output angle the move started from.
         """
         try:
-            overshoot_deg = (target_deg
-                             - self._settings.fine_approach_overshoot_deg)
+            requested_overshoot_deg = (
+                target_deg
+                + direction * self._settings.fine_approach_overshoot_deg)
+            low_deg, high_deg = self._state.reachable_output_range_deg()
+            overshoot_deg = min(max(requested_overshoot_deg, low_deg),
+                                high_deg)
+            overshoot_clamped = overshoot_deg != requested_overshoot_deg
             overshoot_counts = self._state.counts_from_output_deg(
                 overshoot_deg)
-            self._servo.command_move(overshoot_counts, speed_counts,
-                                     acceleration)
-            deadline = (monotonic()
+            overshoot_acked = self._servo.command_move(
+                overshoot_counts, speed_counts, acceleration)
+            if overshoot_acked is False:
+                self._record_failure(
+                    "servo.move.failed",
+                    f"fine approach overshoot leg to {overshoot_deg:.2f} deg "
+                    "was not acknowledged",
+                    {"target_deg": target_deg, "leg": "overshoot"})
+                return
+            self._record_accepted(target_deg, from_deg, acceleration)
+            start_snapshot = self._servo.read_snapshot()
+            wait_start = monotonic()
+            deadline = (wait_start
                         + self._settings.fine_approach_timeout_seconds)
             is_moving = True
             while (monotonic() < deadline) and (is_moving is True):
                 sleep(0.05)
                 is_moving = (self._servo.read_snapshot().moving is True)
+            wait_elapsed_s = monotonic() - wait_start
             if generation != self._move_generation:
                 logger.debug("fine approach: superseded, final leg skipped",
                              metadata={"event": "servo.move.fine_approach"})
@@ -291,14 +333,42 @@ class MotionService:
                 logger.debug("fine approach: isolated, final leg skipped",
                              metadata={"event": "servo.move.fine_approach"})
                 return
-            self._servo.command_move(target_counts, speed_counts,
-                                     acceleration)
+            position_at_final_leg_deg = self._state.current_output_deg()
+            final_speed_counts = speed_counts
+            if self._settings.fine_approach_final_speed_dps is not None:
+                final_speed_counts = (
+                    self._state.counts_speed_from_output_speed(
+                        self._settings.fine_approach_final_speed_dps))
+            final_acceleration = acceleration
+            if self._settings.fine_approach_final_acceleration is not None:
+                final_acceleration = (
+                    self._settings.fine_approach_final_acceleration)
+            final_acked = self._servo.command_move(
+                target_counts, final_speed_counts, final_acceleration)
+            if final_acked is False:
+                self._record_failure(
+                    "servo.move.failed",
+                    f"fine approach final leg to {target_deg:.2f} deg was "
+                    "not acknowledged",
+                    {"target_deg": target_deg, "leg": "final"})
+                return
+            end_snapshot = self._servo.read_snapshot()
             logger.debug("fine approach: final leg commanded",
                          metadata={"event": "servo.move.fine_approach"},
                          extra={"target_deg": target_deg})
-            self._events.record("servo.move.fine_approach",
-                                f"fine approach to {target_deg:.2f} deg",
-                                {"overshoot_deg": round(overshoot_deg, 2)})
+            self._events.record(
+                "servo.move.fine_approach",
+                f"fine approach to {target_deg:.2f} deg",
+                {"overshoot_deg": round(overshoot_deg, 2),
+                 "overshoot_clamped": overshoot_clamped,
+                 "wait_elapsed_s": round(wait_elapsed_s, 3),
+                 "position_at_final_leg_deg": (
+                     round(position_at_final_leg_deg, 2)
+                     if position_at_final_leg_deg is not None else None),
+                 "current_a_at_overshoot": start_snapshot.current_a,
+                 "torque_kgcm_at_overshoot": start_snapshot.torque_kgcm,
+                 "current_a_at_final": end_snapshot.current_a,
+                 "torque_kgcm_at_final": end_snapshot.torque_kgcm})
         except (sqlite3.OperationalError, ValueError):
             logger.exception(
                 "fine approach failed",

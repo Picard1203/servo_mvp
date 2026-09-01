@@ -211,6 +211,54 @@ class TestCommandAck:
         with pytest.raises(CommandNotAcknowledgedError):
             motion.recover()
 
+    def test_fine_approach_overshoot_ack_failure_does_not_report_accepted(
+            self, monkeypatch, backend, sim):
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        motion = get_motion_service()
+        monkeypatch.setattr(sim, "command_move", lambda *a, **k: False)
+        motion.move_to(12.0)
+        assert wait_until(
+            lambda: "servo.move.failed" in
+            [e.event for e in _events(backend)], timeout=8)
+        events = [e.event for e in _events(backend)]
+        assert "servo.move.accepted" not in events
+        [event] = [e for e in _events(backend)
+                  if e.event == "servo.move.failed"]
+        assert event.data["leg"] == "overshoot"
+
+    def test_fine_approach_final_leg_ack_failure_is_recorded(
+            self, monkeypatch, backend, sim):
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        motion = get_motion_service()
+
+        real_command_move = sim.command_move
+        calls = []
+
+        def _fail_second_call(target_counts, speed_counts_s, acceleration):
+            calls.append(target_counts)
+            if len(calls) == 1:
+                return real_command_move(target_counts, speed_counts_s,
+                                         acceleration)
+            return False
+
+        monkeypatch.setattr(sim, "command_move", _fail_second_call)
+        motion.move_to(12.0)
+        assert wait_until(
+            lambda: "servo.move.failed" in
+            [e.event for e in _events(backend)], timeout=8)
+        events = [e.event for e in _events(backend)]
+        assert "servo.move.accepted" in events
+        assert "servo.move.fine_approach" not in events
+        [event] = [e for e in _events(backend)
+                  if e.event == "servo.move.failed"]
+        assert event.data["leg"] == "final"
+
 
 class TestFineApproach:
     """Consistent-direction anti-backlash approach."""
@@ -242,14 +290,31 @@ class TestFineApproach:
         assert wait_until(
             lambda: abs(store.current_output_deg() - 12.0) < 0.3, timeout=8)
 
-    def test_enabled_upward_move_stays_direct(self, monkeypatch, backend,
-                                              sim):
+    def test_enabled_upward_move_also_overshoots_then_arrives(
+            self, monkeypatch, backend, sim):
+        """An upward move gets the same correction as a downward one - a
+        plain direct upward move measured a real 0.61 deg shortfall on the
+        rig (1 September 2026); "arrives from a consistent direction
+        already" turned out not to be true protection on its own."""
         monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
-        from app.deps import get_motion_service
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        # Fixed below the target - real, not the ambient default, so the
+        # move's direction does not depend on whatever SERVO_DIRECTION this
+        # machine's .env happens to carry.
+        monkeypatch.setattr(store, "current_output_deg", lambda: 0.0)
         motion = get_motion_service()
-        motion.move_to(18.0)   # upward from 0: no overshoot leg
-        events = [e.event for e in _events(backend)]
-        assert "servo.move.fine_approach" not in events
+        motion.move_to(18.0)   # upward from 0: overshoots above, then back
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        [event] = [e for e in _events(backend)
+                  if e.event == "servo.move.fine_approach"]
+        assert event.data["overshoot_deg"] == (
+            18.0 + backend.settings.fine_approach_overshoot_deg)
+        assert wait_until(
+            lambda: abs(sim.read_snapshot().raw_counts
+                       - store.counts_from_output_deg(18.0)) <= 1, timeout=8)
 
     def test_unknown_start_position_skips_fine_approach(
             self, monkeypatch, backend, sim):
@@ -351,6 +416,134 @@ class TestFineApproach:
         motion = get_motion_service()
         motion.move_to(target_deg)   # downward: spawns the thread
         assert wait_until(lambda: len(logged) > 0, timeout=4)
+
+    def test_overshoot_is_clamped_to_the_reachable_range(
+            self, monkeypatch, backend, sim):
+        """The overshoot leg must never command a count outside the servo's
+        single-turn range - it was unchecked before this delivery, latent
+        only because D40b's testing never approached a travel edge."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        requested_overshoot_deg = (
+            6.0 - backend.settings.fine_approach_overshoot_deg)
+        clamp_low = requested_overshoot_deg + 0.5   # forces clamping
+        monkeypatch.setattr(store, "reachable_output_range_deg",
+                            lambda: (clamp_low, 100.0))
+        motion = get_motion_service()
+
+        calls = []
+        real_command_move = sim.command_move
+        monkeypatch.setattr(
+            sim, "command_move",
+            lambda counts, speed, accel: (calls.append(counts),
+                                          real_command_move(counts, speed,
+                                                            accel))[1])
+
+        motion.move_to(6.0)   # downward: overshoot wants below clamp_low
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        [event] = [e for e in _events(backend)
+                  if e.event == "servo.move.fine_approach"]
+        assert event.data["overshoot_deg"] == clamp_low
+        assert event.data["overshoot_clamped"] is True
+        assert calls[0] == store.counts_from_output_deg(clamp_low)
+
+    def test_overshoot_within_range_is_not_reported_as_clamped(
+            self, monkeypatch, backend, sim):
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        sim.set_deadband(1)
+        motion = get_motion_service()
+        motion.move_to(12.0)
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        [event] = [e for e in _events(backend)
+                  if e.event == "servo.move.fine_approach"]
+        assert event.data["overshoot_clamped"] is False
+        assert event.data["overshoot_deg"] == (
+            12.0 - backend.settings.fine_approach_overshoot_deg)
+
+    def test_event_carries_diagnostic_metadata_for_the_board_run(
+            self, monkeypatch, backend, sim):
+        """Fields needed to tell 'the mechanism didn't help' apart from 'the
+        mechanism never actually ran' - the wait loop can exit before the
+        overshoot leg has moved, collapsing both legs into roughly one
+        ordinary move with no visible sign in the log otherwise."""
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        sim.set_deadband(1)
+        motion = get_motion_service()
+        motion.move_to(12.0)
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        [event] = [e for e in _events(backend)
+                  if e.event == "servo.move.fine_approach"]
+        assert "wait_elapsed_s" in event.data
+        assert event.data["wait_elapsed_s"] >= 0.0
+        assert "position_at_final_leg_deg" in event.data
+        assert "current_a_at_overshoot" in event.data
+        assert "torque_kgcm_at_overshoot" in event.data
+        assert "current_a_at_final" in event.data
+        assert "torque_kgcm_at_final" in event.data
+
+    def test_final_leg_speed_override_applies_only_to_the_final_leg(
+            self, monkeypatch, backend, sim):
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        monkeypatch.setattr(backend.settings,
+                            "fine_approach_final_speed_dps", 6.0)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        motion = get_motion_service()
+
+        calls = []
+        real_command_move = sim.command_move
+        monkeypatch.setattr(
+            sim, "command_move",
+            lambda counts, speed, accel: (calls.append(speed),
+                                          real_command_move(counts, speed,
+                                                            accel))[1])
+        motion.move_to(12.0)
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        expected_final_speed = store.counts_speed_from_output_speed(6.0)
+        assert calls[0] == store.counts_speed_from_output_speed(
+            backend.settings.default_speed_dps)
+        assert calls[1] == expected_final_speed
+
+    def test_final_leg_speed_unset_keeps_the_move_speed(
+            self, monkeypatch, backend, sim):
+        monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
+        motion = get_motion_service()
+
+        calls = []
+        real_command_move = sim.command_move
+        monkeypatch.setattr(
+            sim, "command_move",
+            lambda counts, speed, accel: (calls.append(speed),
+                                          real_command_move(counts, speed,
+                                                            accel))[1])
+        motion.move_to(12.0)
+        assert wait_until(
+            lambda: "servo.move.fine_approach" in
+            [e.event for e in _events(backend)], timeout=8)
+        move_speed = store.counts_speed_from_output_speed(
+            backend.settings.default_speed_dps)
+        assert calls[0] == move_speed
+        assert calls[1] == move_speed
 
     def test_join_fine_approach_is_a_no_op_with_no_thread(self, motion):
         motion.join_fine_approach(timeout=0.1)   # must not raise

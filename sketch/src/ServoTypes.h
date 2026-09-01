@@ -27,5 +27,16 @@ struct MoveCommand {
   uint8_t acceleration = 0;
 };
 
+/// One coherent reading of the servo's control-loop tuning registers.
+struct TuningSnapshot {
+  uint8_t position_p = 0;
+  uint8_t position_d = 0;
+  uint8_t position_i = 0;
+  uint16_t min_start_force = 0;
+  uint8_t cw_dead_zone = 0;
+  uint8_t ccw_dead_zone = 0;
+  bool valid = false;
+};
+
 }  // namespace servo
 #endif  // SERVO_TYPES_H

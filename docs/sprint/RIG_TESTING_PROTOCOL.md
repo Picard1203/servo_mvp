@@ -6,7 +6,7 @@
 - **Backlog T17**: Bench rig with belt mounted to provide mechanical leverage for R2's hand-turn scenario.
 - **Backlog R2**: Motor isolation (de-energize holding torque, rotate output by hand, live 2 Hz telemetry tracking, seamless torque re-engagement).
 - **Backlog R4**: 3D-printed clamping arch with butterfly screws (manual friction lock enabling long-term de-energized holding).
-- **Backlog R9 & D35**: Fixed global speed ($30.0^\circ/\text{s}$) validation and investigation of belt ratio factor on `GoalSpeed`.
+- **Backlog R9 & D35**: Fixed global speed ($30.0^\circ/\text{s}$) validation and investigation of belt ratio factor on `GoalSpeed`. **Both closed** — R9 30 Aug, D35 1 Sept (resolved by sampling `PRESENT_SPEED` directly rather than Protocol 4's stopwatch method below; see `docs/history/CLOSED.md` D35). Protocol 4 does not need to be re-run.
 - **Backlog R10**: Saved-position repeatability across the belt transmission under load.
 
 ---
@@ -123,6 +123,12 @@ flowchart TD
 ---
 
 ### Protocol 4: R9 Velocity & D35 Speed Ratio Investigation
+**Superseded, 1 September 2026 — D35 closed without running this protocol.**
+`PRESENT_SPEED` (register 0x3A) was added and sampled live during real moves
+instead of stopwatch timing, which resolves the ambiguity this protocol's
+step 2 was designed to distinguish directly rather than by inference. Kept
+below as the original plan, not a step still to execute.
+
 **Objective**: Characterize true output angular velocity against commanded $30.0^\circ/\text{s}$ and resolve D35.
 
 1. **Step Move Timing**:
@@ -193,5 +199,5 @@ flowchart TD
 2. **Documentation Sign-off**:
    - Close **T17** in `docs/backlog/T.md` with physical test evidence.
    - Mark **R2** as accepted in `docs/backlog/R.md`.
-   - Update **D35** in `docs/backlog/D.md` with measured velocity findings.
+   - **D35 closed** 1 Sept 2026, findings in `docs/history/CLOSED.md`, not this protocol's timing method.
    - Record Rig Day summary in `docs/PROJECT_STATE.md`.

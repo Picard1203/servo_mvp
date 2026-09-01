@@ -212,6 +212,90 @@ class TestCommands:
         bridge.raise_on_call = RuntimeError("bridge down")
         assert repo.read_torque_register() is None
 
+    def test_read_tuning_registers_payload(self, bridge, repo):
+        bridge.reply = "1,32,32,0,0,1,1"
+        repo.read_tuning_registers()
+        assert bridge.calls[-1] == ("servo_read_tuning", "")
+
+    def test_read_tuning_registers_parses_all_fields(self, bridge, repo):
+        bridge.reply = "1,16,32,8,50,0,0"
+        registers = repo.read_tuning_registers()
+        assert registers.position_p == 16
+        assert registers.position_d == 32
+        assert registers.position_i == 8
+        assert registers.min_start_force == 50
+        assert registers.cw_dead_zone == 0
+        assert registers.ccw_dead_zone == 0
+
+    def test_read_tuning_registers_none_when_not_acknowledged(self, bridge,
+                                                               repo):
+        bridge.reply = "0,32,32,0,0,1,1"
+        assert repo.read_tuning_registers() is None
+
+    def test_read_tuning_registers_none_on_malformed_payload(self, bridge,
+                                                              repo):
+        bridge.reply = "1,32,32"
+        assert repo.read_tuning_registers() is None
+
+    def test_read_tuning_registers_none_on_unparsable_payload(self, bridge,
+                                                               repo):
+        bridge.reply = "1,x,32,0,0,1,1"
+        assert repo.read_tuning_registers() is None
+
+    def test_read_tuning_registers_none_on_bridge_exception(self, bridge,
+                                                             repo):
+        bridge.raise_on_call = RuntimeError("bridge down")
+        assert repo.read_tuning_registers() is None
+
+    def test_write_tuning_registers_all_unset_sends_all_sentinels(
+            self, bridge, repo):
+        bridge.reply = "ok"
+        repo.write_tuning_registers()
+        assert bridge.calls[-1] == ("servo_write_tuning", "-1,-1,-1,-1,-1,-1")
+
+    def test_write_tuning_registers_payload_leaves_unset_fields_at_sentinel(
+            self, bridge, repo):
+        bridge.reply = "ok"
+        repo.write_tuning_registers(position_p=16, min_start_force=50)
+        assert bridge.calls[-1] == (
+            "servo_write_tuning", "16,-1,-1,50,-1,-1")
+
+    def test_write_tuning_registers_returns_true_on_ack(self, bridge, repo):
+        bridge.reply = "ok"
+        assert repo.write_tuning_registers(position_p=16) is True
+
+    def test_write_tuning_registers_returns_false_when_not_acknowledged(
+            self, bridge, repo):
+        bridge.reply = "err"
+        assert repo.write_tuning_registers(position_p=16) is False
+
+    def test_write_tuning_registers_returns_false_on_bridge_exception(
+            self, bridge, repo):
+        bridge.raise_on_call = RuntimeError("bridge down")
+        assert repo.write_tuning_registers(position_p=16) is False
+
+    def test_read_present_speed_payload(self, bridge, repo):
+        bridge.reply = "120"
+        repo.read_present_speed_counts_s()
+        assert bridge.calls[-1] == ("servo_read_speed", "")
+
+    def test_read_present_speed_parses_positive(self, bridge, repo):
+        bridge.reply = "120"
+        assert repo.read_present_speed_counts_s() == 120
+
+    def test_read_present_speed_parses_negative(self, bridge, repo):
+        bridge.reply = "-120"
+        assert repo.read_present_speed_counts_s() == -120
+
+    def test_read_present_speed_none_on_unparsable_payload(self, bridge,
+                                                            repo):
+        bridge.reply = "err"
+        assert repo.read_present_speed_counts_s() is None
+
+    def test_read_present_speed_none_on_bridge_exception(self, bridge, repo):
+        bridge.raise_on_call = RuntimeError("bridge down")
+        assert repo.read_present_speed_counts_s() is None
+
 
 class TestResilience:
     """A misbehaving bus must not take the backend down."""

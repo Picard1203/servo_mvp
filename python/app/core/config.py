@@ -2,6 +2,7 @@
 
 import pathlib
 from functools import lru_cache
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -41,6 +42,10 @@ class Settings(BaseSettings):
         fine_approach_enabled (bool): True to enable anti-backlash approach.
         fine_approach_overshoot_deg (float): Overshoot angle in output degrees.
         fine_approach_timeout_seconds (float): Timeout for overshoot approach.
+        fine_approach_final_speed_dps (Optional[float]): Final-leg speed
+            override; None uses the move's own speed.
+        fine_approach_final_acceleration (Optional[int]): Final-leg
+            acceleration override; None uses the move's own acceleration.
         sampler_interval_seconds (float): Telemetry sampling interval.
         telemetry_retention_days (int): Telemetry retention window in days.
         telemetry_purge_interval_seconds (float): Retention purge interval.
@@ -79,8 +84,10 @@ class Settings(BaseSettings):
     default_acceleration: int = 50
     max_acceleration: int = 254
     fine_approach_enabled: bool = False
-    fine_approach_overshoot_deg: float = 1.0
+    fine_approach_overshoot_deg: float = 1.5
     fine_approach_timeout_seconds: float = 30.0
+    fine_approach_final_speed_dps: Optional[float] = None
+    fine_approach_final_acceleration: Optional[int] = None
     sampler_interval_seconds: float = 0.5
     telemetry_retention_days: int = 30
     telemetry_purge_interval_seconds: float = 3600.0

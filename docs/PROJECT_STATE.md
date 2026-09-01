@@ -30,15 +30,42 @@ Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
 (one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-337 Python tests, coverage of app/ gated at 99% (99.65% measured)
+368 Python tests, coverage of app/ gated at 99% (99.28% measured)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 106 client-behaviour assertions (T12)
 Brace balance check: ok
 ```
 
-(as of Session 20, 1 September 2026 — `tools/verify.py` is the source of truth
+(as of Session 21, 1 September 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
+
+**1 September 2026 — Session 21: D40c closed (fine approach activated and
+tuned, register readback/write and PRESENT_SPEED added); D35 closed as a
+side effect.** Fine approach (overshoot past target, return from one
+direction — built earlier, never switched on) is now live and bidirectional.
+Turning it on re-opened D40a's ack-surfacing fix on a second path (the
+overshoot/final legs discarded their acknowledgement); fixed the same way,
+both legs checked now. A live tuning campaign, unloaded, isolated one
+variable at a time: baseline noise floor established at N=5 (~0.4-0.5°
+mean error, bistable); `MinStartForce` (0x18, factory default 0, never
+written) swept 0→50→100→150; **150 landed every one of 55 real moves (11
+targets × 5 repeats, full ±90° range) within 0.00-0.03° of target, every
+repeat identical.** Along the way found and root-caused a genuine hardware
+oscillation at the travel extremes (a stiction-driven limit cycle, matches
+this exact servo's own documented "jitter when the arm is extended")
+resolved by the same `MinStartForce=150` rather than the dead-zone
+workaround first tried. Value written permanently into
+`Config.h::kMinStartForce`, confirmed via reflash + readback. Creep speed
+(`fine_approach_final_speed_dps`, built and tested) was not needed —
+`MinStartForce` alone reached the encoder's resolution floor. **All of this
+session's numbers are unloaded** — D40d (Session 22) verifies the result
+holds under hand-held load. D35 (commanded vs. real speed) closed as a side
+effect of the same campaign: `PRESENT_SPEED` (0x3A) sampled live confirms
+the documented `GoalSpeed` conversion is accurate; the earlier "1.5-2.3x
+faster" reading was a wall-clock-timing artifact. Full findings:
+`docs/backlog/D.md` D40, `docs/history/CLOSED.md` D35,
+`skills/uno-q-st3215/SKILL.md` §2.
 
 **1 September 2026 — Session 20: D40a's three prerequisite fixes landed; D40b's live investigation found the root cause.** D40a (ack surfacing on `command_move`/`command_stop`, fine-approach thread generation-token cancellation and isolation-abort, `None`-guard on a failed position read) fixed and verified — closes D46's first finding. D40b, live on the rig with the operator holding it: false ack ruled out (D40a's own fix confirms every move genuinely acknowledges, shortfall persists regardless); a firmware edge-trigger theory tested directly and also ruled out; `MinStartForce` register (0x18) found completely unconfigured in `sketch/src/`, writing it produced a real but position-inconsistent partial improvement, not yet confirmed via register readback; root cause identified as genuine position-dependent mechanical stiction/backlash in the belt-and-gear drivetrain, not a software or firmware quirk. Full findings, numbers and caveats: `docs/backlog/D.md` D40. Uncovered and fixed along the way: a background-thread teardown race in the test suite (a new fine-approach thread left running past its test into the next test's database close, the same class of segfault the telemetry sampler thread was fixed for once already) — `MotionService` now tracks and joins it, mirroring `TelemetryService.stop_sampler()`. D40c (the convergence retry) and D40d (tuning) remain open for Session 21.
 
@@ -258,13 +285,12 @@ is answered, this table is a priority ordering rather than a schedule.
   below 0 silently and still reports success
 - direction **+1**; deadband **0**; speed saturates ~**1100 counts/s**;
   acceleration has no effect above ~**50**
-- **Not yet in this list, and it should be:** what one `GoalSpeed` register
-  unit is actually worth in real deg/s. Assumed equal to one position count
-  (0.06°) by symmetry with position — structurally plausible (same register
-  block, same packet, same official library layout) but a live timed move
-  measured the servo running ~1.5-2x faster than that assumption predicts
-  (backlog D35). Don't build anything on the 0.06 speed-step assumption
-  until D35 closes it with an actual measurement.
+- **`GoalSpeed` is worth what it says, confirmed 1 Sept 2026 (D35, closed):**
+  one register unit ≈ one encoder count/s, scaled by the belt ratio, matching
+  the 0.06° position-step assumption by symmetry. The earlier "~1.5-2x
+  faster than commanded" reading was elapsed-time-over-distance contaminated
+  by acceleration ramp-up, not a register discrepancy — see
+  `skills/uno-q-st3215/SKILL.md` §2 for the measured numbers.
 - Serial1 @ 1 Mbps is reliable (200/200 reads, 220 µs)
 - Ethernet shield needs **SpiRemap** — SPI2 sits on D11–D13 but the shield takes
   SPI from ICSP (PD1/PC2/PC3). Apply it after `SPI.begin()` **and again** after

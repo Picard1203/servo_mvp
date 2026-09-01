@@ -98,6 +98,43 @@ String HandleReadTorque(String /*unused*/) {
   return String(value);
 }
 
+String HandleReadTuning(String /*unused*/) {
+  BridgeApi* api = BridgeApi::instance();
+  if (api == nullptr) return String("0,0,0,0,0,0,0");
+  const servo::TuningSnapshot snapshot =
+      api->controller().ReadTuningRegisters();
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), "%d,%u,%u,%u,%u,%u,%u",
+          snapshot.valid ? 1 : 0,
+          static_cast<unsigned>(snapshot.position_p),
+          static_cast<unsigned>(snapshot.position_d),
+          static_cast<unsigned>(snapshot.position_i),
+          static_cast<unsigned>(snapshot.min_start_force),
+          static_cast<unsigned>(snapshot.cw_dead_zone),
+          static_cast<unsigned>(snapshot.ccw_dead_zone));
+  return String(buffer);
+}
+
+String HandleWriteTuning(String payload) {
+  BridgeApi* api = BridgeApi::instance();
+  if (api == nullptr) return String(Ack(false));
+  const int16_t p = static_cast<int16_t>(FieldAt(payload, 0, -1));
+  const int16_t d = static_cast<int16_t>(FieldAt(payload, 1, -1));
+  const int16_t i = static_cast<int16_t>(FieldAt(payload, 2, -1));
+  const int16_t min_start_force =
+      static_cast<int16_t>(FieldAt(payload, 3, -1));
+  const int16_t cw = static_cast<int16_t>(FieldAt(payload, 4, -1));
+  const int16_t ccw = static_cast<int16_t>(FieldAt(payload, 5, -1));
+  return String(Ack(api->controller().WriteTuningRegisters(
+      p, d, i, min_start_force, cw, ccw)));
+}
+
+String HandleReadSpeed(String /*unused*/) {
+  BridgeApi* api = BridgeApi::instance();
+  if (api == nullptr) return String("err");
+  return String(static_cast<long>(api->controller().ReadPresentSpeed()));
+}
+
 String HandleGetStatus() {
   BridgeApi* api = BridgeApi::instance();
   if (api == nullptr) return String("no-servo");
@@ -186,6 +223,9 @@ void BridgeApi::Register() {
   Bridge.provide("servo_configure_range", HandleConfigureRange);
   Bridge.provide("servo_set_torque", HandleSetTorque);
   Bridge.provide("servo_read_torque", HandleReadTorque);
+  Bridge.provide("servo_read_tuning", HandleReadTuning);
+  Bridge.provide("servo_write_tuning", HandleWriteTuning);
+  Bridge.provide("servo_read_speed", HandleReadSpeed);
   Bridge.provide("get_status", HandleGetStatus);
 
   if (relay_ != nullptr) {

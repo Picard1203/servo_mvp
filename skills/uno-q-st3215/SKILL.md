@@ -60,13 +60,39 @@ different thing in each).
 |---|---|---|
 | `0x10` | max torque | 2 bytes |
 | `0x12` | phase | **BIT4 = 1 enables multi-turn** |
+| `0x15`-`0x17` | position P/D/I | 1 byte each. Factory default `P=32 D=32 I=0`. Bench-verified 1 September 2026: leaving these at factory default and tuning `0x18` instead resolved a settling defect (see `0x18`, below) — never tuned away from default on this project. |
+| `0x18` | min start force | 2 bytes, 0..1000 — same ceiling as torque limit (`0x30`). Guarantees a minimum push on every corrective move, even when the calculated correction is too small to break static friction on its own; at the factory default of `0` a small residual error can sit uncorrected forever (the servo "knows" it's off but never applies enough force to move). Bench-tuned to **150** (15% of range) this project, closing D40 — see the oscillation note below before raising this further. |
+| `0x1A`/`0x1B` | CW/CCW dead zone | 1 byte each, 0..32 counts. Factory default `1`; this project's own firmware writes `0` at boot for tighter accuracy. **Interacts with `0x18`**: `0` dead zone plus a nonzero min-start-force gives the control loop no "close enough, stop" tolerance, which is what produces the oscillation below at some positions. Restoring the factory `1` fixes it but costs accuracy (~0.13° landed vs ~0.01-0.03° with a well-tuned min-start-force alone) — tune min-start-force first, dead zone only if that doesn't resolve it. |
 | `0x22` | protect torque | |
 | `0x24` | overload torque | |
 | `0x28` | torque switch | **0 disables drive torque, 1 restores it, 128 sets current position to 2048.** Confirmed against Waveshare's own register map, not inferred. Torque off keeps the electronics powered (sensors keep answering) — this is how you cut motor power without losing telemetry. **These three values share ONE register with a mode-select semantic**: write it through an SDK helper (`EnableTorque(id, 0/1)`), never a raw `WriteByte` with a variable, or a stray 128 silently re-centres the servo and destroys calibration. |
+| `0x2E` | goal speed | 2 bytes, counts/s. Bench-confirmed 1 September 2026 (see Bench-verified behaviour, below): the documented conversion (1 unit ≈ 1 encoder count/s, scaled by the belt ratio) is accurate once measured off `0x3A` directly — an earlier wall-clock-based measurement (elapsed time over distance) read as "1.5-2.3x faster than commanded" purely from acceleration ramp-up and fine-approach's two-leg travel, not a register discrepancy. |
 | `0x30` | torque limit | 2 bytes, 0..1000 |
 | `0x37` | **lock** | **EEPROM write lock** (0 unlocked, 1 locked). This is *not* an operator safety lock — never conflate them. EEPROM writes need the unlock ritual. |
+| `0x3A` | present speed | 2 bytes, sign-magnitude — same wire format as present position, decode explicitly (below). The only reliable way to measure real servo speed: elapsed-time/distance is diluted by acceleration ramp-up and, if fine approach is active, its own two-leg structure. |
 | `0x3C` | present load | **PWM duty, NOT torque.** Do not report it as torque. |
 | `0x41` | status | fault bits, below |
+
+### A settling oscillation at extended positions — real, not a tuning artifact
+
+At some positions — bench-confirmed at the far ends of this project's travel
+window, one servo turn's worth of extension from centre — a nonzero minimum
+start force (`0x18`) combined with zero dead zone (`0x1A`/`0x1B`) can produce
+a **sustained limit-cycle oscillation** that never damps on its own: the
+shaft trembles between two positions about one encoder count apart,
+indefinitely, stopping only when a new command interrupts it. This is a
+textbook stiction-driven limit cycle (a correction too weak to break static
+friction, force builds, it slips and overshoots, repeat) and matches this
+exact servo's own documented behaviour independently: Robo9's STS3215 bench
+testing reports "the servo exhibits jitter or oscillation when the arm is
+extended." **Watch the shaft directly (not just a single position poll)
+when tuning `0x18` upward** — a single reading can land mid-oscillation and
+look like a real, stable result. Two independent fixes work: restore the
+factory dead zone (`1`, coarser accuracy) or raise `0x18` further (kept
+tight accuracy on this project, going from `100` to `150`). Load, or
+anything that increases effective leverage, is expected to make this more
+likely, not less — verify under load separately, don't assume an unloaded
+fix transfers.
 
 ### Status register 0x41 — six faults
 
@@ -93,6 +119,14 @@ reads as ~32700**. Decode explicitly.
 - **Deadband 0.** Measured landing error: 0→0.06°, 1→0.10°, 8→0.52°, 32→1.98°.
   Larger deadbands cost accuracy for nothing.
 - **Speed saturates near 1100 counts/s** (~66°/s output) whatever you command.
+- **Below that ceiling, `0x2E` means what it says — measured off `0x3A`
+  directly.** Commanding 9-15 output °/s (~150-250 counts/s after the belt
+  ratio) landed within a few percent of the documented conversion. At
+  higher commanded speeds over a *short* travel distance, measured speed
+  can fall well short of the commanded value — plain acceleration ramp-up
+  (not enough distance to reach cruise speed before decelerating), not a
+  register problem. Judge "is it going the right speed" from `0x3A` over a
+  long enough move, never from elapsed-time-over-distance on a short one.
 - **Acceleration has no measurable effect above ~50.**
 - **Serial1 @ 1 Mbps is reliable** — 200/200 reads, 220 µs each.
 - **Restoring torque after cutting it: re-command the present position
@@ -226,8 +260,9 @@ fails at runtime as **silence**, not an error.
 
 ```
 Linux -> MCU   servo_read, servo_move, servo_stop, servo_set_deadband,
-               servo_configure_range, servo_set_torque, get_status,
-               net_tx(slot,data), net_shutdown(slot)
+               servo_configure_range, servo_set_torque, servo_read_torque,
+               servo_read_tuning, servo_write_tuning, servo_read_speed,
+               get_status, net_tx(slot,data), net_shutdown(slot)
                (CentreHere() is deliberately NOT exposed here - see
                BridgeApi.h's own comment: calibration is a software
                relabel recorded in SQLite, and a servo-held position
@@ -246,6 +281,10 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
   servo_configure_range    "multiturn,amplification" -> "ok" | "err"
   servo_set_torque         "enabled"                 -> "ok" | "err"
   servo_read_torque        (no payload)              -> "0" | "1" | "err"
+  servo_read_tuning        (no payload)              -> "valid,p,d,i,msf,cw,ccw"
+  servo_write_tuning       "p,d,i,msf,cw,ccw"        -> "ok" | "err"
+                           (-1 per field means leave that register alone)
+  servo_read_speed         (no payload)              -> signed counts/s | "err"
   get_status               (no payload)              -> "ready" | "no-servo"
   ```
   `get_status` takes no parameter because Python calls it with no payload at
@@ -290,6 +329,8 @@ MCU -> Linux   net_open(slot, client_ip), net_rx(slot, data), net_close(slot)
 | Calibration captured a datum of 0 | A failed read was stored as a position — `valid` flag discarded |
 | One fault never trips | Status decoder missing bit4 (angle) |
 | A torque/move write always "succeeds" even when the servo never answers | Checked the SCServo library's write-return value (`EnableTorque`, `WritePosEx`) against `-1` — that sentinel is for this library's *read* calls only; writes return `Ack()`'s own convention, 0 fail / 1 success, never -1 |
+| Shaft trembles between two positions near the far end of travel, never stops on its own | `0x18` (min start force) nonzero with `0x1A`/`0x1B` (dead zone) at 0 — a stiction-driven limit cycle, see §2's register-map note |
+| A move looks 1.5-2x faster than commanded, measured by elapsed time | Measuring speed from wall-clock/distance instead of `0x3A` — acceleration ramp-up on a short move (or fine approach's own two-leg travel) inflates the apparent speed, `0x2E`'s own conversion is accurate |
 
 ---
 

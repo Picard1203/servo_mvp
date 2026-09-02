@@ -5,6 +5,155 @@ Full entries for every open `D`-numbered item. Indexed one line each in
 
 ---
 
+### D48 — Diagnose the load-induced settling oscillation properly: fast instrumentation first, then a structured experiment, not another tuning sweep
+**Status:** open · **Severity:** high · **Found:** Session 22, immediately
+after D40d — the operator's own explicit call: this needs designing
+properly, not repeating the same ad hoc register-nudging that produced a
+confusing, non-convergent picture in D40d
+
+**What was wrong with D40d's own method, stated plainly so it is not
+repeated.** D40d changed one register at a time, N=1–5 per configuration,
+against no pre-declared pass/fail bar, and kept moving to a new variable
+whenever the current one looked ambiguous. Given D40d's own data shows
+roughly a 40–60% failure rate at some settings, N=2–3 cannot tell a real
+fix from a lucky pair of repeats — several of D40d's "clean" results were
+almost certainly luck, not fixes, and the session's own conclusion (P=24
+kept, dead zone reverted, real state still unresolved) reflects that. This
+item exists to run the properly designed version.
+
+**Two independent deep-research passes (Claude and Gemini, 2 September
+2026, same prompt) converge on the same diagnosis and the same gap in
+today's own method** — full text kept in
+`docs/research/D40_resonance_research_claude.md` and
+`docs/research/D40_resonance_research_gemini.md` (Gemini's response was cut
+off mid-protocol by a 50,000-character paste limit; the missing tail is
+noted in the file, not silently absent). Both converge on:
+
+1. **The mechanism is more consistent with load-coupled mechanical
+   resonance (a two-mass system: motor+pulley vs. output+load, coupled
+   through the compliant belt) than with simple Coulomb stick-slip** —
+   non-monotonic register response, position-specific severity unrelated to
+   travel-limit proximity, ~40–60% intermittency, and reliable hand-damping
+   all match the resonance signature better than the friction one.
+2. **This is inferred, not confirmed, and today's own instrumentation
+   cannot confirm it.** Belt-transmission resonances typically sit in the
+   tens-to-hundreds of Hz; D40d's raw position polling ran at ~7–12 Hz
+   (80–150ms intervals) — far below the Nyquist rate needed, so it aliases
+   any true high-frequency oscillation into something that merely looks
+   like a slow, confusing wobble. **Confirming the mechanism, not guessing
+   at it, is Stage 0 below and is the single highest-value thing this item
+   does that D40d did not.**
+3. **Three concrete, cheap, never-tried levers**, all live-writable or
+   config-only, no reflash needed to test: **position D gain** (register
+   0x16, held at the factory default 32 all session — the literal textbook
+   damping term, direct electronic analog of the hand that reliably
+   suppressed this all night); **a softened final leg**
+   (`fine_approach_final_speed_dps`/`fine_approach_final_acceleration`,
+   built in D40c, never used — both reports independently flag the
+   overshoot-then-hard-reversal stop as a likely resonance-injection event,
+   which is consistent with reducing overshoot *distance* not helping in
+   D40d, since the excitation is in the stop, not the swing); **P lowered
+   further than D40d tried**, toward the LeRobot community's own validated
+   10–16 range (D40d only reached 16/24), accepting more steady-state droop
+   that the existing fine-approach mechanism is already built to correct.
+
+**Files:**
+- `tools/jitter_probe.py` (new this session, promoted from a scratch
+  script D40d built and validated live) — polls `output_deg`/`current_a`
+  continuously through a move and counts real direction reversals near
+  target, instead of trusting the firmware's own settle-completion event
+  (D40d confirmed that event is blind to sustained trembling — see D40,
+  `docs/history/CLOSED.md`). Use this, not `fine_approach_trial.py` alone,
+  for every trial in this item — `fine_approach_trial.py`'s own settle
+  wait is the exact metric this tool exists to not trust.
+- A new tool, to be built as Stage 0 below: a fast current/load logger.
+  `current_a` is already exposed by `/servo/state` (no new firmware) — the
+  gap is polling it fast enough, simultaneously with position, during a
+  known-bad trial, and telling a coherent oscillating trace apart from
+  sharp spikes concentrated at reversal moments only.
+- `sketch/src/Config.h`/`ServoController.{h,cpp}` — only if Stage 2's D
+  gain result is kept permanently; mirror the existing `kPositionGainP`
+  boot-write pattern added this session (same file, same discipline: bake
+  the kept value in, do not leave it live-only in EEPROM).
+- `python/.env`/`.env.board` — only if `fine_approach_final_speed_dps` or
+  `fine_approach_final_acceleration` is kept; both settings already exist
+  and are unit-tested, unused since D40c built them.
+
+**The protocol, in order — do not skip Stage 0, it is what D40d skipped.**
+
+- **Stage 0 — confirm the mechanism (prerequisite, ~30–45 min, decisive).**
+  Build a script that logs `current_a` (already exposed) alongside
+  `output_deg`, polled as fast as the HTTP/Bridge round trip allows, during
+  a reliably-reproducing bad trial (−60°, the D40d worst point, under the
+  same hand-plus-improvised-weight proxy load). **State the achieved
+  polling rate honestly against the ideal** (both research reports put true
+  belt resonance at 30–300 Hz, needing ≥60–600 Hz to resolve by strict
+  Nyquist — this project's own HTTP+Bridge path will likely not reach
+  that) — this test is not a full spectral confirmation, but it can still
+  tell a coherent, sinusoidal-ish current oscillation (resonance
+  signature) apart from sharp asymmetric spikes concentrated only at
+  direction-reversal moments (stick-slip signature), which is enough to
+  choose Stage 2a vs. 2b below with real evidence instead of inference.
+- **Stage 1 — read Stage 0's result and pick a branch**, stated before
+  starting, not decided after seeing which branch looks more convenient:
+  resonance signature → Stage 2a; stick-slip signature → Stage 2b.
+- **Stage 2a (resonance, expected) — test the three new levers, at real
+  statistical power this time.** One test point only, −60°, the point
+  D40d found fails most reliably — do not spread thin across many angles
+  the way D40d's own final sweep did. **N≥10 per configuration**, not
+  D40d's N=2–5 — the ~40–60% failure rate D40d measured means fewer
+  repeats cannot distinguish a real fix from a lucky run. **Declare the
+  pass bar before running each configuration**, in writing, in this
+  entry's own working notes: e.g. "0 of 10 trials show >3 reversals past
+  5s, or ≤1 does" — decided in advance, not adjusted after seeing the
+  data, which is what let D40d's goalposts drift. Test, in this order: (i)
+  D raised from 32 (try 48, then 64) alone; (ii) the final leg softened
+  (`fine_approach_final_speed_dps` set well below the move's own speed, or
+  `fine_approach_final_acceleration` set low) alone; (iii) **if both (i)
+  and (ii) individually help, do not stop there — run the small 2×2
+  factorial** (both low, both high, each alone) at N≥5 per cell. Testing
+  factors one at a time can miss real interactions between them and
+  produce a misleading conclusion — exactly the shape of confusion D40d
+  ran into jumping between P, MinStartForce, dead zone and overshoot
+  without ever checking whether they interacted. (iv) P lowered further,
+  toward 14–16, checked against the resulting steady-state droop.
+- **Stage 2b (stick-slip, if Stage 0 says so) — the friction-remedy path
+  D40d already ran is the relevant one.** Revisit dead zone (D40d's own
+  `2/2` result: 4 of 5 clean at the worst point) and `MinStartForce`
+  85–95 (D40d's own clean-ish, small-offset range) with the same N≥10
+  rigor Stage 2a specifies, rather than treating D40d's small-N results as
+  final.
+- **Stage 3 — only if Stage 2 does not converge to a pass**, probe the
+  velocity-loop registers both reports independently surfaced (0x25/speed
+  P, default 10; 0x27/speed I, default 200) — real but not documented in
+  an official English register table; change one at a time, reversibly,
+  and record the originals before writing anything.
+- **Stage 4 — bracket the real arm without it.** Repeat the best Stage 2
+  (or 3) configuration with a deliberately *exaggerated* bench inertia
+  (added mass at a longer lever than the improvised weight used in D40d)
+  to approximate the real arm's worst-case reflected inertia. A
+  configuration that holds across that exaggerated range is a defensible
+  real-arm starting point; one that does not means the fix needs D47's
+  real hardware regardless, and that should be said plainly rather than
+  assumed away.
+
+**Acceptance:** a configuration is found that passes its own pre-declared
+Stage 2/3 bar at −60° (N≥10) **and** does not regress the other points
+D40d already measured clean (0°, ±60°, ±90°, N≥3 each, confirming no
+regression rather than re-running a full campaign). That configuration is
+written permanently (`Config.h` and/or `.env`/`.env.board`, matching
+whichever settings changed) the same session it is confirmed, mirroring
+D40d's own persistence discipline. **This item does not require D47's real
+arm to close** — D47 stays open afterward regardless, as the final
+real-hardware confirmation; this item is about reaching a real,
+statistically credible answer on the mechanism and the best available
+proxy-load fix.
+
+**Related:** D40 (closed, `docs/history/CLOSED.md`), D47 (real-arm
+verification, stays open independently of this item's outcome).
+
+---
+
 ### D47 — Verify the anti-backlash fix holds once the servo carries its real load
 **Status:** open · **Severity:** medium · **Found:** Session 22, D40d
 proxy-load testing

@@ -305,7 +305,7 @@
     "semantic_hash": ""
   },
   "sketch/src/App.cpp": {
-    "mtime": 1788355625.674002,
+    "mtime": 1788357699.7588766,
     "ast_hash": "35ed1dafdb95d46855b25dce34251993",
     "semantic_hash": ""
   },
@@ -325,7 +325,7 @@
     "semantic_hash": ""
   },
   "sketch/src/Config.h": {
-    "mtime": 1788356710.5809581,
+    "mtime": 1788357699.8846288,
     "ast_hash": "02dc3c99086148f0d1ddc73523555ac5",
     "semantic_hash": ""
   },
@@ -350,12 +350,12 @@
     "semantic_hash": ""
   },
   "sketch/src/ServoController.cpp": {
-    "mtime": 1788355619.4593537,
+    "mtime": 1788357699.9467266,
     "ast_hash": "738564153aea3590b21fb900d5e2b54d",
     "semantic_hash": ""
   },
   "sketch/src/ServoController.h": {
-    "mtime": 1788355606.50279,
+    "mtime": 1788357700.083253,
     "ast_hash": "5f741be28bedc1cfa552125515e31445",
     "semantic_hash": ""
   },
@@ -420,8 +420,8 @@
     "semantic_hash": "c35705e386e30676eec0befdeb6a5223"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1788357083.4968307,
-    "ast_hash": "14443329e60c587d3dc797c13fe07b48",
+    "mtime": 1788359256.7897363,
+    "ast_hash": "7ea41071ea668e50606ad2677ba2bb12",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "docs/BACKLOG.md": {
-    "mtime": 1788357020.2113862,
-    "ast_hash": "b5b3319fbeeac94c92e712e3bbc4c929",
+    "mtime": 1788359244.9451523,
+    "ast_hash": "3047b9b464612de265e307b8424c794c",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -525,7 +525,7 @@
     "semantic_hash": ""
   },
   "skills/uno-q-st3215/SKILL.md": {
-    "mtime": 1788357231.7182543,
+    "mtime": 1788357700.206119,
     "ast_hash": "3f53ed55127f16c9050ddfe32f95ff6f",
     "semantic_hash": ""
   },
@@ -665,8 +665,8 @@
     "semantic_hash": ""
   },
   "docs/backlog/D.md": {
-    "mtime": 1788356920.5284379,
-    "ast_hash": "cdde681475af8ea37f01066cf0279a00",
+    "mtime": 1788359222.2125945,
+    "ast_hash": "770bd7ea40a2ffc0a691bea8a1dff655",
     "semantic_hash": ""
   },
   "docs/backlog/R.md": {
@@ -775,7 +775,7 @@
     "semantic_hash": ""
   },
   "docs/history/CLOSED.md": {
-    "mtime": 1788356988.3548582,
+    "mtime": 1788357697.3880534,
     "ast_hash": "068aa9b8fa8bb40d7c8f4d7c347dca7c",
     "semantic_hash": ""
   },
@@ -785,13 +785,28 @@
     "semantic_hash": ""
   },
   "docs/sprint/SPRINTS.md": {
-    "mtime": 1788357065.3996637,
+    "mtime": 1788357727.2825847,
     "ast_hash": "a4d47455b9d364691b2f167ef9ab80f5",
     "semantic_hash": ""
   },
   "docs/sprint/JIRA_EXPORT.md": {
     "mtime": 1788338564.8770604,
     "ast_hash": "94fe1f3a2fcd9c3760482628d37738a7",
+    "semantic_hash": ""
+  },
+  "tools/jitter_probe.py": {
+    "mtime": 1788359162.1948316,
+    "ast_hash": "bf0aeee6741a27a8c2b29a9c089e1aa0",
+    "semantic_hash": ""
+  },
+  "docs/research/D40_resonance_research_claude.md": {
+    "mtime": 1788359008.222488,
+    "ast_hash": "126d49dd86c6cbcce16deb0f88dd53ca",
+    "semantic_hash": ""
+  },
+  "docs/research/D40_resonance_research_gemini.md": {
+    "mtime": 1788359091.656448,
+    "ast_hash": "26aa224c68915bcaf68b3626bf87cfff",
     "semantic_hash": ""
   }
 }

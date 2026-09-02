@@ -67,6 +67,23 @@ test-visible behaviour changed, only two EEPROM-persisted servo constants.
 R11 and the rig protocols (both committed this sprint) did not start —
 D40d's investigation used the full session.
 
+**Same evening, after closing D40: two independent deep-research passes
+(Claude and Gemini, same prompt) both converged on load-coupled mechanical
+resonance as the more likely mechanism, and both flagged that D40d's own
+instrumentation (raw position polling at ~7-12 Hz) cannot actually confirm
+that — it aliases any true belt-transmission resonance, which typically
+sits tens to hundreds of Hz.** Both surfaced three concrete, never-tried
+levers (position D gain, a softened fine-approach final leg via
+`fine_approach_final_speed_dps`/`_acceleration`, both built in D40c and
+unused; P lowered further toward the LeRobot community's own 10-16 range).
+Full research kept in `docs/research/`. Filed as **D48** — a properly
+designed experiment (fast current logging first to confirm the mechanism,
+then adequate repeat counts against the ~40-60% intermittency D40d itself
+measured, pre-declared pass bars, a small factorial check for interactions
+between levers) — explicitly slotted for the next session rather than run
+the same night. `tools/jitter_probe.py` (promoted from a validated scratch
+script) is the instrument D48 should use throughout.
+
 **1 September 2026 — Session 21: D40c closed (fine approach activated and
 tuned, register readback/write and PRESENT_SPEED added); D35 closed as a
 side effect.** Fine approach (overshoot past target, return from one

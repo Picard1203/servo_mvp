@@ -42,6 +42,12 @@ unchanged, only the tier moved). Neither is dropped either way: what doesn't
 land this sprint carries to Sun 6 Sept exactly as before. **T20** runs via
 Antigravity, not session-bound. See `docs/sprint/SPRINTS.md` for the capacity math.
 
+**Decided 2 September 2026, same evening as D40's close:** next session
+runs **D48** (the properly designed resonance experiment), not R11 or the
+rig protocols — those push to the sprint starting 6 Sept regardless of
+whether Thursday's remaining capacity would technically fit them, the
+operator's own call rather than a capacity accident.
+
 **Still deferred from the original session-15 triage** — narrower now that
 Session 19 pulled out everything the rig findings needed: **T10**, **T11**
 (originally sessions 16/17's job), **T18**, T2, R7, and the D42–D46/T21

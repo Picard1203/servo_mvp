@@ -15,16 +15,17 @@ class ServoController {
   explicit ServoController(ServoBus& bus);
 
   /// Applies startup configuration: travel range, dead zone, torque limit,
-  /// and minimum start force.
+  /// minimum start force, and position gain P.
   /// @param multi_turn Enable multi-turn absolute positioning.
   /// @param angle_resolution Amplification 1..3 (multi-turn only).
   /// @param deadband_counts Dead-zone width, 0..32.
   /// @param torque_limit Torque ceiling, 0..1000.
   /// @param min_start_force Minimum PWM force before a move begins, 0..1000.
+  /// @param position_gain_p Position-loop proportional gain, 0..255.
   /// @return True when the servo answered and every step succeeded.
   bool Begin(bool multi_turn, uint8_t angle_resolution,
              uint8_t deadband_counts, uint16_t torque_limit,
-             uint16_t min_start_force);
+             uint16_t min_start_force, uint8_t position_gain_p);
 
   /// Reads one coherent snapshot in a single bus round trip.
   /// @return The snapshot; valid is false when the bus did not answer.
@@ -52,6 +53,11 @@ class ServoController {
   /// @param force Minimum PWM force before a move begins, 0..1000.
   /// @return True on success.
   bool SetMinStartForce(uint16_t force);
+
+  /// Writes the position-loop proportional gain register.
+  /// @param p Position gain P, 0..255.
+  /// @return True on success.
+  bool SetPositionGainP(uint8_t p);
 
   /// Selects single-turn or multi-turn absolute positioning.
   /// @param multi_turn Enable multi-turn absolute positioning.

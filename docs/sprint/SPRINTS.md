@@ -56,11 +56,23 @@ knowingly over the 85% discipline, the operator's explicit call)
 | D40a — 3 CR HIGH prerequisites (ack surfacing, thread cancellation, `None`-guard) | | ~0.75h | 14:47 | 15:44 | 57m | 20 | Done |
 | D40b — investigation, operator holding the rig | | 1.25h | 15:44 | 17:19 | 1h35m | 20 | Done |
 | D40c — activate and harden the existing anti-backlash fine approach (travel-limit clamp, overshoot resized to measured data, event diagnostics, tuning-register read/write, PRESENT_SPEED read, MinStartForce tuning campaign) | | ~2h | 18:53 | 23:20 | 4h27m | 21 | Done |
-| D40d — verify MinStartForce=150 holds under hand-held load; retune only if it does not | | 1.0h | | | | 22 | To Do |
-| D40 total | 5 | ~5h | | | | 20–22 | In Progress |
-| R11 — snap to nearest + delta | 2 | 3.0h | | | | 22 | To Do |
-| Rig protocols 1/2/3/5, hand-held | 1 | 1.5h | | | | 22 | To Do |
+| D40d — verify MinStartForce=150 holds under hand-held load; retune only if it does not | | 1.0h | 14:52 | 16:55 | ~4h | 22 | Done |
+| D40 total | 5 | ~5h | | | | 20–22 | Done |
+| R11 — snap to nearest + delta | 2 | 3.0h | | | | 22 | To Do — did not start, see note |
+| Rig protocols 1/2/3/5, hand-held | 1 | 1.5h | | | | 22 | To Do — did not start, see note |
 | T20 — doc-truth sweep (Antigravity, parallel — not counted against the 13.25h above) | 1 | 1.5h | | | | — | To Do |
+
+**D40d actual, ~4h against a 1.0h estimate — an unexplained-mismatch case,
+stated plainly.** The estimate assumed a single confirmation pass
+(`MinStartForce=150` holds, or it doesn't). What actually happened: the
+confirmation failed in a way the estimate did not anticipate (jitter at
+−60°, not the ±90° extremes the prior session had flagged), which opened a
+real investigation — instrumentation fixed, root cause hypothesis built and
+evidence-gathered, several register combinations tried live, one kept
+permanently (`P`), a deep-research prompt drafted for further external
+work. **R11 and the rig protocols did not start this session** — D40d's
+investigation used the full remaining time. Both carry forward exactly as
+committed scope, not dropped.
 
 **13:51 note, before D40a genuinely starts:** an earlier edit briefly marked
 D40a "In Progress" with a 13:51 start — wrong, that time went to this retune

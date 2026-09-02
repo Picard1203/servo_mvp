@@ -40,11 +40,13 @@ ServoController::ServoController(ServoBus& bus) : bus_(bus) {}
 
 bool ServoController::Begin(bool multi_turn, uint8_t angle_resolution,
                             uint8_t deadband_counts, uint16_t torque_limit,
-                            uint16_t min_start_force) {
+                            uint16_t min_start_force,
+                            uint8_t position_gain_p) {
   if (!bus_.Ping()) return false;
   bool ok = ConfigureRange(multi_turn, angle_resolution);
   ok = SetDeadband(deadband_counts) && ok;
   ok = SetMinStartForce(min_start_force) && ok;
+  ok = SetPositionGainP(position_gain_p) && ok;
   ok = bus_.WriteWord(reg::kTorqueLimit,
                       static_cast<int16_t>(torque_limit)) && ok;
   // EnableTorque: 0 fail / 1 success, never -1.
@@ -124,6 +126,10 @@ bool ServoController::SetMinStartForce(uint16_t force) {
   const uint16_t clamped = ClampMinStartForce(force);
   return bus_.WriteEepromWord(reg::kMinStartForce,
                               static_cast<int16_t>(clamped));
+}
+
+bool ServoController::SetPositionGainP(uint8_t p) {
+  return bus_.WriteEepromByte(reg::kPositionP, p);
 }
 
 bool ServoController::ConfigureRange(bool multi_turn,

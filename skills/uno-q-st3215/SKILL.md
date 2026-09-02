@@ -60,9 +60,9 @@ different thing in each).
 |---|---|---|
 | `0x10` | max torque | 2 bytes |
 | `0x12` | phase | **BIT4 = 1 enables multi-turn** |
-| `0x15`-`0x17` | position P/D/I | 1 byte each. Factory default `P=32 D=32 I=0`. Bench-verified 1 September 2026: leaving these at factory default and tuning `0x18` instead resolved a settling defect (see `0x18`, below) — never tuned away from default on this project. |
-| `0x18` | min start force | 2 bytes, 0..1000 — same ceiling as torque limit (`0x30`). Guarantees a minimum push on every corrective move, even when the calculated correction is too small to break static friction on its own; at the factory default of `0` a small residual error can sit uncorrected forever (the servo "knows" it's off but never applies enough force to move). Bench-tuned to **150** (15% of range) this project, closing D40 — see the oscillation note below before raising this further. |
-| `0x1A`/`0x1B` | CW/CCW dead zone | 1 byte each, 0..32 counts. Factory default `1`; this project's own firmware writes `0` at boot for tighter accuracy. **Interacts with `0x18`**: `0` dead zone plus a nonzero min-start-force gives the control loop no "close enough, stop" tolerance, which is what produces the oscillation below at some positions. Restoring the factory `1` fixes it but costs accuracy (~0.13° landed vs ~0.01-0.03° with a well-tuned min-start-force alone) — tune min-start-force first, dead zone only if that doesn't resolve it. |
+| `0x15`-`0x17` | position P/D/I | 1 byte each. Factory default `P=32 D=32 I=0`. **Bench-verified 2 September 2026: lowering `P` was the single most consistent fix found for load-induced settling oscillation, out of everything tried** — matches published community guidance for this exact servo family (LeRobot/Hugging Face: "lowering the P-gain is the most critical fix for stable, smooth motion" on Feetech STS3215). This project kept `P=24` (down from factory `32`). `D`/`I` were never touched. |
+| `0x18` | min start force | 2 bytes, 0..1000 — same ceiling as torque limit (`0x30`). Guarantees a minimum push on every corrective move, even when the calculated correction is too small to break static friction on its own; at the factory default of `0` a small residual error can sit uncorrected forever (the servo "knows" it's off but never applies enough force to move). Bench-tuned to **150** on this project — held up well unloaded and under one steady hand-drag load test, but **do not treat it as a settled, monotonic tuning knob**: a fine sweep (85/90/95/98/100/150/200) under load found the response non-monotonic, with no clean threshold. See the oscillation note below. |
+| `0x1A`/`0x1B` | CW/CCW dead zone | 1 byte each, 0..32 counts — unit is 1 raw servo-shaft encoder step (not degrees; convert via the system's own counts-per-degree). Factory default `1`, the register's own floor (cannot go smaller, it is an unsigned integer). **Interacts with `0x18` and with load**: a wider dead zone reduces (but on this project's bench testing did not reliably eliminate) load-induced settling oscillation, at a real, roughly linear accuracy cost (each step of dead zone ≈ one more encoder count of possible final-position slop, per side). Dead zone `2/2` cleaned up ~80% of trials at this project's worst-behaved point under a proxy load; `1/1` did not reliably help under load at all, despite fixing an *unloaded* extremes-only oscillation earlier in the same project (see below) — **do not assume an unloaded dead-zone fix transfers to a loaded one.** |
 | `0x22` | protect torque | |
 | `0x24` | overload torque | |
 | `0x28` | torque switch | **0 disables drive torque, 1 restores it, 128 sets current position to 2048.** Confirmed against Waveshare's own register map, not inferred. Torque off keeps the electronics powered (sensors keep answering) — this is how you cut motor power without losing telemetry. **These three values share ONE register with a mode-select semantic**: write it through an SDK helper (`EnableTorque(id, 0/1)`), never a raw `WriteByte` with a variable, or a stray 128 silently re-centres the servo and destroys calibration. |
@@ -73,26 +73,64 @@ different thing in each).
 | `0x3C` | present load | **PWM duty, NOT torque.** Do not report it as torque. |
 | `0x41` | status | fault bits, below |
 
-### A settling oscillation at extended positions — real, not a tuning artifact
+### A settling oscillation, unloaded, at travel extremes — real, not a tuning artifact
 
 At some positions — bench-confirmed at the far ends of this project's travel
-window, one servo turn's worth of extension from centre — a nonzero minimum
-start force (`0x18`) combined with zero dead zone (`0x1A`/`0x1B`) can produce
-a **sustained limit-cycle oscillation** that never damps on its own: the
-shaft trembles between two positions about one encoder count apart,
-indefinitely, stopping only when a new command interrupts it. This is a
-textbook stiction-driven limit cycle (a correction too weak to break static
-friction, force builds, it slips and overshoots, repeat) and matches this
-exact servo's own documented behaviour independently: Robo9's STS3215 bench
-testing reports "the servo exhibits jitter or oscillation when the arm is
-extended." **Watch the shaft directly (not just a single position poll)
-when tuning `0x18` upward** — a single reading can land mid-oscillation and
-look like a real, stable result. Two independent fixes work: restore the
-factory dead zone (`1`, coarser accuracy) or raise `0x18` further (kept
-tight accuracy on this project, going from `100` to `150`). Load, or
-anything that increases effective leverage, is expected to make this more
-likely, not less — verify under load separately, don't assume an unloaded
-fix transfers.
+window, one servo turn's worth of extension from centre, **unloaded** — a
+nonzero minimum start force (`0x18`) combined with zero dead zone
+(`0x1A`/`0x1B`) can produce a **sustained limit-cycle oscillation** that
+never damps on its own: the shaft trembles between two positions about one
+encoder count apart, indefinitely, stopping only when a new command
+interrupts it. This is a textbook stiction-driven limit cycle (a correction
+too weak to break static friction, force builds, it slips and overshoots,
+repeat) and matches this exact servo's own documented behaviour
+independently: Robo9's STS3215 bench testing reports "the servo exhibits
+jitter or oscillation when the arm is extended." **Watch the shaft directly
+(not just a single position poll) when tuning `0x18` upward** — a single
+reading can land mid-oscillation and look like a real, stable result. Two
+independent fixes work *for this unloaded, extremes-only case*: restore the
+factory dead zone (`1`, coarser accuracy) or raise `0x18` further.
+
+### The same symptom, under load, is a different and harder problem
+
+**Do not assume the fix above transfers to a loaded servo.** Bench-tested 2
+September 2026 with a hand-applied and improvised-weight proxy load (not a
+rigid mount): the same low-amplitude settling oscillation reappeared, but
+**worst at a mid-travel position, not the extremes** — the opposite of
+where the unloaded case predicts trouble. Neither raising `0x18` (swept
+85-200, non-monotonic response) nor a wider dead zone (`2/2` helped most of
+the time but not reliably) fully resolved it; reducing the anti-backlash
+overshoot magnitude did not help either. What did help most, consistently:
+**lowering `P`** (see the register table above).
+
+**Working hypothesis, evidence-based but not confirmed: this looks like
+load-coupled mechanical resonance, not simple stiction.** Signs pointing
+that way: non-monotonic response to every register tried; no consistent
+effect from overshoot magnitude (stiction limit cycles care about the
+final correction's force, not how far the initial swing was); severity
+tied to a specific joint angle unrelated to travel-limit proximity (a
+belt-driven arm's effective inertia and leverage shift with position, which
+would shift a resonant frequency but wouldn't obviously affect Coulomb
+friction this way); roughly half of identical repeats at fixed settings
+failing and half not (consistent with sensitivity to starting phase, not a
+deterministic threshold); and direct hand contact reliably damping it — the
+textbook resonance remedy. If this holds, **resonant frequency is a
+property of the attached mass and mounting stiffness**, so a fix tuned on
+one mechanical configuration (a bench proxy, a different arm) has no
+particular reason to transfer to another. Verify under the real load,
+mounted as it will actually be used, not a hand-held stand-in.
+
+### The firmware's own settle-completion event can miss this entirely
+
+`servo.move.fine_approach`'s `wait_elapsed_s` field (this project's Python
+layer, not a servo register) reports how long its own settle *check*
+took to clear — it does **not** mean the shaft was actually still. Measured
+directly: one move reported `wait_elapsed_s=3.5s` while continuous raw
+position polling (not the "moving" flag, which also stayed `false`
+throughout) showed 19 direction reversals still ongoing 14+ seconds later.
+**Never judge settle quality from an elapsed-time or "moving" flag alone —
+poll raw position continuously through the whole window and look for
+reversals, or watch the shaft directly.**
 
 ### Status register 0x41 — six faults
 

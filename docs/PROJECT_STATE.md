@@ -40,6 +40,33 @@ Brace balance check: ok
 (as of Session 21, 1 September 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
+**2 September 2026 — Session 22: D40d found the anti-backlash fix does not
+hold reliably under load, root-caused it, and D40 closed honestly rather
+than cleanly.** Set out to verify `MinStartForce=150` under hand-held
+load; instead found position-dependent, intermittent settling oscillation
+— worst at −60°, not the ±90° extremes Session 21 had flagged as the risk
+to watch — that no register combination reliably removed. Found and
+documented a real instrumentation gap along the way: the firmware's own
+settle metric (`servo.move.fine_approach`'s `wait_elapsed_s`) is blind to
+sustained trembling a move can still be doing while it reports a fast,
+clean settle. Landed one real, permanent improvement — position gain `P`
+lowered 32→24, baked into `Config.h::kPositionGainP` (new), matching
+published community guidance for this exact servo family. Dead zone was
+tried at 1 and 2 (2/2 cleaned up 4 of 5 trials at the worst point) and
+deliberately reverted to the factory-boot default 0/0 — the operator's own
+call, accepting residual jitter risk over an accuracy cost. Evidence
+points to mechanical resonance rather than stiction (non-monotonic
+register response, overshoot-magnitude independence, ~50% intermittency,
+reliable damping by hand contact) — resonant frequency depends on the
+attached mass and mounting stiffness, which today's proxy load (a hand
+grip plus an improvised weight) has no reason to share with the real arm.
+**D40 closed on this basis; D47 opened for verification once the servo
+carries its real mounted load.** Full findings: `docs/history/CLOSED.md`
+D40. `tools/verify.py` unchanged at baseline (368/99.28%/194/106/ok) — no
+test-visible behaviour changed, only two EEPROM-persisted servo constants.
+R11 and the rig protocols (both committed this sprint) did not start —
+D40d's investigation used the full session.
+
 **1 September 2026 — Session 21: D40c closed (fine approach activated and
 tuned, register readback/write and PRESENT_SPEED added); D35 closed as a
 side effect.** Fine approach (overshoot past target, return from one

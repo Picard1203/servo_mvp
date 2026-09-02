@@ -2697,10 +2697,11 @@ shipped, its two-leg overshoot-and-return structure — neither of which
 the documented conversion needed no correction factor once measured
 correctly.
 
-**Related:** D40 (closed the same session, from the same board time — the
-speed benchmark was D40c's own step 1), D32 (the speed-step enforcement this
-was blocking can now use the documented conversion as-is), R9 (the 30 °/s
-default this measurement was suspected of undermining stands unchanged).
+**Related:** D40 (this measurement was D40c's own step 1; D40 itself stayed
+open for D40d and closed Session 22 — see this file), D32 (the speed-step
+enforcement this was blocking can now use the documented conversion as-is),
+R9 (the 30 °/s default this measurement was suspected of undermining stands
+unchanged).
 
 **Original report follows.**
 
@@ -2759,3 +2760,264 @@ of D32's enforcement.
 (closed 30 August 2026 — the global move speed it fixed at 30 deg/s
 commanded depends on this measurement; resolving D35 may show that figure
 needs revisiting).
+
+---
+
+### D40 — A move settles short under load and re-commanding the same target does not correct it
+**Status:** CLOSED · 2 September 2026 · Session 22 · **Severity:** high
+
+**Resolution: closed with a real, kept improvement and an honest,
+unresolved residual risk — not a clean pass.** D40a–c (prior sessions)
+fixed the acknowledgement-surfacing defects and tuned the fix to a clean
+0.00–0.03° unloaded result. D40d (this session) set out to verify that
+result under hand-held load and instead found it does not hold reliably,
+identified a likely root cause, made one further real improvement, and
+closed on the operator's own explicit call to accept the residual risk
+rather than keep chasing it on a bench proxy.
+
+**Kept, permanent, confirmed by readback after reflash:** position gain `P`
+lowered 32→24, baked into `Config.h::kPositionGainP` and
+`ServoController::Begin()` (new — P had never been touched by firmware
+before this session). This was the single most consistent improvement
+found all session, and matches published community guidance for this same
+servo family (LeRobot/Hugging Face: "lowering the P-gain is the most
+critical fix for stable, smooth motion" on Feetech STS3215 servos).
+`MinStartForce=150` (D40c's value, already permanent) held cleanly under a
+steady hand-drag load in an initial 3/3 trial. **Final live register
+state:** `P=24 D=32 I=0 MinStartForce=150 cw_dead_zone=0 ccw_dead_zone=0`.
+
+**A real instrumentation gap was found, not just worked around:** the
+firmware's own settle metric (`servo.move.fine_approach`'s
+`wait_elapsed_s`) is blind to sustained low-amplitude oscillation — a move
+can report a fast, clean ~3s settle while raw position polling shows the
+shaft still trembling 10+ seconds later. Measured directly: one move
+logged `wait_elapsed_s=3.5s` while continuous polling showed 19 direction
+reversals still ongoing past 14s in a 15s observation window. Any future
+accuracy or settle-time claim sourced from that event field alone should
+be read with this caveat; watching the shaft directly caught what the
+metric missed, repeatedly, this session.
+
+**Tried and reverted, not kept:** dead zone was tested at 0 (off), 1 (the
+servo's own factory default, and the smallest possible nonzero value — an
+integer register, 1 raw step ≈ 0.06° per side, matching this project's own
+`output_step_deg`), and 2. Dead zone 1 did not reliably remove the
+oscillation (still 22–21 reversals at the worst point across repeats).
+Dead zone 2 was substantially better — 4 of 5 repeats clean at the worst
+point — but not a complete fix (1 of 5 still oscillated the full 15s
+window), at a real accuracy cost. **The operator's explicit final call:
+revert to the factory-boot default 0/0** and accept that a move may jitter
+but should still settle eventually, rather than trade accuracy for a
+partial fix. Fine-approach overshoot was also reduced from its originally
+bench-tuned 1.5° (roughly 8x this project's own 0.18° backlash-acceptance
+spec) to 0.4°, on the theory that a smaller overshoot leaves less momentum
+to dissipate near target; this also did not resolve it (3 of 5 repeats at
+the worst point still oscillated) and was reverted to 1.5°. `MinStartForce`
+was swept in fine steps from 85 to 200: non-monotonic, no clean threshold
+found at any single value.
+
+**−60° is the single worst-behaved point found this session** — worse
+than the ±75°/±90° extremes D40c's own findings had flagged as the risk to
+watch. Confirmed reproducible across two independent runs at the final
+kept registers (37/30 reversals, then 22/21, never settling inside a 15s
+window), unloaded.
+
+**Root cause, evidence-grounded, not confirmed:** likely mechanical
+resonance, not stiction alone. Every register response was non-monotonic;
+overshoot magnitude made no consistent difference; failures were
+position-specific in a way unrelated to travel-limit proximity; roughly
+half of identical repeats at a fixed setting failed and half did not; and
+direct hand contact reliably damped it, the textbook resonance remedy, not
+a friction one. Resonant frequency is a property of the attached mass and
+mounting stiffness — today's proxy load (a hand grip plus an improvised
+weight, no rigid mount) has no reason to share the real arm's resonant
+frequency. This is why the bench proxy could not answer the question D40d
+was opened to answer, and why this closes honestly rather than as a clean
+pass. A deep-research prompt capturing the full investigation (hardware,
+symptom, everything tried, the resonance hypothesis, open questions) was
+prepared the same session for further external research — not committed to
+this repo, handed to the operator directly.
+
+**All numbers from D40d are proxy-loaded, not real-load** — stated
+plainly, the same discipline D40b and D40c's own entries already used.
+
+**Related:** D40a–c (prior sessions, same investigation), D35 (closed
+Session 21, from D40c's own speed-benchmark data), D47 (opened this
+session — real-rig verification once the servo carries its real mounted
+load), ADR-0008.
+
+**Original report follows.**
+
+**Status:** open · **Severity:** high · **Found:** rig hand-testing, 1
+September 2026 · **the operator's own top-priority defect**
+
+Under load, a move to e.g. 90° can settle at ~89°. Pressing 90° again produces
+no corrective step. Commanding several degrees further does reach the target.
+The operator cannot trust that the number on screen is the number achieved.
+
+**D40a — three prerequisite fixes, landed and verified this session**
+(branch `feature/move-acknowledgement`). `command_move`/`command_stop` now
+return whether the servo acknowledged; `MotionService` raises
+`CommandNotAcknowledgedError` on a move, stop, or recover the servo never
+acknowledged, instead of reporting acceptance regardless — closes D46's first
+finding. The fine-approach background thread now carries a generation token
+and aborts on supersession or on isolation, and logs rather than swallows any
+exception raised in its body. `_needs_fine_approach()` no longer crashes when
+the current position is unknown. Software deadband (`servo_deadband_counts`)
+is confirmed `0` on the board — ruling out a *software* dead zone
+specifically; it does not rule out a mechanical one, which is what the
+investigation below found instead.
+
+**D40b — investigation findings, this session, unloaded on the rig.**
+1. **False ack — ruled out.** D40a's fix is live on the board: every tested
+   move genuinely acknowledges, and the shortfall persists unchanged. A false
+   `202` is not the mechanism.
+2. **Firmware edge-triggering (repeating the same Goal Position is a no-op) —
+   tested directly, not supported.** A three-condition test at three
+   positions (−60°, 0°, 60°) compared an identical re-command against a
+   genuinely different tiny nudge (0.06° away, then back): both produced the
+   same near-zero movement at every position. A clean edge-trigger would also
+   forbid the occasional real movement an identical repeat did produce at 0°
+   — that happened too. Ruled out.
+3. **`MinStartForce` register (0x18) — found unconfigured, partially fixed.**
+   Never written anywhere in `sketch/src/` before this session, despite being
+   documented (servo datasheet/forums) as the minimum startup torque needed
+   to break the servo free from rest. Writing `0` at boot
+   (`Config.h`/`ServoController::Begin()`, this session) produced a real but
+   partial, **position-inconsistent** improvement: 0.3° became a reliable
+   corrective step at 2 of 3 tested positions (0°, 60°); at the third (−60°)
+   the fix measured *worse*, needing ≥1.2° where 0.6° had sometimes worked
+   before the fix — though this specific before/after delta is confounded by
+   an intervening datum recalibration (see caveats) and should not be read as
+   the fix backfiring. **Not independently confirmed** — the register write
+   was never read back from the board over the Bridge, so this fix should be
+   treated as deployed but unverified until a diagnostic readback closes that
+   gap (first item for D40c).
+4. **Conclusion: genuine mechanical stiction/backlash in the belt-and-gear
+   drivetrain** (44:30 belt reduction, `docs/sprint/RIG_TESTING_PROTOCOL.md`),
+   not a software or firmware quirk. Position-dependent, occasionally breaks
+   free on its own, and needs a real-magnitude corrective offset — no repeat
+   command trick substitutes for one. Reliable correction floor measured,
+   post-fix, at 0.3–0.6° at two of three positions; −60° needed ≥1.2° both
+   before and after the fix.
+
+**Caveats on the numbers above.** The datum was recalibrated mid-session
+(an app restart reset the in-memory verified flag), so a position label like
+"−60°" is not the same physical gear position before and after that point —
+the before/after comparison at −60° above is directional, not a clean A/B.
+All D40b testing was unloaded: the loaded comparison originally planned was
+set aside once the unloaded data already supported the mechanical-stiction
+conclusion. Position P/D/I gain registers (0x15–0x17), also never configured,
+were noted as a further lead but not tested.
+
+**D40c — fine approach activated and hardened, register readback/write and
+PRESENT_SPEED added, a MinStartForce tuning campaign run, all this session
+(21), all unloaded.**
+
+1. **The anti-backlash "fine approach" (overshoot past the target, return
+   from one consistent direction) already existed in `motion_service.py` but
+   had never been switched on** (`FINE_APPROACH_ENABLED=false` in both
+   `.env` files) — D40b's whole investigation, and its mechanical-stiction
+   conclusion, ran with it off. Switched on, made bidirectional (was
+   downward-only), overshoot resized from bench data, travel-limit clamped.
+2. **Turning it on re-opened D40a's own defect on a second path.** The
+   overshoot and final legs called `command_move` and discarded the
+   acknowledgement, so a servo that never took the first step of a fine-
+   approach move was still reported `servo.move.accepted` — the identical
+   shape D40a fixed on the direct path, missed on this one, covered by
+   nothing because the test suite pins `FINE_APPROACH_ENABLED=false`
+   globally. Fixed: both legs now check their ack; `accepted` is recorded
+   only once the overshoot leg is confirmed, and a failed leg records
+   `servo.move.failed` naming which leg, never a false accept.
+3. **Register readback (0x15–0x1B) closes D40b's own unverified-write
+   gap.** Baseline read live: `P=32 D=32 I=0 MinStartForce=0 CW=0 CCW=0`.
+   D40b's fix wrote `MinStartForce=0` at boot — the readback confirms that
+   write genuinely lands, but `0` **is** the register's factory default, so
+   writing it changes nothing about servo behaviour. Whatever improvement
+   D40b measured cannot have come from that write specifically; D40b's own
+   caveats already point at the likelier explanation (a mid-session datum
+   recalibration confounding the before/after comparison). Dead zones read
+   `0`, not the servo's own factory `1` — a *different* register this
+   firmware does write nonzero-effectively at boot, confirming the write
+   path itself works and ruling the silent-write-failure hypothesis out for
+   good. A matching **write** endpoint was added so campaign values could be
+   tried live, one Bridge round trip, no reflash per value — the value
+   actually kept gets written into `Config.h` afterward, same as always
+   intended.
+4. **D35 resolved as a side effect, closed in `docs/history/CLOSED.md`** —
+   `PRESENT_SPEED` (0x3A) is now read and was sampled live throughout real
+   moves at three commanded speeds.
+5. **The measurement tool itself (`tools/fine_approach_trial.py`, new) had
+   two real bugs, both caught by comparing its numbers against what the
+   operator directly observed on the rig, both fixed:** an event-timestamp
+   comparison that used microsecond precision against the server's second-
+   precision timestamps (a same-second event could sort as "older" than the
+   read that should have matched it); and a settle check that trusted the
+   first `moving == false` poll, which can land in a brief pause between two
+   corrective micro-moves rather than the true final position. Fixed with a
+   debounce requiring both `moving == false` **and** an unchanged
+   `output_deg`, sustained continuously, before a reading counts as final.
+6. **Baseline accuracy, N=5 at −60°/0°/60°, `MinStartForce=0`
+   (unloaded):** mean |error| 0.39–0.47°, ~0.9° peak spread, and a clear
+   **bistable** signature — each target alternated between two fixed nearby
+   resting points repeat to repeat, not random noise. This is the real,
+   N=5 noise floor; the earlier N=2 hint from this session's own manual
+   testing (0.72°) was directional only.
+7. **`MinStartForce` sweep — 0 → 50 → 100 → 150, isolated one variable at a
+   time, N=5 per value at the anchor targets, then the full 11-target set
+   (0/30/45/60/75/90° and negatives) at the value kept.** 100 alone dropped
+   mean error to 0.01–0.03° at every anchor and made every repeat land
+   identically — an 8–10× improvement over baseline, confirmed genuine once
+   the tool's settle-detection bug (above) was fixed.
+8. **A genuine hardware finding at the travel extremes, not a tuning
+   artifact.** At `MinStartForce=100`, ±90° (and, less severely, 75°) never
+   settled — the shaft kept trembling between two positions roughly 0.06°
+   apart indefinitely, stopping only when a new command interrupted it.
+   Matches a textbook stiction-driven limit cycle (small correction can't
+   break static friction, force builds, it slips and overshoots, repeat) and
+   independently, this exact servo's own documented behaviour ("the servo
+   exhibits jitter or oscillation when the arm is extended" — Robo9 STS3215
+   bench testing). Load, or effective load, means more of exactly this
+   leverage — **D40d must watch for this specifically, not just re-measure
+   accuracy.** Two independent fixes were tried and compared, live, watching
+   the shaft directly rather than trusting a single poll: restoring the
+   dead zone to the servo's factory default of `1` (currently `0`, this
+   firmware's own boot write) stopped the oscillation at both 90° and 75°
+   but cost accuracy (~0.13° landed, coarser than elsewhere); raising
+   `MinStartForce` to **150** with the dead zone left at `0` also stopped it
+   cleanly **and** kept the tight accuracy.
+9. **`MinStartForce=150`, dead zone unchanged at `0`, is the result kept.**
+   Full 11-target sweep, N=5 each, unloaded: **every single repeat landed
+   identically at every target**, mean error 0.00–0.03° everywhere,
+   including ±90° and ±75° — no oscillation observed across repeated
+   15-second holds. Written into `Config.h::kMinStartForce` as the
+   permanent boot value (was `0`), confirmed by a fresh flash + reboot +
+   readback reproducing `150`. Register is `0`–`1000`; `150` is 15% of
+   range, not a value pushing any limit — **safe to retune again if a
+   future problem surfaces**, the same live-write-then-lock-into-`Config.h`
+   process this session used, no code change needed for the trial itself.
+10. **Creep speed (`fine_approach_final_speed_dps`, config-only override,
+    built and unit-tested this session) was not needed.** `MinStartForce`
+    alone reached the encoder's own resolution floor; the setting stays
+    unset (`None`, today's behavior unchanged) and is available for D40d
+    if a hand-held load changes the picture.
+
+**Caveat repeated deliberately: every number in D40c is unloaded.** D40b
+already recorded that mistake once (its own testing was unloaded, the
+loaded comparison set aside) — D40d exists specifically to check whether
+`MinStartForce=150` holds with the operator's hand on the mechanism, not to
+re-run the tuning campaign from scratch.
+
+**Twin-path:** `move_to()` and `move_to_counts()` both funnel through the
+same D40a/D40c-fixed `_command()`, so the saved-position "go" path is
+covered by the same fixes, not separate ones. Item 2's ack-drop fix is
+itself the twin-path finding for D40c (§2 above).
+
+**Acceptance:** a move converges to its target within a stated tolerance, or
+reports plainly that it could not — never silently settles short while
+reporting success. D40a, D40b and D40c done; D40d (verify under hand-held
+load) remains open, Session 22.
+
+**Related:** D46 (its first finding closed by D40a), ADR-0008 (the anti-pattern
+D40a's ack-surfacing mirrors on the write side, now closed on both the
+direct and fine-approach paths), D35 (closed the same session, from this
+campaign's own speed-benchmark data — see `docs/history/CLOSED.md`).

@@ -87,6 +87,7 @@ knowingly over the 85% discipline, the operator's explicit call)
 | R11 — snap to nearest + delta | 2 | 3.0h | | | | 22 | To Do — did not start, see note |
 | Rig protocols 1/2/3/5, hand-held | 1 | 1.5h | | | | 22 | To Do — did not start, see note |
 | T20 — doc-truth sweep (Antigravity, parallel — not counted against the 13.25h above) | 1 | 1.5h | | | | — | To Do |
+| D48 — characterise the settling jitter properly, then fix it (Steps 1-5, see plan file) | 5 | ~4h | 12:47 | not marked | | 24 | In Progress |
 
 **D40d actual, ~4h against a 1.0h estimate — an unexplained-mismatch case,
 stated plainly.** The estimate assumed a single confirmation pass

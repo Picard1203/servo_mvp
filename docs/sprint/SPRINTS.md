@@ -10,6 +10,32 @@ Points: Fibonacci, anchored on the operator's own calibration that a 5 is
 about 7.5h: **1** ≈1–1.5h · **2** ≈3h · **3** ≈4.5h · **5** ≈7.5h · **8**
 split it. Estimates, not commitments.
 
+**Jira export convention** (the air-gapped Jira has no API access, so import
+is copy-paste from a standalone file, regenerated on request — not this
+file, which is the working record; current copy: `docs/sprint/JIRA_EXPORT.md`).
+`D` → issue type Bug, `T` → Task, `R` → Story. Priority derives from the
+item's own stated severity/urgency: `high` severity that is safety- or
+delivery-blocking → Highest, other `high` → High, `medium` → Medium, `low`
+→ Low, post-MVP → Lowest. A multi-part item (a lettered defect, a batched
+review item) is one Jira story with its sub-items as subtasks, never split
+into separate stories. **Every story and every subtask carries its own To
+Do / In Progress / Done status.**
+
+**The export must be fully self-contained — the operator's explicit
+correction, 2 Sept, after a first draft leaned on this repo's own D/T/R
+numbering.** The air-gapped Jira, and anyone reading it who isn't on this
+project, has no access to this repo: no backlog IDs, ADR numbers, session
+numbers, internal tool names (this project's own skill/agent names), or
+cross-references to files in this repo anywhere in the export — every fact
+a reader needs is written inline in plain language instead. Each item must
+stand alone well enough to be deleted or edited in isolation without
+breaking anything else in the file. **Subtasks appear only once an item is
+actually pulled into a sprint** — an item still sitting in the general
+backlog is one story with no subtask breakdown; that breakdown happens at
+sprint-planning time, not backlog-grooming time. When asked to build a
+sprint from specific backlog numbers, apply this same convention without
+re-asking.
+
 **Timestamp every item boundary, every session — non-negotiable, not a
 per-conversation habit.** Get a real clock time from the operator or `date`
 at the moment work on a story starts and again when it closes; write both

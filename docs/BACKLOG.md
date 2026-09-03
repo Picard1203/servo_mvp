@@ -32,6 +32,7 @@ sessions actually spent, not the ones originally planned.
 | **20** | **DONE, 1 Sept 2026.** **D40a** — three CR-flagged HIGH prerequisites fixed and verified: ack surfacing on `command_move`/`command_stop`, fine-approach thread generation-token cancellation and isolation-abort, `None`-guard on a failed position read. **D40b** — live investigation with the operator holding the rig: false ack ruled out, firmware edge-triggering tested directly and ruled out, `MinStartForce` register found unconfigured and partially fixed, root cause identified as genuine position-dependent mechanical stiction/backlash in the belt-and-gear drivetrain. Full findings and caveats: `docs/backlog/D.md` D40. | yes |
 | **21** | **DONE, 1 Sept 2026.** **D40c** — fine approach activated (was built, never switched on), hardened (re-opened and re-closed D40a's ack-surfacing gap on the fine-approach path), register readback and a live tuning campaign added: `MinStartForce` swept 0→150, closing at every one of 55 real moves within 0.00-0.03°, including a real oscillation found and fixed at the travel extremes. **D35 closed as a side effect** (`PRESENT_SPEED` sampling resolved the commanded-vs-actual speed question). Full findings: `docs/backlog/D.md` D40, `docs/history/CLOSED.md` D35. All numbers unloaded. | yes |
 | **22** | **DONE, 2 Sept 2026.** **D40d** — set out to verify `MinStartForce=150` under hand-held load; instead found it does not hold reliably (worst at −60°, not the ±90° extremes expected), root-caused (evidence-based) to likely mechanical resonance rather than stiction, fixed the settle-detection instrumentation gap that was masking it, landed one real permanent improvement (`P` 32→24, matches published community guidance for this servo family), tried and deliberately reverted a dead-zone tradeoff (operator's own call: accept residual jitter risk over an accuracy cost). **D40 closed** on that honest, non-clean basis; **D47** opened for real-rig verification. Two independent deep-research passes (Claude, Gemini) run the same evening converged on the same diagnosis and surfaced three untried levers (D gain, a softened fine-approach final leg, deeper P reduction) plus the instrumentation gap in D40d's own method (no fast current logging, inadequate repeat counts against a ~40-60% intermittent failure) — captured as **D48**, a properly designed experiment, explicitly slotted for the next session rather than run tonight. R11 and the rig protocols did not run this session — the D40d investigation used the full session. | yes |
+| **23** | **DONE, 3 Sept 2026.** Tooling session ahead of D48, not D48 itself — no register was touched, no trial was run. Vendored the SCServo library into `libraries/SCServo/` (was documented, never actually present; confirmed via its own source that D48's gain registers are not in Feetech's/Waveshare's own library). Installed 8 skills from cold storage into `~/.claude/skills/`, woven into `skills/deliver/SKILL.md` by phase (experiment-design rigor for D48-shaped items, debugging, verification, skill-writing discipline), with 2 explicitly excluded for conflicting with standing rules. Built and live-fire-tested 3 `PostToolUse` hooks (`docs/WORKFLOWS.md` W9) that surface `docs/CONVENTIONS.md`'s Python/C++ rules and the glossary/no-backlog-ID rules on every edit, since they were previously advisory-only and unenforced. Full account: `docs/PROJECT_STATE.md`. | no |
 
 **R11 pulled into committed scope 1 Sept**, alongside T20 and the rig
 protocols — real capacity slack opened up once D39 and D40 were retuned
@@ -46,7 +47,10 @@ Antigravity, not session-bound. See `docs/sprint/SPRINTS.md` for the capacity ma
 runs **D48** (the properly designed resonance experiment), not R11 or the
 rig protocols — those push to the sprint starting 6 Sept regardless of
 whether Thursday's remaining capacity would technically fit them, the
-operator's own call rather than a capacity accident.
+operator's own call rather than a capacity accident. **Session 23 (3 Sept)
+was a tooling detour, not that session** — D48 is still next, genuinely
+ready to run: the experiment-rigor skills and the SCServo library grounding
+it needed are in place now.
 
 **Still deferred from the original session-15 triage** — narrower now that
 Session 19 pulled out everything the rig findings needed: **T10**, **T11**
@@ -105,6 +109,7 @@ detail entries above (filed and ranked, not started).
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
 | T20 | Doc-truth sweep from the whole-app review (~25 verified fixes) | open · low · **sprint, Antigravity** |
 | T21 | Constants and dead code with no shared source | open · low |
+| T22 | Run graphify's semantic pass on the doc backlog it's never had | open · low |
 
 **R-items** (full entries: `docs/backlog/R.md`)
 

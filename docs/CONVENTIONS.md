@@ -10,7 +10,10 @@ Status: **draft**. Derived from the standard used in `Eyal-FastAPI-Project` and
 `python/ruff.toml`** — run via `ruff check python/app --config
 python/ruff.toml`, advisory only (not part of `tools/verify.py`'s gate).
 Where the two disagree, this file wins — the config is adapted from a general
-personal standard, not written for this repo.
+personal standard, not written for this repo. **Advisory also means nudged
+live, not just on request** — since 3 September 2026, `PostToolUse` hooks
+(`docs/WORKFLOWS.md` W9) surface this file's Python, C++ and glossary rules on
+every edit, without gating anything.
 
 ---
 

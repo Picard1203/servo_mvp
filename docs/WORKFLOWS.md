@@ -230,9 +230,11 @@ once so far: **R2's session opens with it**, on R2's own open design questions
 explicit request that R2 be grounded in the docs rather than a prior session's
 paraphrase.
 
-`deliver` borrows superpowers' `writing-plans` and `executing-plans` for the
-plan-and-checkpoint mechanics; both are now installed. Nothing else from the
-frameworks surveyed was adopted.
+`deliver` borrows `writing-plans` and `executing-plans` for the
+plan-and-checkpoint mechanics, plus, as of 3 September 2026, six more
+skills woven in at the phase each applies to — full list and the two
+skills deliberately left out (and why) are in `skills/deliver/SKILL.md`'s
+own "When to call the other skills" section, not duplicated here.
 
 **Why written rather than installed.** BMAD-METHOD (51.6k★), Spec-Kit (80k★) and
 metaswarm were all evaluated. Each installs its own document skeleton, which
@@ -254,15 +256,69 @@ teaches something general, feed it back.
 
 ---
 
+### W9 — Convention hooks: **DONE**
+**Status:** written and wired, 3 September 2026 · `tools/hooks/`,
+`.claude/settings.json`
+
+`docs/CONVENTIONS.md` had a machine-checkable subset (`python/ruff.toml`) that
+its own text admitted was "advisory only, not part of `tools/verify.py`'s
+gate" — nothing ever ran it. Three `PostToolUse` hooks now fire on every
+`Write`/`Edit`, advisory only (the edit already landed; they surface a
+reminder, never block):
+
+| Script | Fires on | Checks |
+|---|---|---|
+| `check_python_conventions.sh` | `python/**/*.py` | `ruff check` against `python/ruff.toml`; `Args:`/`Returns:` lines missing a `(type)` parenthetical |
+| `check_cpp_conventions.sh` | `sketch/src/**/*.{h,cpp}` | doc comments (`///`, `/**`) added in a `.cpp` instead of the `.h`; `break`/`continue`/`while(true)` outside the `RELAY_NOTES.md` drain-loop exception |
+| `check_glossary_and_ids.sh` | any `.py`/`.cpp`/`.h`/`.js`/`.css` | backlog-ID tags (`D12`, `ADR-0008`, …) inside a code comment; `ts`/`tick`/`home` where the glossary requires `timestamp`/`count`/`datum` |
+
+The third one deliberately covers `.js`/`.css` too, ahead of the frontend work
+already queued in the backlog — the glossary and no-ID rules are stated in
+`CLAUDE.md` as universal, not Python/C++-specific, so the tooling shouldn't
+lag the convention.
+
+Modeled on the `PostToolUse` hook pattern already vendored in
+`skills/phd-skills/plugin/scripts/` (`jargon_scrub.sh`, `citation_guard.sh`) —
+found while researching experiment-design skills for D48, reused rather than
+built from nothing. Each script pipe-tested against real repo content and
+live-fire-proven (temporary sentinel file, per the `update-config` skill's own
+verification steps) before being left in place.
+
+**The glossary/ID check was run against the existing corpus before being
+left in place, not just against synthetic trigger cases** — a first pass
+matching any bare `D11-D13` (an SPI pin range in `SpiRemap.h`, not a
+backlog ID) and any bare `ts`/`tick`/`home` (the real `tick()` heartbeat
+method in `isolation_service.py`, `/home/arduino/...` paths in `config.py`,
+chart-axis "tick-label" in `app.js`) turned up 16 false hits on the
+glossary word alone out of 17 total. Narrowed to a pin-range exclusion for
+the ID check and a declaration/assignment shape (`ts =`, `def f(ts`, a
+bare param in a destructure) plus an explicit exclusion list for the
+glossary check — re-run against the same corpus, down to the one hit that
+is a real existing violation (`app.js`'s `ts: s.timestamp`). A hook that
+fires on legitimate code is worse than no hook: it trains the next session
+to ignore it.
+
+**Why a hook and not a downloaded "coding conventions" skill.** Searched for
+one first. Skills are model-invoked — they fire when Claude judges them
+relevant, which is not a reliable trigger for "apply this on every edit"
+(confirmed against Anthropic's own steering guidance, not just inferred). A
+rule that must hold every time belongs in `CLAUDE.md` or a hook; this repo's
+Python and C++ conventions are also deliberately non-generic (explicit
+`Optional[X]` never `X | None`, doc comments required in the `.h` not the
+`.cpp`), so an imported generic-language skill would have pushed back toward
+the standard this project already rejected, not enforced its own.
+
+---
+
 ## Every flow ends the same way
 
-`verification-before-completion` — the mechanised form of the rule already in
+`verification-before-completion` (superpowers, now installed to
+`~/.claude/skills/` — it was named here as if live before it actually was;
+fixed 3 September 2026) — the mechanised form of the rule already in
 `CLAUDE.md`:
 
 ```bash
-cd python && pytest                      # 207
-cd sketch/tests/native && make           # 194
-python3 tools/check_bridge_contract.py   # both sides agree
+python3 tools/verify.py   # source of truth, not a count quoted here (CLAUDE.md §3)
 graphify update .
 ```
 

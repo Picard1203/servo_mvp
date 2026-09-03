@@ -41,12 +41,13 @@ pointed at them. Pass this rule to every sub-agent you dispatch.
    one, say so out loud — *"Contradicts ADR-000N because…"* — and do not silently
    override it.
 4. **`graphify query`** for the code involved.
-5. **Baseline the numbers** before touching anything:
+5. **Baseline the numbers** before touching anything — `tools/verify.py`, not
+   a count quoted here, is the source of truth (a number written into this
+   file is exactly what let a stale count survive for months, per
+   `CLAUDE.md` §3):
 
 ```bash
-cd python && pytest                      # expect 198
-cd sketch/tests/native && make           # expect 164
-python3 tools/check_bridge_contract.py   # expect "both sides agree"
+python3 tools/verify.py   # compares against tools/verify_baseline.json
 ```
 
 If the baseline is already wrong, stop and say so. Do not start work on a repo
@@ -94,7 +95,25 @@ Use `AskUserQuestion` inside plan mode to settle a real judgment call before
 writing the final plan — do not silently pick one and only mention it in
 passing.
 
-**Then call `ExitPlanMode`.** This is the only checkpoint. Wait for go-ahead.
+**If the item is a hardware experiment, not a code change** (a D-item shaped
+like D48 — tuning a register, diagnosing a physical failure mode, anything
+whose evidence is trial repeats rather than a test suite): the plan itself
+must state, before Phase 2 starts, the same things D48's own protocol
+required and D40d's post-mortem found missing — a pre-declared pass/fail bar
+written down before any trial runs, the sample size behind it, and which
+variable moves alone versus in a factorial. Use `experiment-design` for the
+matrix shape (single-variable isolation, factorial vs. sequential
+elimination) and `statistical-analysis` for the actual sample-size number
+instead of a round one. `pre-registration-writing` and `hypothesis-building`
+carry the same discipline from social-science methodology if the plan needs
+a more formal falsifiable-claim structure — use them for the underlying
+"declare the bar before you see the data" logic, not for their registry or
+survey-specific apparatus, which doesn't apply here.
+
+**Then call `ExitPlanMode`.** This is the only checkpoint. Wait for
+go-ahead — and if it comes back as pushback rather than approval, use
+`receiving-code-review`'s discipline: verify the specific objection against
+the actual plan rather than performatively agreeing and rewriting.
 
 ---
 
@@ -121,6 +140,10 @@ On go-ahead, execute the whole plan without further prompting. Use
   before — the branch is where the work happens, not a label added after.
 - **Test-first where the code is testable.** Use the `tdd` skill. RED must
   actually fail for the stated reason before you write GREEN.
+- **Root cause before any fix, always.** Use `systematic-debugging` — read
+  the error fully, reproduce it, form one hypothesis, test it minimally.
+  Three failed fixes in a row means the architecture is wrong, not that a
+  fourth attempt is due.
 - **Never bundle unrelated changes into a fix.** If you spot something else,
   write it into `BACKLOG.md` as a new item and carry on.
 - **Use the glossary's words** (`docs/CONTEXT.md`): `timestamp` never `ts`, `count`
@@ -171,7 +194,12 @@ python3 tools/check_bridge_contract.py
 graphify update .
 ```
 
-**If the numbers moved, stop and say so.** Do not explain them away in passing.
+**If the numbers moved, stop and say so.** Do not explain them away in
+passing — `verification-before-completion`'s iron law is exactly this: no
+completion claim without fresh evidence run in this message, "should pass"
+is not a substitute for running it. For an experiment-shaped item's trial
+data, use `statistical-analysis` to check the result against the plan's own
+pre-declared bar rather than eyeballing a pass/fail from the raw numbers.
 
 ---
 
@@ -201,7 +229,9 @@ graphify update .
    fact is a defect, not a housekeeping matter.
 4. **Feed the skill.** If the item taught something general about this hardware,
    add it to `skills/uno-q-st3215/SKILL.md`. The docs explain *this* project; the
-   skill travels to the next one.
+   skill travels to the next one. Use `writing-skills` for the edit itself —
+   it is a skill file, not prose, and a bad edit degrades every future
+   session that reads it.
 5. **State plainly what was tested and what was assumed.**
 6. **Commit on the feature branch from Phase 2, then merge into `dev`.**
    Message follows `docs/CONVENTIONS.md`'s Git section — plain English, grounded in
@@ -216,7 +246,7 @@ graphify update .
 
 ---
 
-## When to call the other two skills
+## When to call the other skills
 
 - **`operator-lens`** — before planning any change the operator can see, and
   after any change to the UI or an error path. It asks what the *operator* sees,
@@ -224,3 +254,26 @@ graphify update .
 - **`twin-review`** — on demand, on the finished diff, when the change touches
   `sketch/src/`, an error path, or anything with a mirror. It spawns parallel
   reviewers; it costs tokens; it is not automatic.
+- **`systematic-debugging`**, **`verification-before-completion`**,
+  **`receiving-code-review`**, **`writing-skills`** — woven into Phases 2, 4
+  and 5 above at the point each applies; named here too so they are not lost
+  in the phase text. All four installed 3 September 2026, extracted
+  individually from `skills/superpowers/` (cold storage) the same way
+  `writing-plans`/`executing-plans` already were, not installed as the whole
+  plugin.
+- **`experiment-design`**, **`statistical-analysis`**, **`pre-registration-writing`**,
+  **`hypothesis-building`** — Phase 1 only, and only for a hardware-experiment
+  item (D48-shaped). Installed the same day from `phd-skills` and
+  `open-science-skills`, added specifically because D48's own post-mortem on
+  D40d found the missing discipline was exactly what these encode: a
+  pre-declared pass bar, a real sample size, one variable at a time unless a
+  factorial is deliberately chosen.
+
+**Deliberately not installed, so the gap isn't rediscovered by accident:**
+`finishing-a-development-branch` (superpowers) deletes the branch after
+merge (`git branch -d`/`-D`) — this repo never deletes branches, even merged
+ones, so Phase 5's own merge step stays the way to integrate, not this skill.
+`using-git-worktrees` (superpowers) checks work out into a second directory —
+incompatible with `CLAUDE.md` §6, where the working copy *is* the CIFS mount
+of the board and a worktree would not be. Both stay in `skills/superpowers/`
+cold storage; nothing about the case for excluding them expires.

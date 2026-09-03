@@ -420,8 +420,8 @@
     "semantic_hash": "c35705e386e30676eec0befdeb6a5223"
   },
   "docs/PROJECT_STATE.md": {
-    "mtime": 1788359256.7897363,
-    "ast_hash": "7ea41071ea668e50606ad2677ba2bb12",
+    "mtime": 1788423366.2731178,
+    "ast_hash": "7f71206433c4061dbf9fd6956c9a7a14",
     "semantic_hash": ""
   },
   "docs/agents/domain.md": {
@@ -430,9 +430,9 @@
     "semantic_hash": ""
   },
   "libraries/README.txt": {
-    "mtime": 1785833274.0,
-    "ast_hash": "f133bc0d393c42ad9a82836591718be1",
-    "semantic_hash": "f133bc0d393c42ad9a82836591718be1"
+    "mtime": 1788423380.855072,
+    "ast_hash": "9defadcbc1158f97b97d9dcff670e79a",
+    "semantic_hash": ""
   },
   "python/requirements-dev.txt": {
     "mtime": 1787763595.0525503,
@@ -470,8 +470,8 @@
     "semantic_hash": ""
   },
   "docs/BACKLOG.md": {
-    "mtime": 1788359244.9451523,
-    "ast_hash": "3047b9b464612de265e307b8424c794c",
+    "mtime": 1788422799.3246882,
+    "ast_hash": "b9e177d9cb83b864affe168f3d4d05f7",
     "semantic_hash": ""
   },
   "docs/adr/0001-network-path-through-the-mcu.md": {
@@ -515,13 +515,13 @@
     "semantic_hash": ""
   },
   "docs/WORKFLOWS.md": {
-    "mtime": 1788261547.0769258,
-    "ast_hash": "0e42e641a7058ea990f92cca35396044",
+    "mtime": 1788423413.975999,
+    "ast_hash": "4f5d8645bda295b4a7dca7df7f6c7859",
     "semantic_hash": ""
   },
   "skills/README.md": {
-    "mtime": 1788261031.0112429,
-    "ast_hash": "f0b024a00e6bf5304fe07191103baf42",
+    "mtime": 1788422585.3154838,
+    "ast_hash": "8ea9a2e0624d2b7bf516b9a7f5ebe0f8",
     "semantic_hash": ""
   },
   "skills/uno-q-st3215/SKILL.md": {
@@ -545,8 +545,8 @@
     "semantic_hash": ""
   },
   "skills/deliver/SKILL.md": {
-    "mtime": 1788261548.6135936,
-    "ast_hash": "2b22b8b0e49c3530ceb90e58061e8c6d",
+    "mtime": 1788423255.1513283,
+    "ast_hash": "2bbfe9caf1593fca078a9e323992972c",
     "semantic_hash": ""
   },
   "skills/operator-lens/SKILL.md": {
@@ -760,8 +760,8 @@
     "semantic_hash": ""
   },
   "docs/CONVENTIONS.md": {
-    "mtime": 1788261546.3698835,
-    "ast_hash": "87d590e69593fb26e2e603d51b3b468b",
+    "mtime": 1788422358.2396119,
+    "ast_hash": "9e413859d7c1c81e4796c3c0a038be42",
     "semantic_hash": ""
   },
   "docs/adr/0011-saved-positions-and-a-single-datum.md": {
@@ -807,6 +807,26 @@
   "docs/research/D40_resonance_research_gemini.md": {
     "mtime": 1788359091.656448,
     "ast_hash": "26aa224c68915bcaf68b3626bf87cfff",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1788422276.062462,
+    "ast_hash": "d999477fad45bfc6af497b01c386684f",
+    "semantic_hash": ""
+  },
+  "tools/hooks/check_cpp_conventions.sh": {
+    "mtime": 1788422180.6129522,
+    "ast_hash": "a362d4ea0655db4836c013eb13911f42",
+    "semantic_hash": ""
+  },
+  "tools/hooks/check_glossary_and_ids.sh": {
+    "mtime": 1788423203.3588965,
+    "ast_hash": "f5284f6dd9e935c9cb6c42036873c400",
+    "semantic_hash": ""
+  },
+  "tools/hooks/check_python_conventions.sh": {
+    "mtime": 1788422172.8719957,
+    "ast_hash": "75c10aca69d522ad14ef8119aeb0a0b5",
     "semantic_hash": ""
   }
 }

@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# check.sh - lightweight package consistency checks for open-science-skills.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+for path in [Path("plugin/.claude-plugin/plugin.json"), Path(".claude-plugin/marketplace.json")]:
+    with path.open(encoding="utf-8") as f:
+        json.load(f)
+print("json ok")
+PY
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+
+find plugin/skills -mindepth 2 -maxdepth 2 -name SKILL.md \
+  | sed 's#plugin/skills/##; s#/SKILL.md$##' \
+  | sort > "$tmpdir/skills"
+
+# Alias commands are thin wrappers that invoke an existing skill with a parameter
+# (e.g. model-committee's chair). They have no skill directory of their own by design.
+cat > "$tmpdir/aliases" <<'ALIASES'
+diverge-codex
+fable-orchestrate
+fair-check
+model-committee-fable
+model-committee-sol
+opus-orchestrate
+paper-review-lite-codex
+post-ocr-cleanup
+survey-flow-audit
+vlm-ocr-evaluation
+vlm-ocr-pipeline
+ALIASES
+
+find plugin/commands -maxdepth 1 -name '*.md' \
+  | sed 's#plugin/commands/##; s#.md$##' \
+  | sort > "$tmpdir/commands-all"
+
+comm -23 "$tmpdir/commands-all" "$tmpdir/aliases" > "$tmpdir/commands"
+
+# Every declared alias must exist as a command file.
+missing_aliases="$(comm -13 "$tmpdir/commands-all" "$tmpdir/aliases")"
+if [ -n "$missing_aliases" ]; then
+  echo "alias command declared but missing from plugin/commands: $missing_aliases" >&2
+  exit 1
+fi
+
+find plugin/.skills -maxdepth 1 -name '*.md' \
+  | sed 's#plugin/.skills/##; s#.md$##' \
+  | sort > "$tmpdir/flat"
+
+if ! diff -u "$tmpdir/skills" "$tmpdir/commands"; then
+  echo "skill/command mismatch" >&2
+  exit 1
+fi
+
+if ! diff -u "$tmpdir/skills" "$tmpdir/flat"; then
+  echo "skill/.skills mismatch" >&2
+  exit 1
+fi
+
+while IFS= read -r skill; do
+  src="plugin/skills/$skill/SKILL.md"
+  flat="plugin/.skills/$skill.md"
+  if ! diff -q "$src" "$flat" >/dev/null; then
+    echo "flat skill is stale: $skill" >&2
+    exit 1
+  fi
+  if ! sed -n '1,8p' "$src" | grep -q "^name: $skill$"; then
+    echo "frontmatter name mismatch: $skill" >&2
+    exit 1
+  fi
+  if ! sed -n '1,8p' "$src" | grep -q "^description:"; then
+    echo "missing description: $skill" >&2
+    exit 1
+  fi
+done < "$tmpdir/skills"
+
+count="$(wc -l < "$tmpdir/skills" | tr -d ' ')"
+if ! grep -q "Claude_skills-$count-" README.md; then
+  echo "README Claude skills badge does not match count $count" >&2
+  exit 1
+fi
+
+codex_count="$(find codex -mindepth 1 -maxdepth 1 -type d ! -name assets | wc -l | tr -d ' ')"
+if ! grep -q "Codex_skills-$codex_count-" README.md; then
+  echo "README Codex skills badge does not match count $codex_count" >&2
+  exit 1
+fi
+
+# The two manifests and the README prose must agree with the directory count.
+for f in plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+  if ! grep -q "$count \(Claude Code \)\?skills" "$f"; then
+    echo "$f description does not say $count skills" >&2
+    exit 1
+  fi
+done
+v1="$(python3 -c 'import json;print(json.load(open("plugin/.claude-plugin/plugin.json"))["version"])')"
+v2="$(python3 -c 'import json;print(json.load(open(".claude-plugin/marketplace.json"))["plugins"][0]["version"])')"
+if [ "$v1" != "$v2" ]; then
+  echo "version mismatch: plugin.json $v1 vs marketplace.json $v2" >&2
+  exit 1
+fi
+if ! grep -q "^## \[$v1\]" CHANGELOG.md; then
+  echo "CHANGELOG.md has no entry for $v1" >&2
+  exit 1
+fi
+
+echo "package ok: $count Claude skills, $codex_count Codex skills, v$v1"

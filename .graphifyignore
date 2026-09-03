@@ -11,3 +11,17 @@ skills/Arduino-Agent/
 skills/_global-claude-skills/
 skills/arduino-cli-claude-plugin/
 skills/agentic-awesome-skills/
+
+# 3 September 2026: three more vendored skill collections, same reasoning -
+# 244 document + 3 paper + 3 image files, none of it servo_mvp's own
+# architecture. Missed when first added; caught before the semantic-extraction
+# pass would have processed all of it as project content.
+skills/phd-skills/
+skills/claude-statistical-analysis-skill/
+skills/open-science-skills/
+
+# Third-party vendored library source, not this project's own code - same
+# category as the skill collections above, just not under skills/. Its
+# absence of P/I/D gain registers was already read and cited directly in
+# docs/PROJECT_STATE.md (D48); the graph doesn't need its own AST for that.
+libraries/SCServo/

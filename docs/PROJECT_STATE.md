@@ -40,6 +40,48 @@ Brace balance check: ok
 (as of Session 21, 1 September 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
+**3 September 2026 — Session 23: tooling session ahead of D48, not D48
+itself — D48's own protocol is unchanged and still queued for next
+session.** Four things landed. (1) `libraries/README.txt` had documented
+vendoring the SCServo library into the repo; the folder was empty, so the
+sketch build has been silently depending on the board's own `arduino-cli`
+cache. Located it via `adb` (`/home/arduino/.arduino15/internal/SCServo_1.0.2_.../SCServo`)
+and pulled it into `libraries/SCServo/`. Its own header (`SMS_STS.h`)
+defines no P/I/D gain registers at all — confirms, from the primary source
+rather than by inference, D48's own caveat that this project's
+`ServoRegisters.h` gain addresses (0x15/0x16/0x17, 0x25/0x27) come from
+secondary/community sources, not Feetech's or Waveshare's own library. (2)
+Three project-specific skill collections vendored into `skills/`
+(`phd-skills`, `claude-statistical-analysis-skill`, `open-science-skills` —
+full rationale and one rejected candidate in `skills/README.md`), then eight
+individual skills extracted from those plus `superpowers` cold storage and
+installed to `~/.claude/skills/`, woven into `skills/deliver/SKILL.md` at
+the phase each applies to (experiment rigor in Phase 1 for D48-shaped
+items, root-cause discipline in Phase 2, evidence-before-claims in Phase 4,
+skill-editing discipline in Phase 5) — two related skills deliberately left
+uninstalled because they conflict with standing rules (branch deletion;
+git worktrees incompatible with the CIFS-mounted working copy), reasoning
+kept in `deliver`'s own file so the gap isn't rediscovered by accident. (3)
+`docs/CONVENTIONS.md`'s machine-checkable subset (`python/ruff.toml`) was
+advisory only and unenforced; three `PostToolUse` hooks now surface it,
+plus the glossary and no-backlog-ID rules, on every edit — `docs/WORKFLOWS.md`
+W9, scripts in `tools/hooks/`, wired via `.claude/settings.json`, each
+live-fire tested before being left in place. (4) None of this touched `python/app/` or `sketch/src/` —
+`tools/verify.py` run and confirmed ALL GREEN, baseline unchanged
+(368/99.28%/194/106/ok). (5) The 3 new vendored skill collections and
+`libraries/SCServo/` were missing from `.graphifyignore` (which excludes
+`skills/superpowers/` and its siblings for exactly this reason) — caught
+before a planned semantic-extraction pass would have processed all of it as
+project content; added, then `graphify update .` pruned 2108 wrongly-ingested
+nodes from 232 files, back to a correct 2536-node graph. That semantic pass
+itself — the real gap, since this project's routine `graphify update .` is
+AST-only and has never re-extracted doc content since the graph's original
+7 August build — was attempted via two Agent-tool subagents, burned real
+session usage for zero output (no chunk file ever written), and was
+abandoned rather than retried blind. Filed as **T22**, with the actual
+lesson: use a Gemini API key (no subagents needed) or much smaller chunks
+next time.
+
 **2 September 2026 — Session 22: D40d found the anti-backlash fix does not
 hold reliably under load, root-caused it, and D40 closed honestly rather
 than cleanly.** Set out to verify `MinStartForce=150` under hand-held

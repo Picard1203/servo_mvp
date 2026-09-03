@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tools/hooks/check_python_conventions.sh",
+            "statusMessage": "Checking docs/CONVENTIONS.md (Python)..."
+          },
+          {
+            "type": "command",
+            "command": "tools/hooks/check_cpp_conventions.sh",
+            "statusMessage": "Checking docs/CONVENTIONS.md (C++)..."
+          },
+          {
+            "type": "command",
+            "command": "tools/hooks/check_glossary_and_ids.sh",
+            "statusMessage": "Checking glossary and backlog-ID rules..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -363,3 +363,40 @@ unmodified.
 
 **Related:** T15 (same "strip the prose" motivation, different axis — code
 organisation, not comment volume).
+
+---
+
+### T22 — Run graphify's semantic pass on the doc backlog it's never had
+**Status:** open · **Severity:** low · **Raised by:** Session 23, 3 September
+2026
+
+**The bare `graphify update .` this project runs after every change is
+AST-only — a Python script, no LLM, no way to dispatch a subagent.** The
+richer semantic pass (extracting rationale and concepts from prose, the
+"fusion" `CLAUDE.md` describes) only ran once, at the graph's original
+build on 7 August. Every doc edited or created since — `docs/CONTEXT.md`,
+most ADRs, `docs/BACKLOG.md`, `docs/WORKFLOWS.md`, `docs/PROJECT_STATE.md`,
+`app.py`, and everything from Session 23 itself — has had its structure
+kept current but never had its content re-extracted. Confirmed via
+`detect_incremental()`: 41 real project doc files pending, not a bug.
+
+**What went wrong trying to close it this session:** dispatched two
+subagents (Agent tool) at ~20 files each, per the `graphify` skill's own
+chunking guidance. Both ran for a long time, visibly read files, burned
+real session usage, and produced no output — no chunk file ever written to
+disk. Likely cause: several of these docs are long (`CLAUDE.md`,
+`BACKLOG.md`, `CONTEXT.md`, every ADR), and 20-file chunks sized for
+typical source files may simply be too much content for one subagent turn
+to finish. Abandoned rather than retried blind, per the operator's own
+call — cost already sunk once, not worth risking twice.
+
+**Do it this way instead:** either (a) set `GEMINI_API_KEY`/`GOOGLE_API_KEY`
+before running `/graphify --update` — the skill uses `extract_corpus_parallel`
+directly against Gemini instead of dispatching subagents at all, sidestepping
+this failure mode entirely, or (b) if staying subagent-based, chunk far
+smaller — 5-6 files per subagent, not 20 — so a single failure loses a
+little work, not all of it.
+
+**Acceptance:** `graphify query` can answer a question grounded in one of
+the docs above (e.g. Session 23's own W9 rationale) that today only exists
+in AST-invisible prose.

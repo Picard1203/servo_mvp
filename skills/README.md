@@ -1,10 +1,18 @@
 # Skills archive
 
 Every skill this project may want, vendored **on disk** so it survives the move
-to the air-gapped network. Downloaded 7 August 2026.
+to the air-gapped network. Downloaded 7 August 2026; three more added 3
+September 2026 (below) to close the gap D40d's own post-mortem found: ad hoc
+tuning with too few repeats and no pre-declared pass bar, the exact method
+error D48 exists to not repeat.
 
-Nothing here is installed. This is the cold store. See `docs/WORKFLOWS.md` for
-which skill drives which piece of work, and for install commands.
+This is the cold store — most of it is not installed, and stays here until it
+is. A handful of individual skills (never a whole vendored collection) have
+been extracted into `~/.claude/skills/`, one at a time, as a real need
+surfaced: `writing-plans`/`executing-plans` from `superpowers/` (W8), four
+more from `superpowers/` plus four from `phd-skills/`/`open-science-skills/`
+(W8 update, 3 September 2026). See `docs/WORKFLOWS.md` for which skill drives
+which piece of work, the full installed roster, and install commands.
 
 ## What's here
 
@@ -17,8 +25,11 @@ which skill drives which piece of work, and for install commands.
 | `Arduino-Agent/` | 1.3M | yes | The `arduino-agent` skill and MCP server. IDE-extension bulk stripped. |
 | `arduino-cli-claude-plugin/` | 128K | yes | Thin arduino-cli wrapper skill. |
 | `agentic-awesome-skills/` | 105M | **no — gitignored** | 1,916 skills, cross-agent including Antigravity. Too large to track; it travels with the folder, not with git. |
+| `phd-skills/` | 264K | yes | fcakyon/phd-skills — `experiment-design` (single-variable isolation, factorial vs. sequential-elimination matrices, pre-declared analysis plan before running) is the direct match for D48's own protocol shape. Also carries `reproduce`, `compare`, `paper-review-lite`; the ML-training-run skills (`compare`'s wandb/epoch alignment) don't apply here and are left unused. |
+| `claude-statistical-analysis-skill/` | 148K | yes | terryfyl/claude-statistical-analysis-skill — diagnoses assumptions before picking a test; includes a power/sample-size workflow, which is what turns D48's "N≥10" into a computed number instead of a round one. |
+| `open-science-skills/` | 2.1M | yes | scdenney/open-science-skills — `pre-registration-writing`, `hypothesis-building` (falsifiable claims via DAGs/counterfactuals) and `research-grill` carry the "declare the bar before you see the data" discipline D48 asks for, from social-science methodology rather than engineering. **CC BY-NC 4.0 — noncommercial only** — fine as an internal methodology aid on an MVP not yet sold, but don't let its wording end up verbatim in anything delivered to the client. `codex/` (duplicate Codex-format distribution) and `assets/hero.jpg` stripped as redundant. |
 
-Total 109M, of which 105M is the untracked library.
+Total ~111.5M, of which 105M is the untracked library.
 
 ## Why the big one is not tracked
 
@@ -67,3 +78,19 @@ where LLM-generated ones did not.
 - [iot-agent/iot-skillsbench](https://github.com/iot-agent/iot-skillsbench)
 - [mixelpixx/Arduino-Agent](https://github.com/mixelpixx/Arduino-Agent)
 - [lookfwd/arduino-cli-claude-plugin](https://github.com/lookfwd/arduino-cli-claude-plugin)
+- [fcakyon/phd-skills](https://github.com/fcakyon/phd-skills) (MIT)
+- [terryfyl/claude-statistical-analysis-skill](https://github.com/terryfyl/claude-statistical-analysis-skill) (MIT)
+- [scdenney/open-science-skills](https://github.com/scdenney/open-science-skills) (CC BY-NC 4.0)
+
+## Considered and left out
+
+**jamestjsp/control-skills** (`control-theory`, `pid-loop-tuning`, `ctrlsys-control`) —
+classical continuous-loop industrial process control: FOPDT identification,
+lambda tuning, bump tests on a flow/pressure/temperature loop with a
+controllable OP. The ST3215 is tuned through discrete on-servo registers
+(P/I/D, `MinStartForce`, velocity-loop gains) with no access to that kind of
+open-loop step-test signal — different enough in kind, not just degree, that
+the methodology doesn't transfer. Also has no `LICENSE` file at all (default
+all-rights-reserved) and depends on an unclear/possibly-unpublished `ctrlsys`
+package. Revisit only if a future servo generation exposes real continuous
+control access.

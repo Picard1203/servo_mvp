@@ -296,8 +296,16 @@ def _append_csv(path: str, fields: list[str], rows: list[dict]) -> None:
 
 
 def probe(base_url: str, target_deg: float, label: str, tag: str,
-          repeat: int, poll_seconds: float = DEFAULT_POLL_SECONDS) -> dict:
-    """Resets to 0, commands one fresh move, and scores trembling near target.
+          repeat: int, poll_seconds: float = DEFAULT_POLL_SECONDS,
+          anchor_deg: float = 0.0) -> dict:
+    """Resets to an anchor, commands one fresh move, and scores trembling near target.
+
+    The anchor is a real parameter, not always 0: scoring only ever covers
+    the move from anchor_deg to target_deg, so a fixed anchor of 0.0 can
+    never produce a genuine scored arrival at 0 (a target_deg of 0.0 would
+    be a 0-to-0 no-op), and it means every trial approaches its target from
+    the same direction. Varying the anchor makes both a real arrival at any
+    angle, including 0, and the approach-direction factor possible.
 
     Args:
         base_url (str): API base URL.
@@ -306,13 +314,14 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
         tag (str): Condition tag (e.g. "rig_attached", "fine_approach_off").
         repeat (int): 1-based repeat number, recorded for later grouping.
         poll_seconds (float): Requested interval between position/current reads.
+        anchor_deg (float): Angle to reset to before commanding the scored move.
 
     Returns:
         dict: The score_trial() result plus the matching server event and
             the achieved sampling rate.
     """
-    reset_to(base_url, 0.0, poll_seconds=poll_seconds)
-    print(f"\n--- {label} repeat {repeat} [{tag}]: -> {target_deg} deg ---")
+    reset_to(base_url, anchor_deg, poll_seconds=poll_seconds)
+    print(f"\n--- {label} repeat {repeat} [{tag}]: {anchor_deg} -> {target_deg} deg ---")
     issued_iso = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
     t0 = time.time()
     move(base_url, target_deg)
@@ -336,6 +345,9 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
           f"  settled_short={result['settled_short']}"
           f"  final={result['final_deg']}"
           f"  achieved_hz={achieved_hz:.1f}")
+    print(f"  => current_mean_a={result['current_mean_a']}"
+          f"  current_peak_a={result['current_peak_a']}"
+          "  (0 reversals does not mean 0 current - check this too)")
 
     fa = latest_fine_approach_event(base_url, issued_iso)
     if fa:
@@ -344,22 +356,22 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
     else:
         print("  server event: none found yet (may still be settling past window)")
 
-    trial_id = f"{label}_{tag}_{target_deg}_{repeat}_{issued_iso}"
+    trial_id = f"{label}_{tag}_{anchor_deg}to{target_deg}_{repeat}_{issued_iso}"
 
     trace_fields = ["trial_id", "elapsed_s", "output_deg", "current_a"]
     trace_rows = [{"trial_id": trial_id, "elapsed_s": e, "output_deg": v,
                    "current_a": c} for e, v, c in trace]
     _append_csv(_csv_path("jitter_trace", label), trace_fields, trace_rows)
 
-    trial_fields = ["trial_id", "label", "tag", "target_deg", "repeat",
-                     "reversals", "median_period_s", "period_stdev_s",
+    trial_fields = ["trial_id", "label", "tag", "anchor_deg", "target_deg",
+                     "repeat", "reversals", "median_period_s", "period_stdev_s",
                      "swing_deg", "final_deg", "final_error_deg",
                      "settled_short", "current_mean_a", "current_peak_a",
                      "current_rms_a", "achieved_hz",
                      "server_wait_elapsed_s", "timestamp"]
     trial_row = {
         "trial_id": trial_id, "label": label, "tag": tag,
-        "target_deg": target_deg, "repeat": repeat,
+        "anchor_deg": anchor_deg, "target_deg": target_deg, "repeat": repeat,
         "achieved_hz": round(achieved_hz, 2),
         "server_wait_elapsed_s": fa["data"].get("wait_elapsed_s") if fa else None,
         "timestamp": issued_iso,
@@ -390,11 +402,17 @@ def main() -> int:
     parser.add_argument("--poll", type=float, default=DEFAULT_POLL_SECONDS,
                         help="requested seconds between reads; the achieved "
                              "rate is measured and reported, not assumed")
+    parser.add_argument("--anchor", type=float, default=0.0,
+                        help="angle to reset to before each scored move; "
+                             "a target equal to the anchor is a no-op, not "
+                             "a genuine arrival, so pick a different anchor "
+                             "to test a target of 0 or to vary approach "
+                             "direction")
     args = parser.parse_args()
 
     base_url = f"http://{args.host}:{args.port}/api/v1"
     results = [probe(base_url, args.target_deg, args.label, args.tag, i,
-                      poll_seconds=args.poll)
+                      poll_seconds=args.poll, anchor_deg=args.anchor)
                for i in range(1, args.repeats + 1)]
 
     print("\n=== summary ===")
@@ -405,6 +423,8 @@ def main() -> int:
               f"  settled_short={r['settled_short']}"
               f"  final={r['final_deg']}"
               f"  achieved_hz={r['achieved_hz']:.1f}"
+              f"  current_mean_a={r['current_mean_a']}"
+              f"  current_peak_a={r['current_peak_a']}"
               f"  server_wait_elapsed_s={wes}")
     return 0
 

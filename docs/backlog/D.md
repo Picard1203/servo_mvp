@@ -152,6 +152,97 @@ proxy-load fix.
 **Related:** D40 (closed, `docs/history/CLOSED.md`), D47 (real-arm
 verification, stays open independently of this item's outcome).
 
+**Session 24 progress (3 Sept, 12:47–16:45) — checkpoint, not closed.**
+Plan file: `/home/egrisaru/.claude/plans/peaceful-whistling-candy.md` (Part A
+plain-language, Part B rigorous — both stay in sync, resume from there). The
+protocol was revised twice with the operator before/during the run; it now
+has **Steps 1–5** (not the original Stage 0/0.5/2/3/4 naming) with a
+**characterisation phase (Step 2) before any fix is tested** — the original
+plan went straight to three research-suggested levers, which the operator
+correctly called premature.
+
+- **Step 1 (instrument) — done, committed** (`d1db4be`, `103f164` on
+  `feature/jitter-experiment`). `tools/jitter_probe.py`: reversal scoring
+  now uses a 5–15s post-move window with no amplitude filter (real jitter
+  and encoder noise are both 1 count, so amplitude can't separate them —
+  period can); settle-short is its own recorded outcome; every trial
+  persists to `archive/jitter_trial_<label>.csv` and
+  `archive/jitter_trace_<label>.csv`; `--anchor` lets a trial reset to any
+  angle before its scored move (was hardcoded to 0, which made a
+  target of 0 an unscored no-op and fixed every approach to one
+  direction); current is now printed live. `tools/verify.py`:
+  368→379 (11 new tests), baseline updated.
+- **Pre-registration changed mid-session, evidence-driven — a third FAIL
+  condition added.** Position-only scoring is blind to correction that
+  never crosses a full 0.06° count: found live at +60° with fine approach
+  off, `reversals=0` in all 3 trials but `current_mean_a` 0.078–0.088A
+  (vs 0.000A for the same angle with fine approach on) and
+  `final_error_deg` degraded −0.01°→−0.25°. Outcome measure is now: (a)
+  reversals > `R_max`, (b) settled short (`>0.5°`), **(c) mean current in
+  the score window > `C_max`.** `R_max` and `C_max` are both still unset —
+  **Step 4 (noise-floor calibration) has not run.**
+- **Step 2 (characterisation) — substantially done, fine approach ON
+  (the restored default), rig attached throughout, N=3 per cell.** Full
+  data: `archive/jitter_trial_d48_step2_survey.csv` (63 rows, columns
+  normalized — the first 45 rows were written before `anchor_deg` existed
+  and have been backfilled with `anchor_deg=0.0`, their true value).
+
+  | Angle | Reversals (3 trials) | Verdict |
+  |---|---|---|
+  | −90° | 0,0,0,0,0 | clean |
+  | −60° | 15,16,0 | bad, 2/3 |
+  | −45° | 0,15,19 | bad, 2/3 |
+  | **−30°** | **22,16,16** | **bad, 3/3** |
+  | −15° | 2,0,0 | near-clean |
+  | 0° (both directions) | 0,0,0 | clean |
+  | +15° | 0,0,0 | clean |
+  | **+30°** | **17,21,17** | **bad, 3/3** |
+  | +45° | 0,0,0 | clean |
+  | +60° | 0,0,0 | clean |
+  | +90° | 3,0,0 | near-clean |
+
+  **±30° is the validated worst point** — 100% reproduction both
+  directions, current elevated ~0.04–0.05A when bad, well clear of the
+  travel extremes. Not a smooth function of angle or simple proximity to
+  the extremes — patchy and asymmetric. **This is the test point for
+  Step 3.** Direction-of-approach and move-size, the other two Step 2
+  factors named in the plan, are not yet separately run (the ±30°/0°
+  arrivals above incidentally cover a few anchor combinations, not a real
+  sweep of either factor).
+- **Real finding, not yet acted on beyond restoring the safer config:
+  fine approach OFF measurably worsens jitter, the opposite of the plan's
+  original H1.** Reproduction rate across the same 7-angle sweep: 43%
+  (9/21) with fine approach on vs. 71% (15/21) off — full data, same file,
+  `tag=fine_off_full_travel`. Mechanically sensible: fine approach is an
+  anti-backlash technique (always finishes from one direction); without it
+  the servo can hunt across the target from either side. `FINE_APPROACH_ENABLED`
+  is back to `true` in `python/.env` (matches the committed value — no
+  diff to carry).
+- **Environment, needed to resume on the board at all — took most of this
+  session's wall time.** (1) `adb devices` needs `adb kill-server && adb
+  start-server` most sessions. (2) The wired NIC (`enp158s0`, subnet
+  `192.168.10.0/24`, the relay path) has dropped link at least twice this
+  session — reseat the cable if `ping 192.168.10.60` fails. (3) **The
+  Docker container (`servo_mvp-main-1`) does not publish port 8000 to the
+  board's host** (`docker inspect servo_mvp-main-1 --format
+  '{{json .NetworkSettings.Ports}}'` → `{}`) — `adb forward tcp:8001
+  tcp:8000` alone reaches nothing. Fix each session: find the container's
+  bridge IP (`docker inspect servo_mvp-main-1 --format
+  '{{.NetworkSettings.Networks.servo_mvp_default.IPAddress}}'`, currently
+  `172.19.0.2`, may change on container recreation), then on the board
+  `nohup socat TCP-LISTEN:8000,fork,reuseaddr TCP:<that IP>:8000 >/tmp/socat_8000.log
+  2>&1 & disown`, then `adb forward tcp:8001 tcp:8000` on the workstation.
+  Confirmed this gives **96Hz** over USB vs **~4.5Hz** over the relay path —
+  worth doing before Step 3, which needs ≥40Hz. Not yet investigated why
+  this used to work without the `socat` step (Session 17's Q9) — a real
+  question, deliberately deferred rather than chased mid-session.
+- **Resume point: Step 3, the mechanism read, at ±30°.** Set up the USB
+  path per above, confirm ≥40Hz achieved, log position+current together
+  through a reliably-bad trial at 30°, read reversal period first (the
+  tell available at these rates), then current trace shape. Branch per the
+  plan: hunting → D gain and P; resonance → D gain, softened final leg, P;
+  stick-slip → `MinStartForce` 85–95.
+
 ---
 
 ### D47 — Verify the anti-backlash fix holds once the servo carries its real load

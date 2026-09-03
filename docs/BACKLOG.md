@@ -33,6 +33,7 @@ sessions actually spent, not the ones originally planned.
 | **21** | **DONE, 1 Sept 2026.** **D40c** — fine approach activated (was built, never switched on), hardened (re-opened and re-closed D40a's ack-surfacing gap on the fine-approach path), register readback and a live tuning campaign added: `MinStartForce` swept 0→150, closing at every one of 55 real moves within 0.00-0.03°, including a real oscillation found and fixed at the travel extremes. **D35 closed as a side effect** (`PRESENT_SPEED` sampling resolved the commanded-vs-actual speed question). Full findings: `docs/backlog/D.md` D40, `docs/history/CLOSED.md` D35. All numbers unloaded. | yes |
 | **22** | **DONE, 2 Sept 2026.** **D40d** — set out to verify `MinStartForce=150` under hand-held load; instead found it does not hold reliably (worst at −60°, not the ±90° extremes expected), root-caused (evidence-based) to likely mechanical resonance rather than stiction, fixed the settle-detection instrumentation gap that was masking it, landed one real permanent improvement (`P` 32→24, matches published community guidance for this servo family), tried and deliberately reverted a dead-zone tradeoff (operator's own call: accept residual jitter risk over an accuracy cost). **D40 closed** on that honest, non-clean basis; **D47** opened for real-rig verification. Two independent deep-research passes (Claude, Gemini) run the same evening converged on the same diagnosis and surfaced three untried levers (D gain, a softened fine-approach final leg, deeper P reduction) plus the instrumentation gap in D40d's own method (no fast current logging, inadequate repeat counts against a ~40-60% intermittent failure) — captured as **D48**, a properly designed experiment, explicitly slotted for the next session rather than run tonight. R11 and the rig protocols did not run this session — the D40d investigation used the full session. | yes |
 | **23** | **DONE, 3 Sept 2026.** Tooling session ahead of D48, not D48 itself — no register was touched, no trial was run. Vendored the SCServo library into `libraries/SCServo/` (was documented, never actually present; confirmed via its own source that D48's gain registers are not in Feetech's/Waveshare's own library). Installed 8 skills from cold storage into `~/.claude/skills/`, woven into `skills/deliver/SKILL.md` by phase (experiment-design rigor for D48-shaped items, debugging, verification, skill-writing discipline), with 2 explicitly excluded for conflicting with standing rules. Built and live-fire-tested 3 `PostToolUse` hooks (`docs/WORKFLOWS.md` W9) that surface `docs/CONVENTIONS.md`'s Python/C++ rules and the glossary/no-backlog-ID rules on every edit, since they were previously advisory-only and unenforced. Full account: `docs/PROJECT_STATE.md`. | no |
+| **24** | **IN PROGRESS, 3 Sept 2026, 12:47–16:45.** D48 itself, Steps 1–2 of 5 (plan revised twice with the operator first — characterisation before any fix, not the original straight-to-three-levers version). Instrument hardened and committed (period-based scoring, settle-short as its own outcome, CSV persistence, a real anchor parameter). Characterisation sweep done, fine approach on, rig attached: **±30° is a validated worst point** (3/3 reproduction both directions), asymmetric and patchy rather than tied to the travel extremes. A third pre-registered FAIL condition (current elevation) added mid-session on live evidence — position-only scoring missed a real case. Real finding: fine approach **off** measurably worsens jitter (43%→71% reproduction), the opposite of the plan's original hypothesis — restored to on. Most wall time went to board connectivity (mount, adb, a dropped wired-NIC link, a Docker container not publishing its port), documented in `docs/backlog/D.md` D48 so it isn't rediscovered. Resume point: Step 3 (mechanism read) at ±30°. Full account: `docs/backlog/D.md` D48, plan file `/home/egrisaru/.claude/plans/peaceful-whistling-candy.md`. | yes |
 
 **R11 pulled into committed scope 1 Sept**, alongside T20 and the rig
 protocols — real capacity slack opened up once D39 and D40 were retuned
@@ -43,14 +44,13 @@ unchanged, only the tier moved). Neither is dropped either way: what doesn't
 land this sprint carries to Sun 6 Sept exactly as before. **T20** runs via
 Antigravity, not session-bound. See `docs/sprint/SPRINTS.md` for the capacity math.
 
-**Decided 2 September 2026, same evening as D40's close:** next session
-runs **D48** (the properly designed resonance experiment), not R11 or the
-rig protocols — those push to the sprint starting 6 Sept regardless of
-whether Thursday's remaining capacity would technically fit them, the
-operator's own call rather than a capacity accident. **Session 23 (3 Sept)
-was a tooling detour, not that session** — D48 is still next, genuinely
-ready to run: the experiment-rigor skills and the SCServo library grounding
-it needed are in place now.
+**Decided 2 September 2026, same evening as D40's close:** D48 (the properly
+designed resonance experiment) runs ahead of R11 and the rig protocols —
+those push to the sprint starting 6 Sept regardless of whether Thursday's
+remaining capacity would technically fit them, the operator's own call
+rather than a capacity accident. Session 23 (3 Sept) was a tooling detour;
+**Session 24 (3 Sept, same day) is D48 itself — in progress, not done, see
+its own row below and `docs/backlog/D.md`.**
 
 **Still deferred from the original session-15 triage** — narrower now that
 Session 19 pulled out everything the rig findings needed: **T10**, **T11**
@@ -84,7 +84,7 @@ detail entries above (filed and ranked, not started).
 | D28 | MCU boot-time `mcu_log` notify lost to a startup race | open · low |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
 | D38 | A saved position's "earlier reference" tag has no way to dismiss it | open · low · R10 |
-| D48 | Diagnose the load-induced settling oscillation properly: fast instrumentation, then a structured experiment | open · high · **slotted for the next session** |
+| D48 | Diagnose the load-induced settling oscillation properly: fast instrumentation, then a structured experiment | open · high · **in progress, Steps 1-2 of 5 done — see its own entry** |
 | D47 | Verify the anti-backlash fix holds once the servo carries its real load | open · medium |
 | D41 | Firmware commands real moves off failed reads and malformed payloads | open · high · before real loaded rig day |
 | D42 | Errors that vanish: SSE stream, migration, sqlite writes | open · medium |

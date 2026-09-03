@@ -40,6 +40,40 @@ Brace balance check: ok
 (as of Session 21, 1 September 2026 — `tools/verify.py` is the source of truth
 going forward, not this snapshot; run it rather than trust this number)
 
+**3 September 2026 — Session 24: D48 itself, Steps 1-2 of 5, checkpointed
+not closed — most wall time went to board connectivity, not measurement.**
+The operator rejected the first plan draft twice before approving it,
+correctly: it went straight to three research-suggested register levers
+without first describing where and when the jitter actually happens, and
+it framed the proxy load as hand-held when the bench rig is now fixed and
+attached, present or not regardless of the operator's grip. Rewritten with
+a characterisation phase (Step 2) ahead of any fix, and rewritten again to
+add a plain-language half a non-engineer could actually approve. **Step 1**
+(the measuring tool) hardened and committed: reversal counting gained a
+post-move time window and no amplitude filter (real jitter and encoder
+noise are both exactly one count, so amplitude cannot separate them —
+period can), a move settling short of target is now its own recorded
+outcome instead of silently scoring as a perfect pass, every trial
+persists to `archive/` instead of only the terminal. **Step 2**
+(characterisation) substantially done: **±30° is a validated worst point,
+100% reproduction both directions**, not simply the travel extremes and
+not a smooth function of angle. A third outcome measure was added
+mid-session on live evidence, not by design: at +60° with fine approach
+off, position scored perfectly quiet (0 reversals) while current stayed
+elevated the whole trial — the servo correcting within one encoder count,
+below what position-only scoring can see. **A real, surprising finding:
+fine approach off measurably worsens the jitter (43%→71% reproduction),
+the opposite of the plan's own starting hypothesis** — restored to on,
+the safer and better-performing default. Board access itself was the
+session's real cost: the mount, `adb`, a wired NIC that dropped link
+twice, and a Docker container that stopped publishing its API port to the
+board's host (worked around with a `socat` relay, root cause not chased).
+Full findings, the current angle map, and the exact resume commands:
+`docs/backlog/D.md` D48; the plan file itself,
+`/home/egrisaru/.claude/plans/peaceful-whistling-candy.md`, is the record
+of what was decided and why. `tools/verify.py`: 368→379 (11 new tests for
+the hardened instrument), baseline updated; nothing else moved.
+
 **3 September 2026 — Session 23: tooling session ahead of D48, not D48
 itself — D48's own protocol is unchanged and still queued for next
 session.** Four things landed. (1) `libraries/README.txt` had documented

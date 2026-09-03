@@ -132,6 +132,18 @@ throughout) showed 19 direction reversals still ongoing 14+ seconds later.
 poll raw position continuously through the whole window and look for
 reversals, or watch the shaft directly.**
 
+**Position polling alone can still miss it — check current too.** The servo
+can correct an error smaller than its own encoder resolution (one count,
+0.06° at 4096 counts/turn on this project's belt ratio) without the
+reported position ever crossing a count boundary, so a reversal counter
+built on position alone can score zero reversals while the servo is
+genuinely still working. Measured directly: one configuration held
+`reversals=0` across three repeats at a target angle while mean current sat
+at 0.08A against 0.00A for the same angle and target under a different
+configuration — current was the only signal that showed anything was
+happening. **A quiet position trace is not sufficient evidence of a quiet
+servo — check current in the same window before calling a settle clean.**
+
 ### Status register 0x41 — six faults
 
 Confirmed from the official memory table:

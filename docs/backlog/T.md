@@ -99,44 +99,6 @@ rule itself is in `CLAUDE.md` §4.
 ---
 
 
-### T17 — Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested
-**Status:** open · **Raised by:** the operator, 26 August 2026, closing out R2
-
-R2 (motor isolation, closed — see `docs/history/CLOSED.md`) confirmed torque actually cuts
-and restores correctly, verified at the register level. One scenario from its
-board-verification list stayed genuinely untested: whether the servo can be
-freely hand-turned while isolated, and whether multi-turn position tracking
-survives a shaft that moved without the drive doing it.
-
-**Why it's a planning item, not something to just go do:** the current bench
-is a bare servo with no belt, arm, or lever attached — there is nothing to
-get a real grip on. A full free-spin attempt this session produced no
-detectable difference between isolated and un-isolated; a much smaller nudge
-(roughly a tenth of a degree, about the most the setup allows) did show the
-expected qualitative difference repeatably - resists and corrects back when
-un-isolated, stays put when isolated - but that was felt, not measured, and
-is not the multi-turn-under-load scenario this item is actually about.
-Outside research on this exact servo (STS3215, high-ratio metal gearbox)
-suggests hand-backdriving is not a reliable test for this part even with a
-lever — so this needs the actual mechanical rig (the belt-driven output the
-rest of the project assumes, per the gear-ratio audit in
-`PROJECT_STATE.md`) mounted, not just more attempts on the bare servo.
-
-**Plan, not execute:** figure out what rig state is needed (belt mounted?
-output arm attached? enough of R4's mechanical assembly to have a real lever?)
-and when it's realistically available, before spending more bench time on a
-test the current setup cannot support.
-
-**Update, 30 August 2026:** distinct from the software soak session
-(unrelated to this item — see `docs/BACKLOG.md`'s session table; that's a
-pure software stress test, no rig involved). Rig assembly and the actual
-hand-turn test happen on a separate day, operator/mechanical-team-led,
-after the soak session and the DB/log cleanup close out. Close T17 once
-the hand-turn scenario is actually tested, not just once the rig exists.
-Full testing protocol prepared: `docs/sprint/RIG_TESTING_PROTOCOL.md`.
-
----
-
 ### T10 — Write the recovery runbook, in two halves
 **Status:** open · **Severity:** high · **Raised by:** the operator answering
 `OPEN_QUESTIONS.md` Q3, 8 August 2026
@@ -366,7 +328,7 @@ organisation, not comment volume).
 
 ---
 
-### T22 — Run graphify's semantic pass on the doc backlog it's never had
+### T23 — Run graphify's semantic pass on the doc backlog it's never had
 **Status:** open · **Severity:** low · **Raised by:** Session 23, 3 September
 2026
 
@@ -400,3 +362,35 @@ little work, not all of it.
 **Acceptance:** `graphify query` can answer a question grounded in one of
 the docs above (e.g. Session 23's own W9 rationale) that today only exists
 in AST-invisible prose.
+
+---
+
+### T24 — A screening filter judges only its first six trials, tainting the "futile" verdicts on the PID gains
+**Status:** open · **Severity:** low · **Found:** 8 September 2026, Session 27,
+while building B9 on top of the same function
+
+`screening_arm_filter` in `tools/d48_s26_campaign.py` collects a second batch
+of trials when an arm needs re-screening, then decides using `trials[:SCREEN_N]`
+— always the same first six, never the six it just went and collected. The
+extra trials cost real board time and then do not reach the decision.
+
+**Why it matters and why it was not fixed on the spot:** blocks B3–B6 used this
+filter to call the PID-gain arms FUTILE. Those verdicts are recorded and were
+acted on — the whole investigation moved off gain tuning partly because of
+them. Re-reading them needs a deliberate look at what each arm's full trial set
+actually says, which is a different job from fixing the line. It was noticed
+mid-session while building something else on the same function, and tucking a
+reinterpretation of four already-recorded blocks into that session would have
+been worse than filing it.
+
+Not urgent: the D48 conclusion does not rest on those blocks. The floor
+trade-off was established by dose-response and confirmatory blocks that do not
+use this filter, and the fix that closed D48 was in software, not in a gain.
+
+**Acceptance:** the re-screen branch decides on every trial it collected, with a
+test that fails on the current behaviour; then B3–B6's recorded verdicts are
+re-derived from their stored trials and either confirmed or corrected in place
+in D48's closed entry.
+
+**Related:** D48 (closed), the same file's `_record_dose_response` picker bug
+fixed in Session 27.

@@ -5,249 +5,35 @@ Full entries for every open `D`-numbered item. Indexed one line each in
 
 ---
 
-### D48 — Diagnose the load-induced settling oscillation properly: fast instrumentation first, then a structured experiment, not another tuning sweep
-**Status:** open · **Severity:** high · **Found:** Session 22, immediately
-after D40d — the operator's own explicit call: this needs designing
-properly, not repeating the same ad hoc register-nudging that produced a
-confusing, non-convergent picture in D40d
-
-**What was wrong with D40d's own method, stated plainly so it is not
-repeated.** D40d changed one register at a time, N=1–5 per configuration,
-against no pre-declared pass/fail bar, and kept moving to a new variable
-whenever the current one looked ambiguous. Given D40d's own data shows
-roughly a 40–60% failure rate at some settings, N=2–3 cannot tell a real
-fix from a lucky pair of repeats — several of D40d's "clean" results were
-almost certainly luck, not fixes, and the session's own conclusion (P=24
-kept, dead zone reverted, real state still unresolved) reflects that. This
-item exists to run the properly designed version.
-
-**Two independent deep-research passes (Claude and Gemini, 2 September
-2026, same prompt) converge on the same diagnosis and the same gap in
-today's own method** — full text kept in
-`docs/research/D40_resonance_research_claude.md` and
-`docs/research/D40_resonance_research_gemini.md` (Gemini's response was cut
-off mid-protocol by a 50,000-character paste limit; the missing tail is
-noted in the file, not silently absent). Both converge on:
-
-1. **The mechanism is more consistent with load-coupled mechanical
-   resonance (a two-mass system: motor+pulley vs. output+load, coupled
-   through the compliant belt) than with simple Coulomb stick-slip** —
-   non-monotonic register response, position-specific severity unrelated to
-   travel-limit proximity, ~40–60% intermittency, and reliable hand-damping
-   all match the resonance signature better than the friction one.
-2. **This is inferred, not confirmed, and today's own instrumentation
-   cannot confirm it.** Belt-transmission resonances typically sit in the
-   tens-to-hundreds of Hz; D40d's raw position polling ran at ~7–12 Hz
-   (80–150ms intervals) — far below the Nyquist rate needed, so it aliases
-   any true high-frequency oscillation into something that merely looks
-   like a slow, confusing wobble. **Confirming the mechanism, not guessing
-   at it, is Stage 0 below and is the single highest-value thing this item
-   does that D40d did not.**
-3. **Three concrete, cheap, never-tried levers**, all live-writable or
-   config-only, no reflash needed to test: **position D gain** (register
-   0x16, held at the factory default 32 all session — the literal textbook
-   damping term, direct electronic analog of the hand that reliably
-   suppressed this all night); **a softened final leg**
-   (`fine_approach_final_speed_dps`/`fine_approach_final_acceleration`,
-   built in D40c, never used — both reports independently flag the
-   overshoot-then-hard-reversal stop as a likely resonance-injection event,
-   which is consistent with reducing overshoot *distance* not helping in
-   D40d, since the excitation is in the stop, not the swing); **P lowered
-   further than D40d tried**, toward the LeRobot community's own validated
-   10–16 range (D40d only reached 16/24), accepting more steady-state droop
-   that the existing fine-approach mechanism is already built to correct.
-
-**Files:**
-- `tools/jitter_probe.py` (new this session, promoted from a scratch
-  script D40d built and validated live) — polls `output_deg`/`current_a`
-  continuously through a move and counts real direction reversals near
-  target, instead of trusting the firmware's own settle-completion event
-  (D40d confirmed that event is blind to sustained trembling — see D40,
-  `docs/history/CLOSED.md`). Use this, not `fine_approach_trial.py` alone,
-  for every trial in this item — `fine_approach_trial.py`'s own settle
-  wait is the exact metric this tool exists to not trust.
-- A new tool, to be built as Stage 0 below: a fast current/load logger.
-  `current_a` is already exposed by `/servo/state` (no new firmware) — the
-  gap is polling it fast enough, simultaneously with position, during a
-  known-bad trial, and telling a coherent oscillating trace apart from
-  sharp spikes concentrated at reversal moments only.
-- `sketch/src/Config.h`/`ServoController.{h,cpp}` — only if Stage 2's D
-  gain result is kept permanently; mirror the existing `kPositionGainP`
-  boot-write pattern added this session (same file, same discipline: bake
-  the kept value in, do not leave it live-only in EEPROM).
-- `python/.env`/`.env.board` — only if `fine_approach_final_speed_dps` or
-  `fine_approach_final_acceleration` is kept; both settings already exist
-  and are unit-tested, unused since D40c built them.
-
-**The protocol, in order — do not skip Stage 0, it is what D40d skipped.**
-
-- **Stage 0 — confirm the mechanism (prerequisite, ~30–45 min, decisive).**
-  Build a script that logs `current_a` (already exposed) alongside
-  `output_deg`, polled as fast as the HTTP/Bridge round trip allows, during
-  a reliably-reproducing bad trial (−60°, the D40d worst point, under the
-  same hand-plus-improvised-weight proxy load). **State the achieved
-  polling rate honestly against the ideal** (both research reports put true
-  belt resonance at 30–300 Hz, needing ≥60–600 Hz to resolve by strict
-  Nyquist — this project's own HTTP+Bridge path will likely not reach
-  that) — this test is not a full spectral confirmation, but it can still
-  tell a coherent, sinusoidal-ish current oscillation (resonance
-  signature) apart from sharp asymmetric spikes concentrated only at
-  direction-reversal moments (stick-slip signature), which is enough to
-  choose Stage 2a vs. 2b below with real evidence instead of inference.
-- **Stage 1 — read Stage 0's result and pick a branch**, stated before
-  starting, not decided after seeing which branch looks more convenient:
-  resonance signature → Stage 2a; stick-slip signature → Stage 2b.
-- **Stage 2a (resonance, expected) — test the three new levers, at real
-  statistical power this time.** One test point only, −60°, the point
-  D40d found fails most reliably — do not spread thin across many angles
-  the way D40d's own final sweep did. **N≥10 per configuration**, not
-  D40d's N=2–5 — the ~40–60% failure rate D40d measured means fewer
-  repeats cannot distinguish a real fix from a lucky run. **Declare the
-  pass bar before running each configuration**, in writing, in this
-  entry's own working notes: e.g. "0 of 10 trials show >3 reversals past
-  5s, or ≤1 does" — decided in advance, not adjusted after seeing the
-  data, which is what let D40d's goalposts drift. Test, in this order: (i)
-  D raised from 32 (try 48, then 64) alone; (ii) the final leg softened
-  (`fine_approach_final_speed_dps` set well below the move's own speed, or
-  `fine_approach_final_acceleration` set low) alone; (iii) **if both (i)
-  and (ii) individually help, do not stop there — run the small 2×2
-  factorial** (both low, both high, each alone) at N≥5 per cell. Testing
-  factors one at a time can miss real interactions between them and
-  produce a misleading conclusion — exactly the shape of confusion D40d
-  ran into jumping between P, MinStartForce, dead zone and overshoot
-  without ever checking whether they interacted. (iv) P lowered further,
-  toward 14–16, checked against the resulting steady-state droop.
-- **Stage 2b (stick-slip, if Stage 0 says so) — the friction-remedy path
-  D40d already ran is the relevant one.** Revisit dead zone (D40d's own
-  `2/2` result: 4 of 5 clean at the worst point) and `MinStartForce`
-  85–95 (D40d's own clean-ish, small-offset range) with the same N≥10
-  rigor Stage 2a specifies, rather than treating D40d's small-N results as
-  final.
-- **Stage 3 — only if Stage 2 does not converge to a pass**, probe the
-  velocity-loop registers both reports independently surfaced (0x25/speed
-  P, default 10; 0x27/speed I, default 200) — real but not documented in
-  an official English register table; change one at a time, reversibly,
-  and record the originals before writing anything.
-- **Stage 4 — bracket the real arm without it.** Repeat the best Stage 2
-  (or 3) configuration with a deliberately *exaggerated* bench inertia
-  (added mass at a longer lever than the improvised weight used in D40d)
-  to approximate the real arm's worst-case reflected inertia. A
-  configuration that holds across that exaggerated range is a defensible
-  real-arm starting point; one that does not means the fix needs D47's
-  real hardware regardless, and that should be said plainly rather than
-  assumed away.
-
-**Acceptance:** a configuration is found that passes its own pre-declared
-Stage 2/3 bar at −60° (N≥10) **and** does not regress the other points
-D40d already measured clean (0°, ±60°, ±90°, N≥3 each, confirming no
-regression rather than re-running a full campaign). That configuration is
-written permanently (`Config.h` and/or `.env`/`.env.board`, matching
-whichever settings changed) the same session it is confirmed, mirroring
-D40d's own persistence discipline. **This item does not require D47's real
-arm to close** — D47 stays open afterward regardless, as the final
-real-hardware confirmation; this item is about reaching a real,
-statistically credible answer on the mechanism and the best available
-proxy-load fix.
-
-**Related:** D40 (closed, `docs/history/CLOSED.md`), D47 (real-arm
-verification, stays open independently of this item's outcome).
-
-**Session 24 progress (3 Sept, 12:47–16:45) — checkpoint, not closed.**
-Plan file: `/home/egrisaru/.claude/plans/peaceful-whistling-candy.md` (Part A
-plain-language, Part B rigorous — both stay in sync, resume from there). The
-protocol was revised twice with the operator before/during the run; it now
-has **Steps 1–5** (not the original Stage 0/0.5/2/3/4 naming) with a
-**characterisation phase (Step 2) before any fix is tested** — the original
-plan went straight to three research-suggested levers, which the operator
-correctly called premature.
-
-- **Step 1 (instrument) — done, committed** (`d1db4be`, `103f164` on
-  `feature/jitter-experiment`). `tools/jitter_probe.py`: reversal scoring
-  now uses a 5–15s post-move window with no amplitude filter (real jitter
-  and encoder noise are both 1 count, so amplitude can't separate them —
-  period can); settle-short is its own recorded outcome; every trial
-  persists to `archive/jitter_trial_<label>.csv` and
-  `archive/jitter_trace_<label>.csv`; `--anchor` lets a trial reset to any
-  angle before its scored move (was hardcoded to 0, which made a
-  target of 0 an unscored no-op and fixed every approach to one
-  direction); current is now printed live. `tools/verify.py`:
-  368→379 (11 new tests), baseline updated.
-- **Pre-registration changed mid-session, evidence-driven — a third FAIL
-  condition added.** Position-only scoring is blind to correction that
-  never crosses a full 0.06° count: found live at +60° with fine approach
-  off, `reversals=0` in all 3 trials but `current_mean_a` 0.078–0.088A
-  (vs 0.000A for the same angle with fine approach on) and
-  `final_error_deg` degraded −0.01°→−0.25°. Outcome measure is now: (a)
-  reversals > `R_max`, (b) settled short (`>0.5°`), **(c) mean current in
-  the score window > `C_max`.** `R_max` and `C_max` are both still unset —
-  **Step 4 (noise-floor calibration) has not run.**
-- **Step 2 (characterisation) — substantially done, fine approach ON
-  (the restored default), rig attached throughout, N=3 per cell.** Full
-  data: `archive/jitter_trial_d48_step2_survey.csv` (63 rows, columns
-  normalized — the first 45 rows were written before `anchor_deg` existed
-  and have been backfilled with `anchor_deg=0.0`, their true value).
-
-  | Angle | Reversals (3 trials) | Verdict |
-  |---|---|---|
-  | −90° | 0,0,0,0,0 | clean |
-  | −60° | 15,16,0 | bad, 2/3 |
-  | −45° | 0,15,19 | bad, 2/3 |
-  | **−30°** | **22,16,16** | **bad, 3/3** |
-  | −15° | 2,0,0 | near-clean |
-  | 0° (both directions) | 0,0,0 | clean |
-  | +15° | 0,0,0 | clean |
-  | **+30°** | **17,21,17** | **bad, 3/3** |
-  | +45° | 0,0,0 | clean |
-  | +60° | 0,0,0 | clean |
-  | +90° | 3,0,0 | near-clean |
-
-  **±30° is the validated worst point** — 100% reproduction both
-  directions, current elevated ~0.04–0.05A when bad, well clear of the
-  travel extremes. Not a smooth function of angle or simple proximity to
-  the extremes — patchy and asymmetric. **This is the test point for
-  Step 3.** Direction-of-approach and move-size, the other two Step 2
-  factors named in the plan, are not yet separately run (the ±30°/0°
-  arrivals above incidentally cover a few anchor combinations, not a real
-  sweep of either factor).
-- **Real finding, not yet acted on beyond restoring the safer config:
-  fine approach OFF measurably worsens jitter, the opposite of the plan's
-  original H1.** Reproduction rate across the same 7-angle sweep: 43%
-  (9/21) with fine approach on vs. 71% (15/21) off — full data, same file,
-  `tag=fine_off_full_travel`. Mechanically sensible: fine approach is an
-  anti-backlash technique (always finishes from one direction); without it
-  the servo can hunt across the target from either side. `FINE_APPROACH_ENABLED`
-  is back to `true` in `python/.env` (matches the committed value — no
-  diff to carry).
-- **Environment, needed to resume on the board at all — took most of this
-  session's wall time.** (1) `adb devices` needs `adb kill-server && adb
-  start-server` most sessions. (2) The wired NIC (`enp158s0`, subnet
-  `192.168.10.0/24`, the relay path) has dropped link at least twice this
-  session — reseat the cable if `ping 192.168.10.60` fails. (3) **The
-  Docker container (`servo_mvp-main-1`) does not publish port 8000 to the
-  board's host** (`docker inspect servo_mvp-main-1 --format
-  '{{json .NetworkSettings.Ports}}'` → `{}`) — `adb forward tcp:8001
-  tcp:8000` alone reaches nothing. Fix each session: find the container's
-  bridge IP (`docker inspect servo_mvp-main-1 --format
-  '{{.NetworkSettings.Networks.servo_mvp_default.IPAddress}}'`, currently
-  `172.19.0.2`, may change on container recreation), then on the board
-  `nohup socat TCP-LISTEN:8000,fork,reuseaddr TCP:<that IP>:8000 >/tmp/socat_8000.log
-  2>&1 & disown`, then `adb forward tcp:8001 tcp:8000` on the workstation.
-  Confirmed this gives **96Hz** over USB vs **~4.5Hz** over the relay path —
-  worth doing before Step 3, which needs ≥40Hz. Not yet investigated why
-  this used to work without the `socat` step (Session 17's Q9) — a real
-  question, deliberately deferred rather than chased mid-session.
-- **Resume point: Step 3, the mechanism read, at ±30°.** Set up the USB
-  path per above, confirm ≥40Hz achieved, log position+current together
-  through a reliably-bad trial at 30°, read reversal period first (the
-  tell available at these rates), then current trace shape. Branch per the
-  plan: hunting → D gain and P; resonance → D gain, softened final leg, P;
-  stick-slip → `MinStartForce` 85–95.
-
----
-
 ### D47 — Verify the anti-backlash fix holds once the servo carries its real load
 **Status:** open · **Severity:** medium · **Found:** Session 22, D40d
 proxy-load testing
+
+**Updated 8 September 2026, when D48 closed — what this item now has to
+verify has changed, and grown.** The configuration to test on the real arm
+is no longer D40's: `Config.h::kMinStartForce` is **55**, not 150 or 40, and
+two software behaviours now sit on top of it — the overshoot is placed by
+the target's own sign (so the arrival side is fixed), and every move reads
+its position back and corrects up to three times before reporting arrival.
+All of it was measured on the bench proxy only.
+
+**Expect 55 to be wrong on the real arm, in a known direction.** More load
+means more friction and more damping: oscillation becomes *less* likely and
+stopping short *more* likely, so the real rig should tolerate — and probably
+need — a higher floor. The value is a starting point, not a result. The
+bench data that bounds the search: 45 and 55 never oscillated in 44 trials
+each, 65 oscillated in 3 of 24, 70 in 10 of 44, and above 150 is refused
+outright (500 drove a divergent oscillation that saturated the serial bus).
+
+**Two things D48 could not check and this item must.** No oscillation-scored
+run — 15 s reversal counting, not a single-landing settle test — was made at
+floor 55 with the shipped code. And the live check covered three angles
+(−60°, 0°, +60°), not the seven that were characterised.
+
+**Also worth watching, since it is new and unproven under load:** how many
+corrections a move needs. On the proxy it was one, and a corrected move took
+6–8.5 s. If the real arm needs the full three routinely, the operator waits
+noticeably longer and the floor is probably too low.
 
 D40 (closed this session, `docs/history/CLOSED.md`) landed a real,
 permanent improvement (`P=24`, baked into `Config.h::kPositionGainP`; the
@@ -571,8 +357,19 @@ Occasional slow first paint. Cause unmeasured. Suspected inefficiency in the
 serving path, plausibly interacting with D4. First paint itself is still
 unmeasured — that half stays open.
 
-Numbers already in hand: a warm app restart is 15.8 s, a cold one ~7 minutes
-(empty `.cache/`); a `/api/v1/servo/state` call served in 0.117–0.134 s.
+Numbers already in hand: a warm app restart is 15.8 s; a `/api/v1/servo/state`
+call served in 0.117–0.134 s.
+
+**The "~7 minutes cold" figure was wrong, corrected 6 September 2026,
+Session 25.** Re-measured directly: `adb shell arduino-app-cli app stop
+user:servo_mvp` (1.0 s) followed immediately by `... app start` with the
+sketch recompiled and uploaded and `.cache/uv` confirmed empty by the app's
+own log line ("No cache found at: .cache/uv") — the exact condition this
+entry called "cold" — completed in **21.7 s**, backend confirmed `hardware`
+in the boot log 2 s later. The old figure was never re-checked after being
+written and no source survives to say what was actually measured. First
+paint in a browser (this entry's own subject, distinct from the CLI/API
+being up) remains unmeasured — that half stays open.
 
 **The relay-chunk-size half is closed, 23 August 2026 — with a cause, not just
 a number.** `kRelayChunkBytes`/`relay_chunk_bytes` raised **128 → 224**,

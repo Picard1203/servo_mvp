@@ -30,15 +30,69 @@ Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
 (one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-368 Python tests, coverage of app/ gated at 99% (99.28% measured)
+444 Python tests, coverage of app/ gated at 99% (99.31% measured)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
 106 client-behaviour assertions (T12)
 Brace balance check: ok
 ```
 
-(as of Session 21, 1 September 2026 — `tools/verify.py` is the source of truth
-going forward, not this snapshot; run it rather than trust this number)
+(as of Session 28, 8 September 2026. This snapshot has already been stale
+once — it read 368 for a week after the suite grew, which is exactly D24's
+own lesson repeating. `tools/verify_baseline.json` is the source of truth;
+run `tools/verify.py` rather than trust the numbers above.)
+
+**8 September 2026 — Session 28: D48 CLOSED, and the accuracy work that ran
+from 1 September is finished on the bench.** Ten sessions swept registers
+without success because the register cannot fix it: `min_start_force` trades
+oscillation against stopping short, in opposite directions, so no value
+avoids both (176 trials, p ≈ 10⁻⁵ each way). The real defects were in
+software — the anti-backlash approach had no fixed arrival side (the same
+command landed in three different places), and nothing ever checked the arm
+arrived. Both are fixed, the floor is 55, and on hardware the same target
+approached from opposite sides now lands identically (0.00° spread, against
+0.6° before). Full account and the method lessons: `docs/history/CLOSED.md`
+D48. **Real-arm verification is D47 and stays open** — everything here is
+the bench proxy, and a loaded arm will likely want a higher floor.
+
+**7–8 September 2026 — Sessions 26 and 27.** Session 26 found that every
+Session 25 campaign trial had run at ~10Hz rather than the fast path,
+confounding poll rate with time-of-day and making its comparisons
+uninterpretable; a pre-registered regimen and a randomised-block campaign
+tool were built to replace them. Session 27 ran the confirmatory block, baked
+in floor 40 — and then the operator's own manual sweep reopened the item the
+same day, which is what exposed the arrival-side defect.
+
+**6 September 2026 — Session 25: D48 Steps 3-5, mechanism confirmed, no fix
+found yet.** **Step 3 confirmed the mechanism**: a fast (~100Hz)
+position+current trace at a reliably-bad point found a reversal period
+identical to three significant figures across three trials (0.2668s,
+0.2670s, 0.2668s) — a deterministic quantisation-boundary digital-control
+limit cycle, not mechanical resonance or stick-slip. Step 4's noise floor
+required re-running Session 24's angle survey at real power (N=10, not
+N=3): +45° had been called clean and was actually 8/10 bad, confirming the
+smaller sample was unreliable. Step 5 tested seven register configs, a
+follow-up bracket, fine-approach final-leg speed/acceleration, overshoot
+distance, move-size/approach-staging, and dead-zone at two values — **none
+reliably fixed it**. The one promising register result (D gain lowered to
+16, 2/10 failures vs baseline's 7/10) turned out to be an isolated
+statistical fluke once bracketed (immediate neighbours failed 7-8 of 8
+trials); every deliberate softening of the fine-approach final leg made
+things worse, not better, the opposite of the working hypothesis. The
+clearest real lever found was move size (a short final approach helps) but
+it only partly works at one of the two worst-behaving angles and does
+nothing at the other, which now looks like a distinct, likely-mechanical
+asymmetry rather than the general quantisation-loop story. Dead-zone gives
+partial relief with a real, measured accuracy cost, worst at the angle it
+doesn't even help. Full trail, every number, and a prepared second deep-
+research prompt: `docs/backlog/D.md` D48,
+`docs/research/D48_followup_research_prompt.md`. Separately, a real
+hardware safety incident this session (an Ethernet shield physically
+shorted, minor operator burn, confirmed unrelated to the servo code,
+replacement shield worked immediately) — hardware runs are attended-only
+from here on. `tools/verify.py`: unchanged at 379/194/106, all green — no
+app or sketch code touched, only the new diagnostic tool
+`tools/resonance_campaign.py`.
 
 **3 September 2026 — Session 24: D48 itself, Steps 1-2 of 5, checkpointed
 not closed — most wall time went to board connectivity, not measurement.**
@@ -112,7 +166,9 @@ itself — the real gap, since this project's routine `graphify update .` is
 AST-only and has never re-extracted doc content since the graph's original
 7 August build — was attempted via two Agent-tool subagents, burned real
 session usage for zero output (no chunk file ever written), and was
-abandoned rather than retried blind. Filed as **T22**, with the actual
+abandoned rather than retried blind. Filed as **T23** (renumbered from a
+first-draft **T22**, which collided with the already-closed doc-reorg
+T22 — caught 6 Sept 2026 while closing T17), with the actual
 lesson: use a Gemini API key (no subagents needed) or much smaller chunks
 next time.
 

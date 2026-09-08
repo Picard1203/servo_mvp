@@ -45,9 +45,21 @@ WINDOW_SECONDS = 15.0
 SCORE_WINDOW_START_SECONDS = 5.0
 SCORE_WINDOW_END_SECONDS = 15.0
 
+# Above this the servo is meaningfully driving rather than resting. Settled
+# trials read a flat 0.000A, so anything clear of the reading's own
+# resolution counts.
+DRIVE_THRESHOLD_A = 0.005
+# Within half an encoder step counts as "on target" for the zero-error
+# current reading.
+ON_TARGET_DEG = 0.03
+
 # A move that never gets this close to target is a settle-short failure,
 # regardless of how quiet its final reading is.
 SETTLE_SHORT_THRESHOLD_DEG = 0.5
+
+# Consecutive invalid reads before a trial gives up. A servo oscillating
+# hard enough to disturb its own bus reads as a run of these.
+MAX_FAILED_READS = 20
 
 # Renamed from RESET_STABLE_SECONDS, which was a degree threshold despite
 # its name - it never measured a duration. Two readings closer than this
@@ -84,19 +96,26 @@ def get(base_url: str, path: str) -> dict:
             time.sleep(0.2)
 
 
-def move(base_url: str, target_deg: float) -> dict:
+def move(base_url: str, target_deg: float,
+         acceleration: Optional[int] = None) -> dict:
     """Commands one move with retry.
 
     Args:
         base_url (str): API base URL.
         target_deg (float): Target output angle in degrees.
+        acceleration (Optional[int]): Ramp setting for this move, or None
+            to let the backend use its configured default. Passing it per
+            move avoids an EEPROM write per configuration change.
 
     Returns:
         dict: The decoded JSON body.
     """
+    body: dict = {"target_deg": target_deg}
+    if acceleration is not None:
+        body["acceleration"] = acceleration
     req = urllib.request.Request(
         f"{base_url}/servo/move",
-        data=json.dumps({"target_deg": target_deg}).encode(),
+        data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
     for attempt in range(3):
         try:
@@ -123,6 +142,11 @@ def reset_to(base_url: str, anchor_deg: float,
     t0 = time.time()
     while time.time() - t0 < RESET_TIMEOUT_SECONDS:
         d = get(base_url, "/servo/state")["output_deg"]
+        if d is None:
+            # Same failed-read guard as the scored loop: a None position
+            # must not reach the arithmetic below.
+            time.sleep(poll_seconds)
+            continue
         now = time.time()
         if last is not None and abs(d - last) < RESET_POSITION_EPSILON_DEG:
             if stable_since is None:
@@ -187,7 +211,9 @@ def _median(values: list[float]) -> Optional[float]:
 
 
 def score_trial(trace: list[tuple[float, float, float]],
-                 target_deg: float) -> dict:
+                 target_deg: float,
+                 window_start_s: float = SCORE_WINDOW_START_SECONDS,
+                 window_end_s: float = SCORE_WINDOW_END_SECONDS) -> dict:
     """Scores one trial's position/current trace against D48's pre-registered outcome.
 
     A trial's primary outcome is FAIL if either: (a) more than the caller's
@@ -203,6 +229,11 @@ def score_trial(trace: list[tuple[float, float, float]],
         trace (list[tuple[float, float, float]]): (elapsed_s, output_deg,
             current_a) samples spanning the whole probe window.
         target_deg (float): Commanded target angle in degrees.
+        window_start_s (float): Start of the scored window, seconds after
+            the move was issued.
+        window_end_s (float): End of the scored window. Scoring a late
+            slice of a long trace and comparing it with an early one is how
+            a self-sustaining cycle is told apart from one that decays.
 
     Returns:
         dict: reversals, reversal_times_s, median_period_s, period_stdev_s,
@@ -219,7 +250,7 @@ def score_trial(trace: list[tuple[float, float, float]],
     scored_currents: list[float] = []
 
     for elapsed, val, current_a in trace:
-        in_window = SCORE_WINDOW_START_SECONDS <= elapsed <= SCORE_WINDOW_END_SECONDS
+        in_window = window_start_s <= elapsed <= window_end_s
         if last_val is not None and val != last_val:
             new_trend = "up" if val > last_val else "down"
             if trend is not None and new_trend != trend and in_window:
@@ -246,8 +277,22 @@ def score_trial(trace: list[tuple[float, float, float]],
     current_rms = (math.sqrt(sum(c * c for c in scored_currents) / len(scored_currents))
                     if scored_currents else None)
 
+    # How much of the settled window the servo spends driving at all, and
+    # what it draws while sitting on target. A proportional loop draws
+    # nothing at zero error; a non-zero reading here is a minimum-drive
+    # floor pushing regardless of how small the error is, which is what
+    # turns a settled hold into a sustained bang-bang cycle.
+    drive_duty = ((sum(1 for c in scored_currents if c > DRIVE_THRESHOLD_A)
+                   / len(scored_currents)) if scored_currents else None)
+    on_target = [c for elapsed, val, c in trace
+                 if window_start_s <= elapsed <= window_end_s
+                 and abs(val - target_deg) <= ON_TARGET_DEG]
+    current_on_target = _median(on_target)
+
     return {
         "reversals": reversals,
+        "drive_duty": drive_duty,
+        "current_on_target_a": current_on_target,
         "reversal_times_s": reversal_times,
         "median_period_s": _median(reversal_periods),
         "period_stdev_s": _stdev(reversal_periods),
@@ -297,7 +342,9 @@ def _append_csv(path: str, fields: list[str], rows: list[dict]) -> None:
 
 def probe(base_url: str, target_deg: float, label: str, tag: str,
           repeat: int, poll_seconds: float = DEFAULT_POLL_SECONDS,
-          anchor_deg: float = 0.0) -> dict:
+          anchor_deg: float = 0.0,
+          window_seconds: float = WINDOW_SECONDS,
+          acceleration: Optional[int] = None) -> dict:
     """Resets to an anchor, commands one fresh move, and scores trembling near target.
 
     The anchor is a real parameter, not always 0: scoring only ever covers
@@ -315,6 +362,11 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
         repeat (int): 1-based repeat number, recorded for later grouping.
         poll_seconds (float): Requested interval between position/current reads.
         anchor_deg (float): Angle to reset to before commanding the scored move.
+        window_seconds (float): How long to observe after the move is issued.
+            Longer than the default separates a self-sustaining limit cycle
+            from residual energy that simply takes a while to die away.
+        acceleration (Optional[int]): Ramp setting for the scored move, or
+            None for the backend default.
 
     Returns:
         dict: The score_trial() result plus the matching server event and
@@ -324,14 +376,37 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
     print(f"\n--- {label} repeat {repeat} [{tag}]: {anchor_deg} -> {target_deg} deg ---")
     issued_iso = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
     t0 = time.time()
-    move(base_url, target_deg)
+    move(base_url, target_deg, acceleration=acceleration)
 
     trace: list[tuple[float, float, float]] = []
-    while time.time() - t0 < WINDOW_SECONDS:
+    temperatures: list[float] = []
+    failed_reads = 0
+    while time.time() - t0 < window_seconds:
         d = get(base_url, "/servo/state")
         elapsed = time.time() - t0
-        trace.append((elapsed, d["output_deg"], d["current_a"]))
+        # A failed bus read reports position and current as None rather than
+        # zero. Appending those straight into the trace turned "the servo
+        # stopped answering" into an arithmetic TypeError further down, which
+        # is a confusing way to be told the bus has stalled - so drop the
+        # sample and fail loudly if it keeps happening.
+        if d.get("output_deg") is None or d.get("current_a") is None:
+            failed_reads += 1
+            if failed_reads > MAX_FAILED_READS:
+                raise RuntimeError(
+                    f"servo stopped answering: {failed_reads} consecutive "
+                    "invalid reads. Stop and check the servo before "
+                    "commanding anything further.")
+        else:
+            failed_reads = 0
+            trace.append((elapsed, d["output_deg"], d["current_a"]))
+            if d.get("temperature_c") is not None:
+                temperatures.append(d["temperature_c"])
         time.sleep(poll_seconds)
+
+    if not trace:
+        raise RuntimeError(
+            "no valid readings for the whole window - the servo never "
+            "answered. Stop and check it before commanding anything further.")
 
     achieved_hz = (len(trace) - 1) / trace[-1][0] if len(trace) > 1 else 0.0
 
@@ -348,6 +423,9 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
     print(f"  => current_mean_a={result['current_mean_a']}"
           f"  current_peak_a={result['current_peak_a']}"
           "  (0 reversals does not mean 0 current - check this too)")
+    print(f"  => drive_duty={result['drive_duty']}"
+          f"  current_on_target_a={result['current_on_target_a']}"
+          f"  swing_deg={result['swing_deg']}")
 
     fa = latest_fine_approach_event(base_url, issued_iso)
     if fa:
@@ -367,22 +445,34 @@ def probe(base_url: str, target_deg: float, label: str, tag: str,
                      "repeat", "reversals", "median_period_s", "period_stdev_s",
                      "swing_deg", "final_deg", "final_error_deg",
                      "settled_short", "current_mean_a", "current_peak_a",
-                     "current_rms_a", "achieved_hz",
+                     "current_rms_a", "drive_duty",
+                     "current_on_target_a",
+                     "achieved_hz", "window_seconds",
+                     "temperature_c_mean", "temperature_c_max",
                      "server_wait_elapsed_s", "timestamp"]
     trial_row = {
         "trial_id": trial_id, "label": label, "tag": tag,
         "anchor_deg": anchor_deg, "target_deg": target_deg, "repeat": repeat,
         "achieved_hz": round(achieved_hz, 2),
+        "window_seconds": window_seconds,
+        "temperature_c_mean": (round(sum(temperatures) / len(temperatures), 2)
+                               if temperatures else None),
+        "temperature_c_max": max(temperatures) if temperatures else None,
         "server_wait_elapsed_s": fa["data"].get("wait_elapsed_s") if fa else None,
         "timestamp": issued_iso,
         **{k: result[k] for k in (
             "reversals", "median_period_s", "period_stdev_s", "swing_deg",
             "final_deg", "final_error_deg", "settled_short",
-            "current_mean_a", "current_peak_a", "current_rms_a")},
+            "current_mean_a", "current_peak_a", "current_rms_a",
+            "drive_duty", "current_on_target_a")},
     }
     _append_csv(_csv_path("jitter_trial", label), trial_fields, [trial_row])
 
-    return {**result, "event": fa, "achieved_hz": achieved_hz, "trial_id": trial_id}
+    return {**result, "event": fa, "achieved_hz": achieved_hz,
+            "trial_id": trial_id,
+            "temperature_c_mean": trial_row["temperature_c_mean"],
+            "temperature_c_max": trial_row["temperature_c_max"],
+            "trace": trace}
 
 
 def main() -> int:

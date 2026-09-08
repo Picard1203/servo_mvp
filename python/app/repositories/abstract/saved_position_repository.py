@@ -71,3 +71,16 @@ class SavedPositionRepository(ABC):
         Returns:
             bool: True when a row was deleted.
         """
+
+    @abstractmethod
+    def mark_dismissed(self, position_id: int,
+                      dismissed_at: str) -> Optional[SavedPosition]:
+        """Records an acknowledgement, touching only dismissed_at.
+
+        Args:
+            position_id (int): Database identifier.
+            dismissed_at (str): ISO timestamp of this acknowledgement.
+
+        Returns:
+            Optional[SavedPosition]: The entity, or None if missing.
+        """

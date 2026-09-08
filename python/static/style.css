@@ -258,7 +258,27 @@ button{font-family:inherit}
 .pos-tag{font-family:var(--ant);font-size:10px;font-weight:600;
   letter-spacing:1px;padding:3px 9px;border-radius:9px;
   background:var(--warn-bg);color:var(--warn);text-transform:uppercase;
-  flex:none;margin-left:auto}
+  flex:none;margin-left:auto;display:inline-flex;align-items:center}
+/* the pill's text stays plain and informational; only this small drawn
+   mark is a click target - a fixed square centred by flex, so its hover
+   highlight lands on the mark itself rather than beside it */
+.tag-clear{border:0;background:transparent;color:inherit;
+  width:16px;height:16px;padding:0;margin:-2px -5px -2px 3px;
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;opacity:.5;border-radius:6px}
+.tag-clear:hover{opacity:1;background:rgba(0,0,0,.08)}
+.tag-clear:focus-visible{opacity:1;outline:1.5px solid var(--warn);
+  outline-offset:1px}
+/* a quiet control, not a hyperlink - nothing else in this app underlines
+   on hover, so it shares the same soft-highlight grammar as .tag-clear
+   above instead, only wider. Exists in the DOM only while >0 are tagged. */
+.clear-all{margin-left:auto;font-family:"Segoe UI",sans-serif;font-size:12px;
+  font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);
+  border:0;background:transparent;cursor:pointer;padding:4px 8px;
+  margin-right:-8px;border-radius:8px;
+  transition:background .12s ease,color .12s ease}
+.clear-all:hover{color:var(--ink);background:rgba(0,0,0,.06)}
+.clear-all[hidden]{display:none}
 .empty-hint{padding:20px 13px;font-family:"Segoe UI",sans-serif;
   font-size:14px;color:var(--faint);text-align:center}
 .posbtns{display:flex;gap:12px;margin-top:16px;flex:none;flex-wrap:wrap}

@@ -8,9 +8,11 @@ from app.deps import get_saved_position_service
 from app.models.entities import SavedPositionView
 from app.schemas.saved_positions import (
     DeletedResponse,
+    DismissedCountResponse,
     GoResponse,
     SavedPositionCreateRequest,
     SavedPositionDeleteRequest,
+    SavedPositionDismissRequest,
     SavedPositionResponse,
     SavedPositionUpdateRequest,
 )
@@ -34,8 +36,9 @@ def _to_response(view: SavedPositionView) -> SavedPositionResponse:
     return SavedPositionResponse(
         id=view.id, name=view.name, description=view.description,
         raw_counts=view.raw_counts, output_deg=view.output_deg,
-        stale_reference=view.stale_reference, created_at=view.created_at,
-        updated_at=view.updated_at)
+        stale_reference=view.stale_reference,
+        reference_dismissed=view.reference_dismissed,
+        created_at=view.created_at, updated_at=view.updated_at)
 
 
 @router.get("", response_model=list[SavedPositionResponse])
@@ -101,6 +104,40 @@ def delete_position(position_id: int, request: SavedPositionDeleteRequest,
     """
     positions.delete(position_id, request.updated_at)
     return DeletedResponse(deleted=True)
+
+
+@router.post("/{position_id}/dismiss-reference",
+            response_model=SavedPositionResponse)
+def dismiss_reference(position_id: int,
+                      request: SavedPositionDismissRequest,
+                      positions: PositionsDep) -> SavedPositionResponse:
+    """Acknowledges one position's earlier-reference tag.
+
+    Args:
+        position_id (int): Database identifier.
+        request (SavedPositionDismissRequest): Last-seen state.
+        positions (SavedPositionService): Injected saved-position service.
+
+    Returns:
+        SavedPositionResponse: The position, enriched for display.
+    """
+    view = positions.dismiss_reference(position_id, request.updated_at)
+    return _to_response(view)
+
+
+@router.post("/dismiss-references", response_model=DismissedCountResponse)
+def dismiss_all_stale_references(
+        positions: PositionsDep) -> DismissedCountResponse:
+    """Acknowledges every currently-tagged position in one call.
+
+    Args:
+        positions (SavedPositionService): Injected saved-position service.
+
+    Returns:
+        DismissedCountResponse: How many positions were cleared.
+    """
+    count = positions.dismiss_all_stale_references()
+    return DismissedCountResponse(dismissed_count=count)
 
 
 @router.post("/{position_id}/go", response_model=GoResponse)

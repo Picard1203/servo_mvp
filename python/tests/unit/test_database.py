@@ -24,7 +24,7 @@ class TestSchema:
             "PRAGMA table_info(saved_positions)")]
         assert set(position_cols) == {"id", "name", "description",
                                       "raw_counts", "created_at",
-                                      "updated_at"}
+                                      "updated_at", "dismissed_at"}
         telemetry_cols = [r[1] for r in
                           db.connection.execute("PRAGMA table_info(telemetry)")]
         for col in ("overload", "overcurrent", "overheat", "voltage_fault",

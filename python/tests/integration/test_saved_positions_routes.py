@@ -112,3 +112,63 @@ class TestGo:
     def test_go_missing_404(self, client):
         assert client.post(
             "/api/v1/positions/999/go").status_code == 404
+
+
+class TestDismiss:
+    """POST /api/v1/positions/{id}/dismiss-reference and the batch route."""
+
+    def _make_stale(self, client):
+        # Seeded in the past and against a past datum literal, not a real
+        # calibrate call - a dismissal always lands at real "now", so the
+        # position and its datum both need to sit safely before that
+        # moment for the fixture to be deterministic (see the unit-test
+        # service fixture's own _make_stale for the same reasoning).
+        from app.deps import (get_app_state_repository,
+                              get_saved_position_repository)
+        from app.models.entities import SavedPosition
+        get_saved_position_repository().add(SavedPosition(
+            id=None, name="p", description="", raw_counts=1000,
+            created_at="2000-01-01T00:00:00",
+            updated_at="2000-01-01T00:00:00"))
+        get_app_state_repository().set(
+            "datum_captured_at", "2010-01-01T00:00:00",
+            "2010-01-01T00:00:00")
+        listed = client.get("/api/v1/positions").json()[0]
+        assert listed["stale_reference"] is True
+        return listed
+
+    def test_dismiss_clears_the_flag(self, backend, client):
+        created = self._make_stale(client)
+        response = client.post(
+            f"/api/v1/positions/{created['id']}/dismiss-reference",
+            json={"updated_at": created["updated_at"]})
+        assert response.status_code == 200
+        assert response.json()["stale_reference"] is False
+
+    def test_dismiss_missing_404(self, client):
+        response = client.post(
+            "/api/v1/positions/999/dismiss-reference",
+            json={"updated_at": "t"})
+        assert response.status_code == 404
+
+    def test_dismiss_stale_409(self, backend, client):
+        created = self._make_stale(client)
+        response = client.post(
+            f"/api/v1/positions/{created['id']}/dismiss-reference",
+            json={"updated_at": "not-the-real-timestamp"})
+        assert response.status_code == 409
+        assert response.json()["reason"] == "stale_position"
+
+    def test_dismiss_all_clears_and_reports_the_count(self, backend, client):
+        self._make_stale(client)
+        response = client.post("/api/v1/positions/dismiss-references")
+        assert response.status_code == 200
+        assert response.json() == {"dismissed_count": 1}
+        assert client.get("/api/v1/positions").json()[0][
+            "stale_reference"] is False
+
+    def test_dismiss_all_zero_when_nothing_tagged(self, client):
+        client.post("/api/v1/positions",
+                    json={"name": "p", "target_deg": 10.0})
+        response = client.post("/api/v1/positions/dismiss-references")
+        assert response.json() == {"dismissed_count": 0}

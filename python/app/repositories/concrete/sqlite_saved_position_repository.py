@@ -125,6 +125,29 @@ class SqliteSavedPositionRepository:
             self._db.connection.commit()
         return cursor.rowcount > 0
 
+    def mark_dismissed(self, position_id: int,
+                      dismissed_at: str) -> Optional[SavedPosition]:
+        """Records an acknowledgement, touching only dismissed_at.
+
+        Args:
+            position_id (int): Database identifier.
+            dismissed_at (str): ISO timestamp of this acknowledgement.
+
+        Returns:
+            Optional[SavedPosition]: The entity, or None if missing.
+        """
+        with self._db.write_lock:
+            cursor = self._db.connection.execute(
+                "UPDATE saved_positions SET dismissed_at = ? WHERE id = ?",
+                (dismissed_at, position_id))
+            self._db.connection.commit()
+            if cursor.rowcount == 0:
+                return None
+            row = self._db.connection.execute(
+                "SELECT * FROM saved_positions WHERE id = ?",
+                (position_id,)).fetchone()
+        return self._to_entity(row)
+
     def _to_entity(self, row: object) -> SavedPosition:
         """Maps a database row to the entity.
 
@@ -137,4 +160,4 @@ class SqliteSavedPositionRepository:
         return SavedPosition(
             id=row["id"], name=row["name"], description=row["description"],
             raw_counts=row["raw_counts"], created_at=row["created_at"],
-            updated_at=row["updated_at"])
+            updated_at=row["updated_at"], dismissed_at=row["dismissed_at"])

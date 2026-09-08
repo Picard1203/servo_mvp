@@ -68,7 +68,19 @@ function makeEl(id) {
       return el._sub;
     },
     querySelectorAll: () => [],
-    appendChild: (c) => { el.children.push(c); return c; },
+    /* A real DOM's innerHTML reflects appended children; this stub's did
+       not, which passed silently until a row grew its first nested
+       control (D38) and the "does the tag's text survive" assertion
+       read stale content. Serializes just enough to match: the child's
+       own tag name (from its <tag> id, real elements only) wrapping its
+       own innerHTML. */
+    appendChild: (c) => {
+      el.children.push(c);
+      const tag = (c.id.startsWith("<") && c.id.endsWith(">"))
+        ? c.id.slice(1, -1) : "span";
+      el.innerHTML += "<" + tag + ">" + (c.innerHTML || "") + "</" + tag + ">";
+      return c;
+    },
     remove: () => {},
     setAttribute: () => {},
     click: () => { if (!el.disabled && el._listeners.click) el._listeners.click(); },
@@ -658,6 +670,74 @@ console.log("\nD14 - a refused connection reads as something to act on");
   $("confirmYes")._listeners.click();
   await goPromise;
   check("confirming sends the go command", goCalled === true);
+
+  console.log("\nD38 - the earlier-reference tag carries a small clear "
+    + "mark, and the header link tracks how many are tagged");
+  ctx.fetch = async () => ({
+    ok: true,
+    json: async () => [
+      { id: 3, name: "gate open", description: "", raw_counts: 0,
+       output_deg: 30.0, stale_reference: true, reference_dismissed: false,
+       created_at: "t", updated_at: "t1" },
+      { id: 4, name: "fresh one", description: "", raw_counts: 0,
+       output_deg: 5.0, stale_reference: false, reference_dismissed: false,
+       created_at: "t", updated_at: "t2" },
+    ],
+  });
+  await ctx.fetchPositions();
+  const clearAll = $("clearAllRefsBtn");
+  check("the header link names the tagged count",
+        clearAll.hidden === false && /1/.test(clearAll.textContent),
+        clearAll);
+  listEl = $("positionList");
+  const posRows = listEl.children.filter((r) =>
+    r.className && r.className.indexOf("saved-position") !== -1);
+  const staleRow = posRows.find((r) => /gate open/.test(
+    r.children[0].innerHTML));
+  const freshRow = posRows.find((r) => /fresh one/.test(
+    r.children[0].innerHTML));
+  check("only the tagged row carries a clear mark",
+        staleRow.children[1].children.length === 1
+        && freshRow.children[1].children.length === 0,
+        { stale: staleRow.children[1].children.length,
+         fresh: freshRow.children[1].children.length });
+
+  let dismissedUrl = null, dismissedBody = null;
+  ctx.fetch = async (url, init) => {
+    dismissedUrl = String(url);
+    dismissedBody = init && init.body ? JSON.parse(init.body) : null;
+    return { ok: true, json: async () => [] };
+  };
+  const tagEl = staleRow.children[1].children[0];
+  tagEl.children[0].onclick({ stopPropagation: () => {} });
+  check("the clear mark dismisses that position, by its own updated_at",
+        dismissedUrl && dismissedUrl.indexOf("/positions/3/dismiss-reference")
+        !== -1 && dismissedBody && dismissedBody.updated_at === "t1",
+        { url: dismissedUrl, body: dismissedBody });
+
+  console.log("\nD38 - clearing all tags, and clearing an already-clean list");
+  let batchCalled = false;
+  ctx.fetch = async (url) => {
+    if (String(url).indexOf("/positions/dismiss-references") !== -1) {
+      batchCalled = true;
+      return { ok: true, json: async () => ({ dismissed_count: 2 }) };
+    }
+    return { ok: true, json: async () => [] };
+  };
+  await ctx.dismissAllReferences();
+  check("the header link's own press reaches the batch route",
+        batchCalled === true);
+  toasts.length = 0;
+  ctx.fetch = async (url) => {
+    if (String(url).indexOf("/positions/dismiss-references") !== -1) {
+      return { ok: true, json: async () => ({ dismissed_count: 0 }) };
+    }
+    return { ok: true, json: async () => [] };
+  };
+  await ctx.dismissAllReferences();
+  check("pressing it again with nothing tagged says so, not silence",
+        toasts.length === 1 && /no positions/i.test(toasts[0].message),
+        toasts);
 
   console.log("\n" + (failures ? failures + " FAILURE(S)" : "all checks passed"));
   process.exit(failures ? 1 : 0);

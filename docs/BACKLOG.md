@@ -38,28 +38,14 @@ sessions actually spent, not the ones originally planned.
 | **26** | **DONE, 7 Sept 2026.** D48 continued. A re-analysis of Session 25's own archive invalidated part of its basis — every campaign trial had run at ~10Hz, not the fast path, so poll rate and time-of-day were perfectly confounded and its between-configuration comparisons were uninterpretable as they stood. New pre-registered regimen and a randomised-block campaign tool built (`docs/sprint/D48_S26_REGIMEN.md`, `tools/d48_s26_campaign.py`). B7 dose-response found the bifurcation between `min_start_force` 85 and 100; B8 crossed dead zone with the floor; multi-angle and bracket sweeps followed. Both deep-research answers came in and disagreed on cause while agreeing on the next experiment. | yes |
 | **27** | **DONE, 8 Sept 2026, 08:48–~17:30.** B9 confirmatory (N=16, two angles) passed and `min_start_force=40` was baked into `Config.h` — then the operator's own manual sweep reopened it the same day: commanding −75° three times landed in three different places, exposing that the fine approach never had a fixed arrival side. `tools/d48_decisive.py` built and run: P1 proved arrival direction decides the miss and flips with the angle's sign; P2A found no floor passes alone; P3 showed a host-side verify-and-correct converges. Left deliberately unclosed for a fresh-eyes analysis. | yes |
 | **28** | **DONE, 8 Sept 2026, 17:36–close. D48 CLOSED.** Analysis of the whole archive showed the two failure modes move in opposite directions with the floor, so no single value can pass — the fix had to be software. Floor **55** (highest never-oscillating value) baked into `Config.h`; arrival direction anchored to the target's sign; verify-and-correct loop added with three guards. Found and fixed a divergence in the correction rule itself (it re-derived its aim from the target each round and ping-ponged; now cumulative). Live on hardware: the same target from opposite sides lands identically, 0.00° spread. Four diagnostic-tool defects fixed, one filed as **T24**. | yes |
-| **29** | **NOT STARTED — resume here.** Pick up **D38** next: run `/deliver` with
-"D38 — let an operator dismiss a saved position's earlier-reference tag,
-single position and batch, without editing name/description/angle."
-Re-prioritized ahead of D41/R11/R12 by the operator at the end of Session
-28 (banking a completable win with two shorter working days ahead, 9–10
-Sept) — full reasoning and the original committed order are both in
-`docs/sprint/SPRINTS.md`'s ordering note; D41 stays the higher-severity
-item on merit and follows D38, not the other way round. `docs/backlog/D.md`
-D38 already has its acceptance criteria written — read that entry, not this
-row, before planning. If D38 finishes with session time left, **T20** (the
-doc-truth sweep) is the fallback — it is an Antigravity handoff per
-`docs/backlog/T.md`, not Claude session work, so treat "time left" as
-"hand T20 off", not "start it here." **Sizing flagged going in:** the
-sprint sheet estimates D38 at 3.0h; the operator's own estimate was closer
-to 10 minutes. State plainly which one the actual turns out to be. | tbd |
+| **29** | **DONE, 8 Sept 2026, 20:30–21:17. D38 CLOSED.** Dismissing the "earlier reference" tag: a small drawn ✕ inside the tag itself for one position, a quiet header link ("clear N tags") for the batch, neither visible when nothing is tagged. Backed by a new `dismissed_at` column, compared against the datum rather than re-stamping `updated_at` (which would have looked like an edit and ejected another operator's open Edit dialog). Three heavier UI variants (a colour band, extra toolbar buttons, the whole tag as a button) were mocked up first and rejected by the operator for costing too much visual weight before this one was approved. Caught and fixed a real cross-cutting bug the same session: `routers/stream.py` built its own `SavedPositionResponse` rather than reusing the router's `_to_response()` helper, so the SSE push silently broke on the new required field — an existing stream test caught it. Full account: `docs/history/CLOSED.md` D38. Neither the 3.0h estimate nor the operator's own ~10-minute guess held — actual 47 minutes, see `docs/sprint/SPRINTS.md`'s sizing note. | no |
 
 **R11 was pulled into committed scope 1 Sept, alongside T20 and the rig
 protocols, then did not start** (D48/D40d's investigation used the full
 remaining time) — carried forward rather than dropped. **R12 and D41**
-similarly moved to stretch and also did not start. All three, plus **D38**,
-**T20**, and the still-in-flight **D48**, are now the **6–10 Sept sprint's
-committed scope** — see `docs/sprint/SPRINTS.md` for the capacity math and
+similarly moved to stretch and also did not start. All three, plus **T20**
+and the closed **D38**/**D48**, were the **6–10 Sept sprint's committed
+scope** — see `docs/sprint/SPRINTS.md` for the capacity math and
 per-story estimates. **T17 closed 6 Sept**, separately, ahead of this
 sprint (see its own row above and `docs/history/CLOSED.md`). The remaining
 rig protocols (R1's loaded sign-off) and D47 stay deferred past this sprint
@@ -96,7 +82,6 @@ detail entries above (filed and ranked, not started).
 | D7 | UI not verified on small operator screens | open · medium |
 | D28 | MCU boot-time `mcu_log` notify lost to a startup race | open · low |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
-| D38 | A saved position's "earlier reference" tag has no way to dismiss it | open · low · R10 · **sprint committed, 6–10 Sept** |
 | D47 | Verify the anti-backlash fix holds once the servo carries its real load | open · medium |
 | D41 | Firmware commands real moves off failed reads and malformed payloads | open · high · before real loaded rig day · **sprint committed, 6–10 Sept** |
 | D42 | Errors that vanish: SSE stream, migration, sqlite writes | open · medium |
@@ -140,6 +125,7 @@ detail entries above (filed and ranked, not started).
 
 | | | closed |
 |---|---|---|
+| **D38** | A saved position's "earlier reference" tag has no way to dismiss it | 8 September 2026 · Session 29 · single and batch, no edit to name/description/angle — see `docs/history/CLOSED.md` |
 | **D48** | Diagnose the settling oscillation properly rather than sweep registers again | 8 September 2026 · Sessions 24–28 · the register could never fix it — the two failure modes move in opposite directions with it. Closed by two software fixes (fixed arrival side, verify-and-correct) plus floor 55; live spread 0.00° from opposite sides — see `docs/history/CLOSED.md`; real-arm verification is D47 |
 | **T17** | Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested | 6 September 2026 · operator-run on the real rig: matched expectations both ways, position tracking read correctly afterward — see `docs/history/CLOSED.md` |
 | **D40** | A move settles short under load; re-commanding does not correct it | 2 September 2026 · Session 22 · closed with `P=24` kept permanently and an honest, unresolved loaded-jitter risk accepted — see `docs/history/CLOSED.md`; real-rig verification is D47 |

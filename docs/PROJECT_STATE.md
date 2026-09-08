@@ -30,17 +30,35 @@ Everything exists — backend, UI, sketch, tests — and `tools/verify.py`
 (one command, `CLAUDE.md` §3) reports ALL GREEN:
 
 ```
-444 Python tests, coverage of app/ gated at 99% (99.31% measured)
+465 Python tests, coverage of app/ gated at 99% (99.33% measured)
 194 native sketch checks, -Wall -Wextra -Wpedantic -Werror
 Bridge contract checker: both sides agree
-106 client-behaviour assertions (T12)
+111 client-behaviour assertions (T12)
 Brace balance check: ok
 ```
 
-(as of Session 28, 8 September 2026. This snapshot has already been stale
+(as of Session 29, 8 September 2026. This snapshot has already been stale
 once — it read 368 for a week after the suite grew, which is exactly D24's
 own lesson repeating. `tools/verify_baseline.json` is the source of truth;
 run `tools/verify.py` rather than trust the numbers above.)
+
+**8 September 2026 — Session 29: D38 CLOSED, board-confirmed.** An operator
+can now clear a saved position's "earlier reference" tag — one at a time via
+a small drawn ✕ inside the tag, or the whole batch via a quiet header link —
+without opening the Edit dialog and without touching name, description or
+angle. Backed by a new `dismissed_at` column compared against the datum
+rather than a re-stamped `updated_at`, which would have ejected another
+operator's open Edit dialog and made an acknowledgement look like an edit.
+Three heavier UI variants (a colour band, extra toolbar buttons, the whole
+tag as one button) were mocked up first and rejected by the operator for
+costing too much visual weight before this shape was approved. Caught and
+fixed along the way: `routers/stream.py` built its own copy of
+`SavedPositionResponse` instead of reusing the router's own helper, silently
+breaking the SSE push on the new field — an existing stream test caught it.
+Verified on the real board after a restart (`backend=hardware` confirmed in
+the log), operator-observed. `tools/verify.py`: 444→465 tests, 106→111
+client-behaviour checks; native/Bridge/brace unchanged. Full account:
+`docs/history/CLOSED.md` D38.
 
 **8 September 2026 — Session 28: D48 CLOSED, and the accuracy work that ran
 from 1 September is finished on the bench.** Ten sessions swept registers

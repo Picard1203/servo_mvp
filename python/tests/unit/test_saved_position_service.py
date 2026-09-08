@@ -140,3 +140,128 @@ class TestStaleReference:
                       "2000-01-01T00:00:00")
         service.create("p", "", 10.0)
         assert service.list_all()[0].stale_reference is False
+
+
+class TestDismissReference:
+    """Clearing the 'earlier reference' tag without editing the position."""
+
+    def _make_stale(self, service):
+        """Seeds a position saved before the datum, without touching the
+        real clock - a dismissal always happens at real "now", so the
+        position and the datum must both sit safely in the past relative
+        to it for "dismissed_at >= datum_captured_at" to hold immediately.
+
+        Returns:
+            The SavedPositionView, already flagged stale_reference.
+        """
+        from app.deps import (get_app_state_repository,
+                              get_saved_position_repository)
+        from app.models.entities import SavedPosition
+        get_saved_position_repository().add(SavedPosition(
+            id=None, name="p", description="old note", raw_counts=1000,
+            created_at="2000-01-01T00:00:00",
+            updated_at="2000-01-01T00:00:00"))
+        app_state = get_app_state_repository()
+        app_state.set("datum_captured_at", "2010-01-01T00:00:00",
+                      "2010-01-01T00:00:00")
+        created = service.list_all()[0]
+        assert created.stale_reference is True
+        return created
+
+    def test_dismiss_clears_the_flag(self, service):
+        created = self._make_stale(service)
+        dismissed = service.dismiss_reference(created.id, created.updated_at)
+        assert dismissed.stale_reference is False
+
+    def test_dismiss_does_not_change_what_the_position_stores(self, service):
+        created = self._make_stale(service)
+        dismissed = service.dismiss_reference(created.id, created.updated_at)
+        assert dismissed.name == created.name
+        assert dismissed.description == created.description
+        assert dismissed.raw_counts == created.raw_counts
+        assert dismissed.updated_at == created.updated_at
+
+    def test_dismiss_missing_raises(self, service):
+        with pytest.raises(NotFoundError):
+            service.dismiss_reference(999, "t")
+
+    def test_dismiss_stale_concurrency_raises(self, service):
+        created = self._make_stale(service)
+        with pytest.raises(StalePositionError):
+            service.dismiss_reference(created.id, "not-the-real-timestamp")
+
+    def test_a_later_datum_reraises_a_dismissed_tag(self, service):
+        from app.deps import get_app_state_repository
+        created = self._make_stale(service)
+        service.dismiss_reference(created.id, created.updated_at)
+        app_state = get_app_state_repository()
+        # Comfortably after "now" - re-dismissal must not survive a
+        # recalibration that happens after the dismissal itself.
+        app_state.set("datum_captured_at", "2222-01-01T00:00:00",
+                      "2222-01-01T00:00:00")
+        assert service.list_all()[0].stale_reference is True
+
+    def test_revision_advances_on_dismiss(self, service):
+        created = self._make_stale(service)
+        start = service.revision()
+        service.dismiss_reference(created.id, created.updated_at)
+        assert service.revision() == start + 1
+
+
+class TestDismissAllStaleReferences:
+    """Clearing every currently-tagged position in one call."""
+
+    def _seed(self, service):
+        """Seeds one position saved before the datum and one saved after
+        (this one created at real "now", so the datum sits in the past
+        relative to it - "newer" stays fresh; see TestDismissReference's
+        _make_stale for why "older" is inserted directly rather than
+        through create(), which would put it at real "now" too).
+
+        Returns:
+            (stale_view, fresh_view) - list_all()'s views, newest first.
+        """
+        from app.deps import (get_app_state_repository,
+                              get_saved_position_repository)
+        from app.models.entities import SavedPosition
+        get_saved_position_repository().add(SavedPosition(
+            id=None, name="older", description="", raw_counts=1000,
+            created_at="2000-01-01T00:00:00",
+            updated_at="2000-01-01T00:00:00"))
+        app_state = get_app_state_repository()
+        app_state.set("datum_captured_at", "2010-01-01T00:00:00",
+                      "2010-01-01T00:00:00")
+        service.create("newer", "", 20.0)
+        views = service.list_all()
+        newer = next(v for v in views if v.name == "newer")
+        older = next(v for v in views if v.name == "older")
+        assert older.stale_reference is True
+        assert newer.stale_reference is False
+        return older, newer
+
+    def test_clears_every_stale_position(self, service):
+        self._seed(service)
+        service.dismiss_all_stale_references()
+        views = {v.name: v for v in service.list_all()}
+        assert views["older"].stale_reference is False
+
+    def test_leaves_a_never_stale_position_untouched(self, service):
+        _, newer = self._seed(service)
+        service.dismiss_all_stale_references()
+        views = {v.name: v for v in service.list_all()}
+        assert views["newer"].updated_at == newer.updated_at
+        assert views["newer"].stale_reference is False
+
+    def test_returns_the_count_cleared(self, service):
+        self._seed(service)
+        assert service.dismiss_all_stale_references() == 1
+
+    def test_returns_zero_when_nothing_is_tagged(self, service):
+        service.create("p", "", 10.0)
+        assert service.dismiss_all_stale_references() == 0
+
+    def test_revision_advances_once_per_position_cleared(self, service):
+        self._seed(service)
+        start = service.revision()
+        service.dismiss_all_stale_references()
+        assert service.revision() == start + 1

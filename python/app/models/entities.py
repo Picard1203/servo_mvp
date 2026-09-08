@@ -28,6 +28,8 @@ class SavedPosition:
         raw_counts (int): Absolute encoder position in raw counts.
         created_at (str): ISO timestamp of creation.
         updated_at (str): ISO timestamp of the last edit.
+        dismissed_at (Optional[str]): ISO timestamp the operator last
+            acknowledged an earlier-reference tag, or None if never.
     """
 
     id: Optional[int]
@@ -36,6 +38,7 @@ class SavedPosition:
     raw_counts: int
     created_at: str
     updated_at: str
+    dismissed_at: Optional[str] = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -49,6 +52,8 @@ class SavedPositionView:
         raw_counts (int): Absolute encoder position in raw counts.
         output_deg (float): Live output angle against the current datum.
         stale_reference (bool): True if saved before the current datum.
+        reference_dismissed (bool): True if a dismissal is covering the
+            current datum - mutually exclusive with stale_reference.
         created_at (str): ISO timestamp of creation.
         updated_at (str): ISO timestamp of the last edit.
     """
@@ -59,6 +64,7 @@ class SavedPositionView:
     raw_counts: int
     output_deg: float
     stale_reference: bool
+    reference_dismissed: bool
     created_at: str
     updated_at: str
 

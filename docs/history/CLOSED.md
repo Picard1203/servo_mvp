@@ -12,6 +12,31 @@ file every session has to read.
 
 ---
 
+### T17 — Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested
+**Status:** done · 6 September 2026 · raised by the operator, 26 August 2026,
+closing out R2
+
+R2 (motor isolation, closed) confirmed torque cuts and restores correctly at
+the register level, but left one scenario genuinely untested on a bare servo
+with no belt or lever attached: whether the servo can be freely hand-turned
+while isolated (multi-turn included), whether it resists and self-corrects
+when un-isolated, and whether position tracking still reads correctly once
+the shaft has moved by hand. `docs/sprint/RIG_TESTING_PROTOCOL.md` was
+written for it ahead of Rig Day (30 August); the rig itself was assembled
+31 August.
+
+**Tested on the real mechanical rig, operator-run: matched expectations.**
+Freely hand-turnable (including multi-turn) while isolated; resists and
+corrects back toward its held position when un-isolated; position tracking
+read correctly after a hand-turn while isolated, once torque was restored.
+No further register-level work needed — R2's own fixes already covered the
+electrical side; this closes the one scenario that needed a real mechanical
+grip rather than a bare servo shaft.
+
+**Related:** R2.
+
+---
+
 ### T22 — Move CONTEXT.md and CONVENTIONS.md into docs/, group history and sprint docs
 **Status:** done · 1 September 2026 · raised by the operator, mid-sprint
 
@@ -3021,3 +3046,1000 @@ load) remains open, Session 22.
 D40a's ack-surfacing mirrors on the write side, now closed on both the
 direct and fine-approach paths), D35 (closed the same session, from this
 campaign's own speed-benchmark data — see `docs/history/CLOSED.md`).
+### D48 — Diagnose the load-induced settling oscillation properly: fast instrumentation first, then a structured experiment, not another tuning sweep
+**Status:** CLOSED · 8 September 2026 · Sessions 24–28 · **Severity:** high
+
+**Resolution: the answer was never in a register.** Ten sessions across
+1–8 September (D39 → D40a–d → D48) swept position gains, the minimum start
+force, dead zones, velocity-loop registers, overshoot sizes, final-leg
+speed and acceleration, and move staging. None of it fixed the problem,
+and Session 25's conclusion that seven configurations all failed was
+correct — there was nothing there to find. The failure was two software
+defects sitting behind a register that cannot fix either of them.
+
+**What the register actually does, which is what took so long to see.**
+`min_start_force` trades two opposite failures against each other. Set high,
+the arm hunts around the target and never stops — nothing in software can
+correct a servo that will not hold still. Set low, the arm goes quiet and
+stops a hair short, typically 0.19° (three counts) — which software can
+correct. Measured across 176 trials at four values, oscillation rises with
+the setting (Cochran-Armitage z = 4.14, p = 3.5×10⁻⁵) while stopping short
+falls (z = −4.26, p = 2.0×10⁻⁵). **No value minimises both.** Every session
+that asked "which value" was asking a question with no answer; the question
+that resolved it was "which of the two failures can software fix".
+
+**The two defects, both in `motion_service.py::_fine_approach`:**
+
+1. **No fixed arrival side.** The overshoot leg was placed along the
+   *direction of travel*, so which side the arm arrived from was decided by
+   wherever the move happened to start. The whole point of an anti-backlash
+   approach is a fixed arrival side; this one never had one. Found by the
+   operator's own manual sweep on 8 Sept: commanding −75° three times landed
+   at −74.55°, −75.09°, −75.15°. P1 (60 trials) then measured it —
+   arriving from the correct side gives 0.03–0.16° error, the wrong side
+   0.45–0.67°, and the good side flips with the angle's sign
+   (negative p = 1.3×10⁻⁶, positive p = 0.0052; a pooled test reads "no
+   effect" because two real opposite-signed effects average to zero).
+   **Fixed:** the overshoot is placed by the target's own sign, so it always
+   sits away from the datum and the final leg always travels toward it.
+2. **Nothing checked that the arm arrived.** The final leg confirmed only
+   that the servo *acknowledged* the command. No readback, no retry. A move
+   that stopped three counts short was reported as a success.
+   **Fixed:** the position is read back and corrected, up to three times.
+
+**Kept, permanent:** `Config.h::kMinStartForce` 40 → **55**, the highest
+value that never oscillated (0 of 44 trials, both 45 and 55 clean; 65 and 70
+oscillate). 40 was baked in earlier the same day on evidence collected
+before arrival direction was known to matter, i.e. with defect 1 mixed into
+every measurement. Confirmed by readback after reflash: the board now boots
+at 55.
+
+**The correction rule, and a divergence found in it before it shipped.**
+The first version corrected by the whole residual measured *from the
+target*, recomputing its aim each round and discarding where it last aimed.
+Against an arm that lands where it is aimed, that flips the error's sign
+forever — measured at +45°: 45.18, 44.82, 45.18, 44.82. It also acted on any
+reading, including one taken mid-travel, and drove it: a 61° "residual" was
+measured and commanded, twice, at 0°. A damped gain was tried as the remedy
+and made things strictly worse (1/5 converging), because halving a *fixed*
+offset leaves half of it forever — it settles permanently 0.25° out.
+**The actual fix is to carry the aim forward** (`aim = aim − residual`)
+rather than re-derive it from the target. That converges under both
+behaviours this servo shows, at full gain, and was confirmed on hardware:
+20/20 across two back-off distances, where the previous rule managed 3
+failures in 35.
+
+**Three guards, because the loop can otherwise do real harm.** A reading the
+servo did not answer is unknown, never a number (ADR-0008, whose own history
+is a bad read used as a position); a residual beyond 2° is a bad reading and
+is reported, never driven; and settling is decided by movement alone, never
+by current — an arm holding against gravity draws a current that never goes
+quiet, and requiring it to meant the settle was never detected at all, so
+every correction burned a 25 s timeout. On movement alone the same
+correction takes 5 s.
+
+**What the operator sees.** The whole positioning sequence now reports as
+SETTLING and never falls back to HOLDING between its own legs — without
+that, several operators watching one arm would see it finish and then move
+again with nobody having commanded it. A move that cannot be brought inside
+0.12° is reported on screen with the distance it fell short, not recorded as
+a success.
+
+**Verified on hardware, 8 September**, after reflash and restart, on the
+real code path (not the diagnostic tool):
+
+| target | approached from | landed | error |
+|---|---|---|---|
+| −60° | +30° | −59.99° | +0.01° |
+| −60° | −90° | −59.99° | +0.01° |
+| 0° | +60° | −0.06° | −0.06° |
+| 0° | −60° | +0.06° | +0.06° |
+
+The same target from opposite sides lands identically — **0.00° spread at
+−60°**, against the 0.6° spread that reopened this item. Each move takes
+6–8.5 s including verification, with one correction. `tools/verify.py`:
+432 → 444 tests, coverage 99.31%, native/bridge/client-behaviour unchanged.
+
+**What this does not establish, stated plainly.** Everything above is the
+bench proxy. A real arm carries more gravitational load, more friction and
+more damping, all of which push oscillation *less* likely and stopping short
+*more* likely — so 55 is a starting point on the real rig, not a settled
+value. **D47 carries that verification and stays open.** Per the operator's
+own instruction, D48 is not reopened until the real final rig is mounted.
+Also not established: no oscillation-scored run (15 s reversal counting) was
+made at floor 55 with the product code, and the live check above covers
+three angles, not the full seven.
+
+**Method lessons worth keeping, since they cost most of the ten sessions:**
+
+- **A confounded design cannot be rescued by more trials.** Session 25's
+  campaign silently ran every trial at ~10 Hz rather than the fast path, so
+  poll rate and time-of-day were perfectly confounded; its between-configuration
+  comparisons were uninterpretable and had to be re-run, not re-derived.
+- **A median hides a coin flip.** `min_start_force=85` was selected as "best"
+  by median swing while its six trials were 3 clean / 3 oscillating.
+- **Two runs must never share one servo.** A run finishing restores the
+  registers and silently drops the floor out from under a run still going;
+  a block labelled `msf55` was collected at 40 and only a live register read
+  caught it. The tool now takes an exclusive lock.
+- **A tool that writes another tool's results destroys them.** `preflight()`
+  saved into the campaign's archive path while holding the decisive run's
+  data, twice — the second time after the documented recovery, so the file
+  spent a day claiming to hold B7/B8/B9 while holding something else. Callers
+  own persistence now, and both test suites are pinned to temp paths.
+- **The same rule has to reach both paths.** Movement-decides-settling was
+  adopted for the oscillation test last session and not applied to the settle
+  detector, which is the twin that mattered for timing.
+
+**Original report follows.**
+
+**Status:** open · **Severity:** high · **Found:** Session 22, immediately
+after D40d — the operator's own explicit call: this needs designing
+properly, not repeating the same ad hoc register-nudging that produced a
+confusing, non-convergent picture in D40d
+
+**What was wrong with D40d's own method, stated plainly so it is not
+repeated.** D40d changed one register at a time, N=1–5 per configuration,
+against no pre-declared pass/fail bar, and kept moving to a new variable
+whenever the current one looked ambiguous. Given D40d's own data shows
+roughly a 40–60% failure rate at some settings, N=2–3 cannot tell a real
+fix from a lucky pair of repeats — several of D40d's "clean" results were
+almost certainly luck, not fixes, and the session's own conclusion (P=24
+kept, dead zone reverted, real state still unresolved) reflects that. This
+item exists to run the properly designed version.
+
+**Two independent deep-research passes (Claude and Gemini, 2 September
+2026, same prompt) converge on the same diagnosis and the same gap in
+today's own method** — full text kept in
+`docs/research/D40_resonance_research_claude.md` and
+`docs/research/D40_resonance_research_gemini.md` (Gemini's response was cut
+off mid-protocol by a 50,000-character paste limit; the missing tail is
+noted in the file, not silently absent). Both converge on:
+
+1. **The mechanism is more consistent with load-coupled mechanical
+   resonance (a two-mass system: motor+pulley vs. output+load, coupled
+   through the compliant belt) than with simple Coulomb stick-slip** —
+   non-monotonic register response, position-specific severity unrelated to
+   travel-limit proximity, ~40–60% intermittency, and reliable hand-damping
+   all match the resonance signature better than the friction one.
+2. **This is inferred, not confirmed, and today's own instrumentation
+   cannot confirm it.** Belt-transmission resonances typically sit in the
+   tens-to-hundreds of Hz; D40d's raw position polling ran at ~7–12 Hz
+   (80–150ms intervals) — far below the Nyquist rate needed, so it aliases
+   any true high-frequency oscillation into something that merely looks
+   like a slow, confusing wobble. **Confirming the mechanism, not guessing
+   at it, is Stage 0 below and is the single highest-value thing this item
+   does that D40d did not.**
+3. **Three concrete, cheap, never-tried levers**, all live-writable or
+   config-only, no reflash needed to test: **position D gain** (register
+   0x16, held at the factory default 32 all session — the literal textbook
+   damping term, direct electronic analog of the hand that reliably
+   suppressed this all night); **a softened final leg**
+   (`fine_approach_final_speed_dps`/`fine_approach_final_acceleration`,
+   built in D40c, never used — both reports independently flag the
+   overshoot-then-hard-reversal stop as a likely resonance-injection event,
+   which is consistent with reducing overshoot *distance* not helping in
+   D40d, since the excitation is in the stop, not the swing); **P lowered
+   further than D40d tried**, toward the LeRobot community's own validated
+   10–16 range (D40d only reached 16/24), accepting more steady-state droop
+   that the existing fine-approach mechanism is already built to correct.
+
+**Files:**
+- `tools/jitter_probe.py` (new this session, promoted from a scratch
+  script D40d built and validated live) — polls `output_deg`/`current_a`
+  continuously through a move and counts real direction reversals near
+  target, instead of trusting the firmware's own settle-completion event
+  (D40d confirmed that event is blind to sustained trembling — see D40,
+  `docs/history/CLOSED.md`). Use this, not `fine_approach_trial.py` alone,
+  for every trial in this item — `fine_approach_trial.py`'s own settle
+  wait is the exact metric this tool exists to not trust.
+- A new tool, to be built as Stage 0 below: a fast current/load logger.
+  `current_a` is already exposed by `/servo/state` (no new firmware) — the
+  gap is polling it fast enough, simultaneously with position, during a
+  known-bad trial, and telling a coherent oscillating trace apart from
+  sharp spikes concentrated at reversal moments only.
+- `sketch/src/Config.h`/`ServoController.{h,cpp}` — only if Stage 2's D
+  gain result is kept permanently; mirror the existing `kPositionGainP`
+  boot-write pattern added this session (same file, same discipline: bake
+  the kept value in, do not leave it live-only in EEPROM).
+- `python/.env`/`.env.board` — only if `fine_approach_final_speed_dps` or
+  `fine_approach_final_acceleration` is kept; both settings already exist
+  and are unit-tested, unused since D40c built them.
+
+**The protocol, in order — do not skip Stage 0, it is what D40d skipped.**
+
+- **Stage 0 — confirm the mechanism (prerequisite, ~30–45 min, decisive).**
+  Build a script that logs `current_a` (already exposed) alongside
+  `output_deg`, polled as fast as the HTTP/Bridge round trip allows, during
+  a reliably-reproducing bad trial (−60°, the D40d worst point, under the
+  same hand-plus-improvised-weight proxy load). **State the achieved
+  polling rate honestly against the ideal** (both research reports put true
+  belt resonance at 30–300 Hz, needing ≥60–600 Hz to resolve by strict
+  Nyquist — this project's own HTTP+Bridge path will likely not reach
+  that) — this test is not a full spectral confirmation, but it can still
+  tell a coherent, sinusoidal-ish current oscillation (resonance
+  signature) apart from sharp asymmetric spikes concentrated only at
+  direction-reversal moments (stick-slip signature), which is enough to
+  choose Stage 2a vs. 2b below with real evidence instead of inference.
+- **Stage 1 — read Stage 0's result and pick a branch**, stated before
+  starting, not decided after seeing which branch looks more convenient:
+  resonance signature → Stage 2a; stick-slip signature → Stage 2b.
+- **Stage 2a (resonance, expected) — test the three new levers, at real
+  statistical power this time.** One test point only, −60°, the point
+  D40d found fails most reliably — do not spread thin across many angles
+  the way D40d's own final sweep did. **N≥10 per configuration**, not
+  D40d's N=2–5 — the ~40–60% failure rate D40d measured means fewer
+  repeats cannot distinguish a real fix from a lucky run. **Declare the
+  pass bar before running each configuration**, in writing, in this
+  entry's own working notes: e.g. "0 of 10 trials show >3 reversals past
+  5s, or ≤1 does" — decided in advance, not adjusted after seeing the
+  data, which is what let D40d's goalposts drift. Test, in this order: (i)
+  D raised from 32 (try 48, then 64) alone; (ii) the final leg softened
+  (`fine_approach_final_speed_dps` set well below the move's own speed, or
+  `fine_approach_final_acceleration` set low) alone; (iii) **if both (i)
+  and (ii) individually help, do not stop there — run the small 2×2
+  factorial** (both low, both high, each alone) at N≥5 per cell. Testing
+  factors one at a time can miss real interactions between them and
+  produce a misleading conclusion — exactly the shape of confusion D40d
+  ran into jumping between P, MinStartForce, dead zone and overshoot
+  without ever checking whether they interacted. (iv) P lowered further,
+  toward 14–16, checked against the resulting steady-state droop.
+- **Stage 2b (stick-slip, if Stage 0 says so) — the friction-remedy path
+  D40d already ran is the relevant one.** Revisit dead zone (D40d's own
+  `2/2` result: 4 of 5 clean at the worst point) and `MinStartForce`
+  85–95 (D40d's own clean-ish, small-offset range) with the same N≥10
+  rigor Stage 2a specifies, rather than treating D40d's small-N results as
+  final.
+- **Stage 3 — only if Stage 2 does not converge to a pass**, probe the
+  velocity-loop registers both reports independently surfaced (0x25/speed
+  P, default 10; 0x27/speed I, default 200) — real but not documented in
+  an official English register table; change one at a time, reversibly,
+  and record the originals before writing anything.
+- **Stage 4 — bracket the real arm without it.** Repeat the best Stage 2
+  (or 3) configuration with a deliberately *exaggerated* bench inertia
+  (added mass at a longer lever than the improvised weight used in D40d)
+  to approximate the real arm's worst-case reflected inertia. A
+  configuration that holds across that exaggerated range is a defensible
+  real-arm starting point; one that does not means the fix needs D47's
+  real hardware regardless, and that should be said plainly rather than
+  assumed away.
+
+**Acceptance:** a configuration is found that passes its own pre-declared
+Stage 2/3 bar at −60° (N≥10) **and** does not regress the other points
+D40d already measured clean (0°, ±60°, ±90°, N≥3 each, confirming no
+regression rather than re-running a full campaign). That configuration is
+written permanently (`Config.h` and/or `.env`/`.env.board`, matching
+whichever settings changed) the same session it is confirmed, mirroring
+D40d's own persistence discipline. **This item does not require D47's real
+arm to close** — D47 stays open afterward regardless, as the final
+real-hardware confirmation; this item is about reaching a real,
+statistically credible answer on the mechanism and the best available
+proxy-load fix.
+
+**Related:** D40 (closed, `docs/history/CLOSED.md`), D47 (real-arm
+verification, stays open independently of this item's outcome).
+
+**Session 24 progress (3 Sept, 12:47–16:45) — checkpoint, not closed.**
+Plan file: `/home/egrisaru/.claude/plans/peaceful-whistling-candy.md` (Part A
+plain-language, Part B rigorous — both stay in sync, resume from there). The
+protocol was revised twice with the operator before/during the run; it now
+has **Steps 1–5** (not the original Stage 0/0.5/2/3/4 naming) with a
+**characterisation phase (Step 2) before any fix is tested** — the original
+plan went straight to three research-suggested levers, which the operator
+correctly called premature.
+
+- **Step 1 (instrument) — done, committed** (`d1db4be`, `103f164` on
+  `feature/jitter-experiment`). `tools/jitter_probe.py`: reversal scoring
+  now uses a 5–15s post-move window with no amplitude filter (real jitter
+  and encoder noise are both 1 count, so amplitude can't separate them —
+  period can); settle-short is its own recorded outcome; every trial
+  persists to `archive/jitter_trial_<label>.csv` and
+  `archive/jitter_trace_<label>.csv`; `--anchor` lets a trial reset to any
+  angle before its scored move (was hardcoded to 0, which made a
+  target of 0 an unscored no-op and fixed every approach to one
+  direction); current is now printed live. `tools/verify.py`:
+  368→379 (11 new tests), baseline updated.
+- **Pre-registration changed mid-session, evidence-driven — a third FAIL
+  condition added.** Position-only scoring is blind to correction that
+  never crosses a full 0.06° count: found live at +60° with fine approach
+  off, `reversals=0` in all 3 trials but `current_mean_a` 0.078–0.088A
+  (vs 0.000A for the same angle with fine approach on) and
+  `final_error_deg` degraded −0.01°→−0.25°. Outcome measure is now: (a)
+  reversals > `R_max`, (b) settled short (`>0.5°`), **(c) mean current in
+  the score window > `C_max`.** `R_max` and `C_max` are both still unset —
+  **Step 4 (noise-floor calibration) has not run.**
+- **Step 2 (characterisation) — substantially done, fine approach ON
+  (the restored default), rig attached throughout, N=3 per cell.** Full
+  data: `archive/jitter_trial_d48_step2_survey.csv` (63 rows, columns
+  normalized — the first 45 rows were written before `anchor_deg` existed
+  and have been backfilled with `anchor_deg=0.0`, their true value).
+
+  | Angle | Reversals (3 trials) | Verdict |
+  |---|---|---|
+  | −90° | 0,0,0,0,0 | clean |
+  | −60° | 15,16,0 | bad, 2/3 |
+  | −45° | 0,15,19 | bad, 2/3 |
+  | **−30°** | **22,16,16** | **bad, 3/3** |
+  | −15° | 2,0,0 | near-clean |
+  | 0° (both directions) | 0,0,0 | clean |
+  | +15° | 0,0,0 | clean |
+  | **+30°** | **17,21,17** | **bad, 3/3** |
+  | +45° | 0,0,0 | clean |
+  | +60° | 0,0,0 | clean |
+  | +90° | 3,0,0 | near-clean |
+
+  **±30° is the validated worst point** — 100% reproduction both
+  directions, current elevated ~0.04–0.05A when bad, well clear of the
+  travel extremes. Not a smooth function of angle or simple proximity to
+  the extremes — patchy and asymmetric. **This is the test point for
+  Step 3.** Direction-of-approach and move-size, the other two Step 2
+  factors named in the plan, are not yet separately run (the ±30°/0°
+  arrivals above incidentally cover a few anchor combinations, not a real
+  sweep of either factor).
+- **Real finding, not yet acted on beyond restoring the safer config:
+  fine approach OFF measurably worsens jitter, the opposite of the plan's
+  original H1.** Reproduction rate across the same 7-angle sweep: 43%
+  (9/21) with fine approach on vs. 71% (15/21) off — full data, same file,
+  `tag=fine_off_full_travel`. Mechanically sensible: fine approach is an
+  anti-backlash technique (always finishes from one direction); without it
+  the servo can hunt across the target from either side. `FINE_APPROACH_ENABLED`
+  is back to `true` in `python/.env` (matches the committed value — no
+  diff to carry).
+- **Environment, needed to resume on the board at all — took most of this
+  session's wall time.** (1) `adb devices` needs `adb kill-server && adb
+  start-server` most sessions. (2) The wired NIC (`enp158s0`, subnet
+  `192.168.10.0/24`, the relay path) has dropped link at least twice this
+  session — reseat the cable if `ping 192.168.10.60` fails. (3) **The
+  Docker container (`servo_mvp-main-1`) does not publish port 8000 to the
+  board's host** (`docker inspect servo_mvp-main-1 --format
+  '{{json .NetworkSettings.Ports}}'` → `{}`) — `adb forward tcp:8001
+  tcp:8000` alone reaches nothing. Fix each session: find the container's
+  bridge IP (`docker inspect servo_mvp-main-1 --format
+  '{{.NetworkSettings.Networks.servo_mvp_default.IPAddress}}'`, currently
+  `172.19.0.2`, may change on container recreation), then on the board
+  `nohup socat TCP-LISTEN:8000,fork,reuseaddr TCP:<that IP>:8000 >/tmp/socat_8000.log
+  2>&1 & disown`, then `adb forward tcp:8001 tcp:8000` on the workstation.
+  Confirmed this gives **96Hz** over USB vs **~4.5Hz** over the relay path —
+  worth doing before Step 3, which needs ≥40Hz. Not yet investigated why
+  this used to work without the `socat` step (Session 17's Q9) — a real
+  question, deliberately deferred rather than chased mid-session.
+- **Resume point: Step 3, the mechanism read, at ±30°.** Set up the USB
+  path per above, confirm ≥40Hz achieved, log position+current together
+  through a reliably-bad trial at 30°, read reversal period first (the
+  tell available at these rates), then current trace shape. Branch per the
+  plan: hunting → D gain and P; resonance → D gain, softened final leg, P;
+  stick-slip → `MinStartForce` 85–95.
+
+**Session 25 progress (6 Sept, resumed 13:06) — checkpoint, not closed.**
+New tool: `tools/resonance_campaign.py` (built this session, imports
+`jitter_probe.py`'s measurement primitive) — drives the whole Step 3–5
+protocol unattended with per-trial checkpoint/resume, a temperature
+cooldown pacer, and a hard 50°C safety abort. Findings persist to
+`archive/d48_campaign_findings.json`.
+
+- **Step 3 (mechanism) — confirmed: M1, quantisation-boundary loop
+  hunting**, not resonance or stick-slip. High-frequency (~100Hz, USB
+  path) position+current trace at +30° showed a reversal period identical
+  to three significant figures across three separate trials (0.2668s,
+  0.2670s, 0.2668s) with modest oscillating current (0.026–0.058A) — a
+  deterministic digital-control limit cycle from sensor quantisation, not
+  noise or a mechanical mode. Root-caused mathematically: the D-gain term
+  computes a derivative off a coarse (0.06°) position signal, so a single
+  count flip near the target is amplified into a real corrective kick;
+  raising D amplifies that kick, lowering it should shrink it — the
+  literature calls this whole class "quantizer-induced limit cycling."
+- **Step 4 (noise floor) — Session 24's N=3 survey shown unreliable, full
+  re-survey run at N=10.** +45° had been called clean (0/3) in Session 24;
+  at N=10 it failed 8/10. Full 11-angle re-survey, N=10, current registers,
+  fine approach on: **clean** = −90,−30,−15,0,+15,+30,+90; **bad** =
+  −60,−45,+45,+60 (worst: +60°, 10/10). `R_max=3`, `C_max=0.0221A` locked
+  from the clean set. −30°/+45° reversing status between sessions (and
+  even between re-runs the same day) confirms the fault is patchy and
+  intermittent, not a fixed function of angle at small N.
+- **Move-size, not direction, is the clearest lever found all session —
+  and it has a real limit.** Isolating direction (two 30°-away anchors,
+  opposite sides) vs. move size (~5° vs ~150°) at both ±60°, N=5 then
+  confirmed at N=10: a short final approach improved +60° (7/10→4/10
+  reversals-bad) but did **nothing at −60°** (10/10 unchanged). Direction
+  alone showed no consistent effect at either angle. **+60° and −60° are
+  not mirror images** — −60° failed under every direction, every move
+  size, every register and dead-zone value tried today; +60° responded
+  partially to several. This asymmetry was not explained and points to a
+  physical cause (belt tension/backlash uneven side-to-side) rather than
+  the general M1 mechanism, which should be symmetric.
+- **Register sweep (P/D gain, 7 configs × N=10 at +60°) — nothing passed;
+  the one promising result did not replicate.** `baseline(P24,D32)`=7/10,
+  P20=7/10, P16=5/10, P12=5/10, D24=5/10, **D16=2/10 (best)**, D8=9/10
+  (worse than doing nothing — confirms D is non-monotonic, lower is not
+  simply better). A follow-up bracket around D16 (D14/18/20, N=8) came
+  back 7/8, 8/8, 6/8 — **D16 is an isolated spike surrounded by near-total
+  failure on both sides**, the signature of a lucky N=10 draw, not a real
+  optimum (Fisher's exact test: D16-vs-baseline p=0.070, not significant;
+  D16-vs-neighbour-D24 p=0.35, indistinguishable). The D16+P16 combination
+  also failed (5/8). **No register value found today reliably helps.**
+- **Fine-approach final-leg tuning (speed, acceleration, overshoot
+  distance) — every deliberate change was worse than the untouched
+  default.** Read `motion_service.py`'s `_fine_approach()` directly before
+  testing: the final corrective leg only starts once the servo's own
+  `moving` flag says the overshoot leg stopped — the same flag already
+  known blind to real settling (why `jitter_probe` exists at all), so a
+  big preceding move could leave real residual energy the firmware already
+  calls "at rest." That motivated testing the final leg's own dynamics,
+  N=8/arm at baseline registers: unsoftened(defaults)=4/8 (the best of the
+  four), softened-moderate(10°/s,accel20)=8/8, softened-aggressive(5°/s,
+  accel10)=6/8, reduced-overshoot(0.5° vs 1.5°)=8/8. No clean trend, no
+  arm beat baseline.
+- **Overall move-speed test (30 vs 15°/s) — inconclusive, not usable.**
+  Ran on top of the (already-discredited) D16 config, and a ~70s Bridge
+  RPC desync mid-test (`servo_read`/`servo_read_tuning` timeouts, one
+  "unknown msgid" log line, self-recovered) coincided with anomalously
+  high reversal counts (29–35, well above anything else measured all
+  session) in exactly the affected trials. Data recorded but excluded from
+  conclusions.
+- **Dead zone (the deliberately-deprioritized last resort) — partial help
+  at +60°, none at −60°, real accuracy cost.** N=10 per (value × angle) at
+  baseline P/D: `dz=1`: +60°=4/10 fail (mean/max abs error 0.042°/0.070° —
+  about one sensor count, negligible), −60°=10/10 fail (unchanged). `dz=2`:
+  +60°=2/10 fail (error 0.114°/0.190°), −60°=10/10 fail **and** error
+  spikes to 0.277°/**1.480° max** — a real, large positioning error for
+  zero jitter benefit at that angle. **Neither value passes the
+  pre-registered ≤1/10 bar anywhere.** Operator's read: dz 1 or 2 is a
+  credible partial candidate for +60° specifically (prefer 1 for its much
+  smaller accuracy cost, unless a future test shows 1 genuinely can't
+  reach the bar and 2 can); −60° stays unsolved by dead zone at any value
+  tried.
+- **Real infrastructure bugs found and fixed this session, all in
+  `tools/resonance_campaign.py`:** a step-alignment bug (an arithmetic
+  anchor offset landing off the servo's 0.06° grid, rejected with a 422 —
+  fixed by snapping every computed anchor to the nearest valid step); a
+  silently-truncated JSON checkpoint (a plain in-place write raced with
+  this mount's own write-back caching at least once — fixed with a
+  write-temp/fsync/atomic-rename pattern, applied to both the checkpoint
+  file and `.env` writes); a duplicate `socat` listener race (a plain
+  `pkill` plus a fixed sleep left two processes bound to the same port,
+  causing intermittent random-looking timeouts — fixed with `SIGKILL` plus
+  polling for actual death before rebinding, and a "try the existing
+  bridge first" cheap path before tearing anything down); an app-restart
+  path that could leave the container fully stopped without recovering
+  (the network-only retry logic didn't check whether the app itself had
+  come back — fixed to detect and re-issue `app start` specifically).
+  Every phase (survey, direction/size, register sweep, bracket, combo,
+  final-leg, speed, dead zone) now checkpoints per-trial and resumes
+  exactly where it left off after any crash.
+- **Real safety incident, unrelated to the servo work: the board's
+  Ethernet shield physically shorted mid-session** (operator described
+  "two metals touching"; a minor burn injury while handling the hot
+  shield). Diagnosed as a hardware fault specific to that shield unit, not
+  a code defect — the sketch hardcodes its own MAC/IP (`App.cpp:24-27`,
+  never read from shield hardware) and correctly applies the documented
+  `SpiRemap` double-call workaround (`NetworkRelay.cpp:36-43`) for this
+  board's known D11–D13/ICSP SPI-routing quirk; the replacement shield
+  worked immediately under the same, unchanged code. A `MAX_SAFE_
+  TEMPERATURE_C=50` abort and a softer cooldown pacer were added to
+  `resonance_campaign.py` after a separate, real 55°C servo-temperature
+  trip during heavy testing later the same session — both trips
+  self-resolved with no fault flags, but hardware runs are attended-only
+  from this point on, not left running unsupervised.
+- **Resume point, tomorrow:** (1) test the best-performing P/D value found
+  so far combined with dead zone (1 and 2), since neither lever alone
+  passes but they act on different parts of the loop; (2) investigate
+  −60° as its own, separate item — nothing electronic tried today moved
+  it at all, which points toward a physical cause D47's real-load test (or
+  a direct rig inspection) is better placed to answer than more register
+  or approach tuning; (3) a second deep-research prompt was prepared
+  (`docs/research/D48_followup_research_prompt.md`) asking specifically
+  about the non-monotonic D response, why softening the final leg made
+  things worse, the untried velocity-loop registers (0x25/0x27) and
+  acceleration ramp (0x29), and the unexplained left/right asymmetry —
+  Gemini's answer is in (see below); Claude's is still pending.
+
+**Session 26 (7 Sept) — re-analysis of Session 25's own archive invalidated
+part of its basis; a new regimen was designed and built, not yet run.**
+Pre-registration: `docs/sprint/D48_S26_REGIMEN.md`. Runbook for the executing
+agent: `docs/sprint/D48_S26_RUNBOOK.md` — deliberately self-contained, so any
+model or harness can run it cold without this session's context.
+
+- **Every Session 25 campaign trial ran at ~10.4Hz, not the fast path.**
+  `resonance_campaign.py` calls `jp.probe()` without passing `poll_seconds`,
+  so all 500+ trials silently used `DEFAULT_POLL_SECONDS = 0.08` regardless
+  of the USB bridge the tool builds. The only ~98Hz blocks are the Step 3
+  mechanism read and the Step 4 noise floor.
+- **Sampling rate is not the explanation for the difference, so the
+  behaviour itself drifts.** Decimating the 98Hz traces to 8–12Hz, including
+  with ±60% timing jitter, reproduces the score exactly (33 reversals,
+  0.267s period) — the detector is rate-robust. Yet the same angle, anchor
+  and registers gave **+30°: 33 reversals at 13:12 and 0 at 16:42**; **+45°:
+  32.5 then 12.5.** Anchor and target were verified from the trial CSVs;
+  the registers are inferred from the session record, not re-read.
+  Poll rate and time-of-day are perfectly confounded in
+  every existing trial, so *either* fast polling induces the oscillation
+  *or* the machine drifts over hours. Existing data cannot separate them.
+- **Consequence: Session 25's between-configuration comparisons are
+  uninterpretable as they stand**, not wrong. Each ran as a contiguous block
+  at a different time of day, so each is confounded with drift — which
+  economically explains the D16 spike, ±30 flipping status, and +45 clean at
+  N=3 then bad at N=10. They need re-running under a drift-resistant design,
+  not re-deriving.
+- **Twin path extended:** velocity-loop `speed_p` (0x25) and `speed_i` (0x27)
+  are now exposed through `TuningSnapshot`, the Bridge payload (7→9 fields),
+  the repositories, schemas and both diagnostic routes. Verify 379→383,
+  all green. A stale sketch now fails the read loudly rather than parsing
+  short. The board must restart once so the sketch recompiles.
+- **New tool `tools/d48_s26_campaign.py`:** randomised complete block design
+  (every arm once per replicate, fresh random order), an in-block baseline as
+  a control chart, per-trial temperature, sham register writes so arms differ
+  only in value, explicit poll rate verified against a 40Hz floor, and
+  pre-declared promote/drop/re-screen stopping that computes its own gate
+  verdicts. `jitter_probe.py` gained a window parameter, per-trial
+  temperature and a per-move acceleration.
+
+**Both deep-research answers to the follow-up prompt are in**
+(`docs/research/D48_followup_research_gemini.md`, 6 Sept;
+`docs/research/D48_followup_research_claude.md`, 7 Sept). Register numbers
+cited (Speed P=0x25/37, Speed I=0x27/39, Acceleration=0x29/41, CW/CCW
+dead-zone=0x1A/0x1B/26/27) checked directly against
+`sketch/src/ServoRegisters.h` and are exactly right in both — real
+grounding, not generic pattern-matching.
+
+**They disagree on the root cause and agree on the next experiment.**
+Gemini argues the 0.267s cycle is a sensor-quantization limit cycle
+(describing-function analysis on the 0.06°/count position signal). Claude
+argues that frequency is 2–3 orders of magnitude too slow for a pure
+position-quantizer cycle in a fast inner loop, and instead points to
+**velocity-loop integrator (0x27/39, default 200) winding up against
+stiction/deadband** — citing Peterchev & Sanders' own paper (which Gemini
+also cites) as actually describing an integrator-plus-quantizer mechanism,
+not quantization alone. Both papers independently converge on the same
+first move regardless of which is right: **sweep Speed I (0x27) down from
+200** (Claude: 150/100/50/25, N=20; Gemini: to 0) — this is the
+discriminating experiment, not a shared guess to adopt on faith. If
+lowering it doesn't change the failure rate or the 0.267s period, the
+quantization-only story is back; if it does, the integrator-hunting story
+is confirmed.
+
+Two concrete, untried, cheap leads worth running before or alongside that:
+**(a)** hold at +60° and −60° with zero commanded motion and compare
+steady-state current — Gemini's top-ranked asymmetry explanation
+(gravitational/load bias) and Claude's #1-ranked one (same test) agree
+here, and it costs nothing; **(b)** a re-datum test moving the servo's zero
+so the same output angle sits at a different encoder count (Claude, Q4) —
+cheaply separates encoder-eccentricity/cogging causes of the ±60°
+asymmetry from a gravity/belt-tension cause, before assuming either.
+
+One point to weigh from Claude worth surfacing: it flags the 0.267s period
+as diagnostic of the *integrator*, not the belt — so any dwell-before-
+final-leg fix (from either report) should be sized from a directly
+measured belt ring-down frequency, not from 0.267s. And one proposal to
+push back on rather than adopt as written (from Gemini): host-side "zero
+torque limit to lock position" contradicts the paper's own leading
+asymmetry hypothesis (a gravitational load would sag under zero torque,
+not hold) — if pursued, needs a relaxed non-zero holding value confirmed
+empirically, not literally zero.
+
+**Session 26 continued (finer sweep & multi-angle validation) — 7 Sept 2026**
+Continuation runbook: `docs/sprint/D48_S26_RUNBOOK.md`. Executed B7 (12-level
+`min_start_force` dose-response), B8 (dead zone × floor factorial), a 7-angle
+confirmatory validation sweep (63 trials), and a fine-bracket sweep `[45, 50, 55]`
+across 8 angles (48 trials).
+
+- **B7 dose-response confirmed `min_start_force` as the sole limit-cycle driver:**
+  B3–B6 had already shown all PID gains futile while `min_start_force` was held at 150.
+  Sweeping downward from 150 revealed a sharp bifurcation between 85 and 100:
+
+  | `min_start_force` | Settled? | Median Swing | Drive Duty | On-Target Current | Median Abs Error |
+  | :---: | :---: | :---: | :---: | :---: | :---: |
+  | 0 | yes | 0.000° | 1.41% | 0.0000A | 0.060° (1.0 count) |
+  | 10 | yes | 0.000° | 5.69% | 0.0000A | 0.050° (0.8 counts) |
+  | 20 | yes | 0.000° | 23.50% | 0.0000A | 0.050° (0.8 counts) |
+  | 30 | yes | 0.030° | 50.84% | 0.0000A | 0.070° (1.2 counts) |
+  | 40 | yes | 0.000° | 0.00% | 0.0000A | 0.010° (0.2 counts) |
+  | 55 | yes | 0.000° | 0.00% | 0.0000A | 0.010° (0.2 counts) |
+  | 70 | yes | 0.000° | 1.31% | 0.0000A | 0.010° (0.2 counts) |
+  | **85** | **yes** | **0.030°** | **40.10%** | **0.0035A** | **0.010° (0.2 counts)** |
+  | 100 | NO | 0.120° | 93.18% | 0.0130A | 0.030° (0.5 counts) |
+  | 115 | NO | 0.180° | 91.75% | 0.0130A | 0.010° (0.2 counts) |
+  | 130 | NO | 0.270° | 94.26% | 0.0200A | 0.080° (1.3 counts) |
+  | 150 (baseline) | NO | 0.360° | 93.15% | 0.0230A | 0.070° (1.2 counts) |
+
+  The tool selected `b7_best_min_start_force = 85` (highest settled value to maximize holding stiffness).
+- **B8 interaction (dead zone × floor):**
+  Factorial crossing {85, 150} × {dz 0, 1, 2} at −60° (36 trials, N=6/arm):
+  `baseline_150_dz0`: 6/6 oscillating (1.0 rate).
+  `msf150_dz1`: 2/6 oscillating; `msf150_dz2`: 1/6 oscillating (deadband alone is inconsistent at 150).
+  `msf85_dz0`: 4/6 oscillating (boundary jitter at dz=0).
+  `msf85_dz1`: **0/6 oscillating** (p=0.00108 vs baseline, `BETTER_THAN_BASELINE`, median error 0.010°).
+  `msf85_dz2`: **0/6 oscillating** (p=0.00108, median error 0.020°).
+- **7-Angle Confirmatory Validation Sweep (63 trials, N=3 per cell across 7 angles):**
+  Evaluated `baseline_150_dz0`, `msf85_dz1`, and `msf40_dz0` across [−90°, −60°, −45°, 0°, +45°, +60°, +90°]:
+  1. *Baseline proves systemic:* Baseline oscillated at 100% of trials across ±45° and ±60° (20–33 reversals, ~0.045A current); only settled at 0° and +90°. The fault was never localized to −60°.
+  2. *`msf85_dz1` failed on positive side:* Oscillated 2/3 at +45° and 2/3 at +60° (20–22 reversals). 85 is too aggressive for the positive side due to mechanical load asymmetry.
+  3. *`msf40_dz0` 100% clean everywhere:* **0/21 failures across all 7 angles**. However, at +60° opposing gravity moment, low holding torque allowed 3.2 counts (−0.190°) of steady-state gravity droop.
+- **Fine-Bracket Sweep `[45, 50, 55]` (48 trials across 8 angles):**
+  Tested zero-deadband candidates `msf45_dz0`, `msf50_dz0`, `msf55_dz0`:
+  `msf45_dz0` achieved **0/16 failures across all 8 angles** (100% clean).
+  High-frequency (100Hz) trace inspection of isolated "reversals" at 50 and 55 revealed **1-bit digital encoder quantization noise**, not physical limit cycles: unique positions in the 10s post-move window were confined strictly to a single 0.060° count transition (e.g. [-30.02°, -29.96°]) drawing <0.008A (<100mW at 12V), with zero motor heating (steady 34°C) and zero mechanical swing.
+- **Engineering Decision on Deadband & Floor:**
+  `dz = 0` is retained by design: introducing `dz = 1` adds ±0.060° to ±0.120° of backlash/slop without physical necessity.
+  Quiescent draw at `dz = 0` is <8mA (<0.1W), causing zero thermal or mechanical wear.
+  `min_start_force = 45–50` provides complete limit-cycle immunity across all angles on this proxy.
+- **What this establishes and does not establish:**
+  Establishes on the bench proxy that `min_start_force` is the sole governing parameter of the limit cycle, and reducing it from 150 to ~45–50 eliminates settling jitter across all angles.
+  Does **not** confirm real-arm holding stiffness: the real robotic arm carries significantly higher gravitational torque, payload, and joint friction.
+- **Next Step:**
+  D47 real-arm verification. Under D47, test `min_start_force` on the physical arm; because higher external load and friction increase physical damping against limit cycles, the real arm will safely tolerate a higher floor to resist gravity droop without re-entering limit cycles.
+- **Deviations & Incidents:**
+  One transient serial RPC timeout occurred at 18:25:46 during heavy continuous 46Hz polling; resolved via clean app restart (`arduino-app-cli app restart user:servo_mvp`), and sweep resumed seamlessly.
+
+**Verification of the above, same session (Claude), against the raw CSVs —
+do not close D48 on this yet.** Two things checked out: `msf45_dz0` really is
+16/16 clean in the fine bracket, and the two "failures" at 50/55 really are
+1-count sensor noise (swing exactly 0.06°, current ~0.005A, nothing like a
+real cycle). But: **`b7_best_min_start_force=85` is wrong** — the campaign
+tool's picker uses *median* swing across N=6, and at msf=85 the raw trials
+are 3 clean / 3 oscillating (27, 28, 12 reversals) — a coin flip that a
+median hides, the same trap that produced the D16 spike in Session 25.
+`msf85` alone (not paired with `dz=1`) fails 4/6 in B8's own data. **Fix
+needed in `tools/d48_s26_campaign.py`'s `_record_dose_response`: pick by the
+same pass/fail proportion the rest of the tool uses, not by median swing.**
+
+**Bigger gap: nothing today reached the pre-registered confirmatory N.** B7/B8
+ran N=6, the multi-angle sweep N=3/angle, the fine bracket N=2/angle. The
+regimen (`docs/sprint/D48_S26_REGIMEN.md`) calls for N≥10–16 with a
+Fisher-exact bar before anything counts as confirmed. `msf45`'s 16/16 is one
+clean draw at n=2/angle, not a confirmed result yet — promising, not proven.
+
+**Resume point, tomorrow morning:**
+1. Fix the selector bug above (small, isolated, ~10 min).
+2. Run one confirmatory block: `msf=40` and `msf=45`, N=10–16, at −60° and
+   one positive angle (+45°) — the angles that actually failed other
+   configs. `tools/d48_s26_campaign.py` already has everything needed;
+   this is a new block, not a re-run of B7/B8.
+3. Only after that passes: bake the chosen `min_start_force` into
+   `sketch/src/Config.h`/`ServoController` (mirrors the existing
+   `kPositionGainP` boot-write pattern) and update `python/.env`/`.env.board`
+   if `min_start_force` needs to differ from the servo's own EEPROM default.
+4. **A real incident happened this session, documented for the record**: a
+   manual test at `min_start_force=500` drove the servo into a divergent
+   oscillation, saturated the serial bus, defeated the read-based safety
+   guards (including restore-on-exit), and the value was still in EEPROM
+   after a power cut. Recovered with the new `tools/d48_recover_registers.py`
+   (waits for the servo, cuts torque, rewrites the floor, before anything can
+   drive again). Root cause: 50% of full drive on a ~345:1 reduction injects
+   more energy per kick than friction removes — a divergent, not bounded,
+   cycle. The campaign tool now hard-refuses any write above 150
+   (`MAX_WRITABLE_MIN_START_FORCE`) regardless of what a block asks for; do
+   not raise that ceiling. No physical damage found on inspection.
+
+**Session 27 (8 Sept) — prep only, no hardware touched, resume-point items 1
+and 2 above prepared for handoff, not yet run.**
+
+- **Item 1 fixed.** `_record_dose_response` picked "best" by median swing
+  across N=6, which is exactly what let `min_start_force=85` (3 clean / 3
+  oscillating) read as settled. It now reads the `status` field
+  `_record_arm_comparison` already computes for the same block (Fisher exact
+  against the in-block baseline — the same test every other block in this
+  tool decides an arm by) and only accepts `MEETS_ACCEPTANCE_BAR` or
+  `BETTER_THAN_BASELINE`. `SWING_SETTLED_THRESHOLD_DEG` removed, unused.
+- **Item 2 built as a new block, `b9`, in `tools/d48_s26_campaign.py`** —
+  not a hand-run script. Tests `min_start_force` 40 and 45 (the fine-bracket
+  sweep's own favourites) against the 150 baseline, at −60° and +45°, using
+  the tool's existing sequential promote/drop/re-screen rule up to N=16.
+  Run with `python3 tools/d48_s26_campaign.py --only b9 --skip-preflight`.
+  Documented in `docs/sprint/D48_S26_RUNBOOK.md`'s own "B9" section, written
+  to the same self-contained, no-judgment standard as the rest of that file
+  (§9's orchestration contract) so it can be handed to an executing agent
+  cold.
+- **16 new unit tests, `python/tests/unit/test_d48_s26_campaign.py`** —
+  synthetic-data only, no hardware: the exact regression (a 3/6 coin-flip
+  arm must not beat a clean arm), `fisher_exact_one_sided`,
+  `is_oscillating`, `summarise`, and `screening_arm_filter`'s promote/drop
+  boundaries. `tools/verify.py`: 383→399, baseline updated; native/bridge/
+  client-behaviour unchanged.
+- **Not run.** No board access from this session; the run itself is being
+  handed to an executing agent per the runbook's own design (§9) — the
+  operator must be physically present per the standing attended-only rule
+  (Session 25's shield incident) before `--only b9` is actually invoked.
+- **Left deliberately alone, out of scope for this pass:**
+  `screening_arm_filter`'s re-screen branch (`osc` computed from
+  `trials[:SCREEN_N]`, i.e. always the same first six, never the second
+  batch collected during a re-screen round) looks like it may not use the
+  extra six trials it collects before deciding — noticed while reading the
+  function to build B9 on top of it, not verified against a concrete
+  counterexample. Did not touch it: B3–B6 already ran and are recorded
+  above, and reinterpreting their FUTILE calls needs a deliberate look, not
+  a same-session tuck-in. Worth a dedicated look before this tool is relied
+  on for another promote/drop decision.
+
+**Session 26 continued (B9 confirmatory) — 8 Sept 2026**
+Runbook: `docs/sprint/D48_S26_RUNBOOK.md` §4 (B9 section). Operator present,
+app restarted via `--restart-app`, preflight passed (103.5 Hz, all registers
+read). Ran `python3 tools/d48_s26_campaign.py --only b9 --restart-app`.
+Deviation from the runbook's literal command: `--restart-app` used instead of
+`--skip-preflight` because the app was off at session start, not merely
+restarted — preflight ran and passed, so this is strictly more conservative,
+not a skip.
+
+B9 tests `min_start_force` 40 and 45 against the 150 baseline at two angles
+(−60° and +45°), N=16 each (both arms promoted from N=6 screening at both
+angles — no arm was dropped early). Fisher exact p-values against the
+in-block baseline.
+
+**b9_m60 (−60°) dose-response:**
+
+| value | status | osc/n | swing° | drive_duty | on_target_A | abs_err° |
+|---|---|---|---|---|---|---|
+| 40 | `MEETS_ACCEPTANCE_BAR` | 0/16 | 0.000 | 87.95% | 0.0000 | 0.070 |
+| 45 | `MEETS_ACCEPTANCE_BAR` | 0/16 | 0.000 | 94.40% | 0.0000 | 0.070 |
+| 150 | `BASELINE` | 16/16 | 0.300 | 93.68% | 0.0320 | 0.060 |
+
+Comparisons: msf_40 `MEETS_ACCEPTANCE_BAR` (0/16 osc, p=1.66×10⁻⁹),
+msf_45 `MEETS_ACCEPTANCE_BAR` (0/16 osc, p=1.66×10⁻⁹). Baseline oscillated
+every trial (16/16).
+
+**b9_p45 (+45°) dose-response:**
+
+| value | status | osc/n | swing° | drive_duty | on_target_A | abs_err° |
+|---|---|---|---|---|---|---|
+| 40 | `MEETS_ACCEPTANCE_BAR` | 0/16 | 0.000 | 100.00% | 0.0000 | 0.180 |
+| 45 | `MEETS_ACCEPTANCE_BAR` | 0/16 | 0.000 | 100.00% | 0.0000 | 0.180 |
+| 150 | `BASELINE` | 12/16 | 0.120 | 90.49% | 0.0200 | 0.030 |
+
+Comparisons: msf_40 `MEETS_ACCEPTANCE_BAR` (0/16 osc, p=8.06×10⁻⁶),
+msf_45 `MEETS_ACCEPTANCE_BAR` (0/16 osc, p=8.06×10⁻⁶). Baseline oscillated
+12 of 16 trials (4 clean — +45° reproduces less reliably than −60°, which
+oscillated 16/16).
+
+**Accuracy trade-off.** Both test values eliminate oscillation completely at
+both angles (0/16 at full confirmatory N), but the median absolute final
+positioning error is larger than the oscillating baseline: 0.070° vs 0.060°
+at −60°, 0.180° vs 0.030° at +45°. The oscillation itself produces swing
+(0.300° at −60°, 0.120° at +45°) that is larger than the static positioning
+error at either test value, but the static droop at +45° (0.180°) is
+non-trivial. The tool reports no single `b9_best_min_start_force` — the two
+angles are reported and judged separately.
+
+**Registers restored** to baseline on exit: `position_p=24 position_d=32
+position_i=0 min_start_force=150 cw_dead_zone=0 ccw_dead_zone=0 speed_p=10
+speed_i=200`. Several timeout reconnects during the run (register write
+timeouts, all recovered on first retry, no bridge rebuild needed). No
+temperature abort, no current abort, no gate abort.
+
+**What this does and does not establish.** Both `min_start_force=40` and
+`min_start_force=45` met the pre-registered acceptance bar at full
+confirmatory N=16 at both angles tested (−60° and +45°). This does not
+confirm the fix holds at the other angles Session 25 characterised (0°, ±90°),
+under the real arm's load, or over a longer duration than the 15s scoring
+windows used. A good number at two bench-proxy angles is not "solved."
+
+**Next step.** Per D48's own acceptance criterion: a no-regression check at
+the remaining angles Session 25 characterised (0°, ±45°, ±60°, ±90°), and
+D47's real-arm verification, which stays open regardless of this result. D48
+remains open pending that regression check.
+
+**Session 27 continued (8 Sept) — the no-regression check above already
+exists in the archive; it breaks the 40/45 tie B9 left open, and
+`min_start_force=40` is now baked in permanently.**
+
+- **The regression check B9's write-up called for was already run, by two
+  other tools this session's own resume list didn't cross-reference.**
+  `tools/d48_multi_angle_sweep.py` (7 angles × N=3, randomized per
+  replicate, same baseline registers as B9) and `tools/d48_bracket_sweep.py`
+  (8 angles × N=2, same design) both ran earlier the same day and are in
+  `archive/d48_multi_angle_findings.json` /
+  `archive/d48_bracket_findings.json`. Re-read directly (not from their own
+  prose summaries):
+
+  | Candidate | Broad-angle coverage | Oscillating | \|final_error\|≥0.3° |
+  |---|---|---|---|
+  | `msf40_dz0` | 7 angles × N=3 (0°,±45°,±60°,±90°) | 0/21 | **0/21**, max 0.19° |
+  | `msf45_dz0` | 8 angles × N=2 (bracket sweep only) | 0/16 | **3/16**, up to 0.48° |
+
+  **`min_start_force=45` was never tested in the 7-angle sweep at all** — its
+  only broad-angle evidence is the smaller bracket sweep, where it produced
+  three real accuracy misses (servo stops 6–8 counts short, `reversals=0` so
+  invisible to the oscillation check) that the bracket sweep's own write-up
+  did not surface, because that write-up only judged oscillation.
+  `msf40_dz0` has no such misses in 21 trials, worst case 0.19° (the known
+  +60° gravity droop, already understood).
+- **This means B9's tie is not a real tie.** At the two angles B9 tested
+  head-to-head, 40 and 45 are identical (0/16 oscillating, same median
+  error). The tie only breaks once the broader-angle accuracy data — which
+  B9 could not see, since it only ran two angles — is brought in. 40 wins on
+  that data; 45 does not have equivalent data to win on.
+- **A limitation in `_record_dose_response`'s corrected picker, worth
+  flagging so it is not trusted blindly next time:** the fix landed earlier
+  this session (median-swing → pass/fail proportion) only changed how it
+  judges *oscillation*. It still has no accuracy term, so it would still
+  pick 45 over 40 on today's B9 data alone — the deciding evidence lives in
+  a different tool's archive the picker never reads. `b9_*_best_min_start_force`
+  in the findings file is therefore not a verdict on its own; the accuracy
+  cross-check above is what actually decided this.
+- **Neither `d48_multi_angle_sweep.py` nor `d48_bracket_sweep.py` records
+  `settled_short`** — their trial records only carry `reversals`,
+  `current_mean_a`, `swing_deg`, `final_error_deg`. "Clean" from those two
+  tools means "did not oscillate," not "settled." Inferred rather than
+  measured: msf40_dz0's 0.19° max clears the pre-registered 0.5°
+  settled-short bar comfortably.
+- **Live register readback, same session, before the permanent write:**
+  `min_start_force: 150`, no fault flags, `locked: false` — confirms B9 left
+  the servo at the documented baseline, nothing stranded.
+- **`min_start_force` was closed on `Config.h`-side only** — it has no
+  `python/.env`/`.env.board` entry to update (checked directly, not
+  assumed). `sketch/src/Config.h::kMinStartForce` changed 150→40, mirroring
+  the `kPositionGainP` boot-write pattern. `tools/verify.py`: 399/194/106,
+  unchanged — this is a sketch constant, invisible to the Python suite and
+  not natively testable (same caveat as `kPositionGainP`).
+- **Not closed yet, deliberately: the operator is running their own manual
+  angle sweep on the reflashed firmware before this item closes.** Board
+  needs `arduino-app-cli app restart user:servo_mvp` to pick up the
+  `Config.h` change (sketch recompile) before that sweep is meaningful.
+  +60° is the one angle worth deliberately including — it is msf40's own
+  worst accuracy point (0.19° droop, gravity-related) and was historically
+  the worst oscillation point at baseline.
+
+**Session 27 continued, same day — the manual sweep above found a real
+defect the closing decision missed. Reopened, redesigned, run to a decision.
+Not closed — facts only below, for next session's own analysis.**
+
+**What reopened it.** Commanding −75° repeatedly (identical target,
+re-sent) landed at three different positions — −74.55°, −75.09°, −75.15° —
+never converging. Decoded against `motion_service.py::_fine_approach()`:
+the final corrective leg always travels *against* the overshoot direction,
+so which side it arrives from is decided by wherever the move started, not
+fixed. The whole point of an anti-backlash approach is a fixed arrival
+side; this one never had one. `_fine_approach`'s final leg also only checks
+the servo *acknowledged* the last command, never that it *arrived* —
+no software readback, no retry.
+
+**Tool built:** `tools/d48_decisive.py` — one self-branching script,
+checkpointed per trial, with phases P1 (does arrival direction explain the
+miss?) → P2A/P2B (branch on P1's verdict, confirm or search a floor) → P3
+(emulate a host-side verify-and-correct and see if it converges). Pass gate
+throughout: no oscillation **and** every landing within 0.12° (the
+operator's own number). Full design rationale in the tool's own docstring.
+
+**P1 result: `SIGN_DOMINANT`.** Arrival direction decides the miss, and the
+good side flips with the angle's sign — arrive **up** on negative angles,
+**down** on positive. Pooled test alone read `NONE` (p=0.92, an artifact of
+a real opposite-signed effect averaging to zero); per-sign: negative
+p=1.3×10⁻⁶, positive p=0.0052. 60 trials, floor 45.
+
+**Real defects found and fixed during the run itself** (each is a fact
+about the tool's own history this session, not a conclusion about the
+servo):
+1. Test suite (`test_d48_decisive.py`) called `decide()`/`verdict_floors()`
+   on synthetic dicts; those functions `save_findings()` unconditionally to
+   the *shared* path, so running pytest was silently overwriting the live
+   run's own findings file. Fixed with an autouse `monkeypatch` fixture
+   redirecting `FINDINGS_PATH` to a temp file for every test in the module.
+2. The oscillation current-threshold was a flat constant calibrated from
+   quiet angles (0A there); at loaded angles (gravity-borne holding
+   current) it flagged a *motionless* trial (reversals=0, swing=0°) as
+   oscillating purely from current. Fixed to reference each angle's own
+   measured holding current.
+3. `verdict_p1`'s effect classification tested only the pooled up/down
+   comparison; a real, opposite-signed effect (see P1 above) pools to
+   "no effect." Added a `SIGN_DOMINANT` classification requiring both
+   halves individually significant, checked ahead of the pooled test.
+4. Re-send landings were accepted after 1.2s of quiet **position** only
+   (`jp.reset_to`'s own constant, meant for confirming an anchor was
+   reached, not for scoring a pass/fail decision). Raised to 3.0s and added
+   an independent **current**-quiet requirement, directly on the operator's
+   stated concern that commands were too rapid to trust.
+5. **Operator's own final rule, adopted verbatim:** oscillation is decided
+   by reversals alone; current does not gate pass/fail at all, at any
+   level ("even 0.2A isn't high, as long as it doesn't move and it's
+   accurate"). `is_oscillating` rewritten accordingly. Current is still
+   recorded on every trial and surfaced as a non-gating `passing_but_strained`
+   diagnostic so an accurate-but-straining trial stays visible without
+   failing it.
+6. `camp.preflight()` (from `tools/d48_s26_campaign.py`, called by
+   `d48_decisive.py` when not `--skip-preflight`) ends with a
+   `save_findings()` call that resolves to *that module's own* path
+   (`archive/d48_s26_findings.json`), not the caller's — silently
+   overwrote yesterday's B7/B8/B9 archive with a stale snapshot of today's
+   unrelated run. Recovered in full (B7's 12-level dose-response, B8's
+   dead-zone factorial, B9's confirmatory results) from the untouched
+   per-trial CSV via `tools/d48_recover_s26_findings.py`, using the
+   campaign tool's own real analysis functions, not hand-recomputed.
+   Numbers matched what had already been read and quoted earlier the same
+   session, byte for byte.
+
+**P2A result: `NO_VIABLE_FLOOR`.** Floors 45, 55, 70 (cheapest-first, per
+the pre-declared order), 44 trials each (11 angles × N=4, sign-aware
+direction throughout):
+
+| Floor | Failed | Type | Worst error |
+|---|---|---|---|
+| 45 | 26/44 (59%) | 100% accuracy, 0% oscillation | 0.54° |
+| 55 | 19/44 (43%) | 100% accuracy, 0% oscillation | 0.48° |
+| 70 | 15/44 (34%) | 10 oscillation, 6 accuracy | 0.31° |
+
+Floor 70's own failures, by angle: **−60° failed 4/4, all oscillation**
+(reversals 22–31, period ≈0.277s — matching the mechanism's known
+signature exactly). **+90° failed 4/4, all accuracy, 0 oscillation** (mean
+error 0.235°, max 0.31° — the whole worst-case figure lives here). Every
+other angle: 7/11 completely clean, overall mean error across all 44
+trials 0.065° (well inside the 0.12° gate) — the worst case is not
+representative of the median case at floor 70.
+
+**Floor 65 — probe, not pre-declared, operator's own call, stopped
+early.** Requested after seeing the 45→55→70 trend (falling failure rate,
+falling worst error) to check the gap between 55 and 70. Recorded under its
+own phase key (`probe_msf65`), same rigor as P2A. Stopped by the operator
+at **21/44 trials**: 10 failed (48%) — 2 oscillation (26 and 13 reversals,
+both genuine, both well past the threshold; one at −60° as usual, one new
+at +45° which had been clean at every other floor tested), 8 accuracy.
+**Not a smooth interpolation** — 65's failure rate at n=21 sat above both
+55 (43%) and 70 (34%), not between them. Operator's own read, recorded as
+his statement: this is the same non-monotonic register response this whole
+investigation has hit repeatedly (D16 spike, non-monotonic P response),
+not a missed sweet spot; not worth chasing 60 either. **This floor's data
+is incomplete (21/44) — treat any statistic from it as a partial screen,
+not a finished verdict.**
+
+**P3 result: `CONVERGES`, 10/10, floor 70, angles −60° and +90°
+(`--p3-floor 70 --p3-angles "-60,90"`), N=5 each.** −60°: 5/5 converged,
+**0 corrections needed on any trial**, errors 0.01–0.07°. +90°: 5/5
+converged, 1 correction needed on 4 of 5 trials, 2 on the fifth, errors
+0.01° after correction. **Important caveat, stated by design not
+discovered after the fact:** P3's check is a single-landing settle test
+(position+current quiet 3s), not the full 15s reversal-counting window
+P2A used to catch −60°'s oscillation — a clean P3 result at −60° does not
+mean the oscillation is gone, only that this particular test did not
+observe it, consistent with the intermittency P2A itself already showed at
+that angle. **Operator's own direct physical observation, same session:**
+did not see oscillation at −60° at any point; did see repeated correction
+attempts at +90°, "some ok some not."
+
+**Infrastructure incidents this session, all self-contained, no hardware
+damage, servo confirmed safe (temperature, current, fault flags checked)
+after every one:**
+- Two `servo_read` Bridge RPC desyncs (`"Response for unknown msgid"` in
+  the container log), the first self-clearing within seconds, the second
+  persisting 80+ seconds and requiring `arduino-app-cli app restart` to
+  clear (which also reflashes the sketch — preflight must not be skipped
+  on the next run after).
+- One register-write failure during P3 startup (`apply_config exhausted
+  retries`) that also defeated the automatic exit-restore
+  (`COULD NOT RESTORE REGISTERS` logged) — same app-restart recovery,
+  confirmed safe afterward (`min_start_force` read back correctly at the
+  boot baseline).
+- Every stop used the tool's own `SIGINT` handling (checkpoint-safe,
+  attempts a register restore) or, when that itself failed, a manual
+  post-restart readback confirmed the true state rather than assuming it.
+
+**Current committed state, unchanged by anything in this subsection:**
+`sketch/src/Config.h::kMinStartForce` is still **40** — the value baked in
+earlier the same day, before this investigation reopened it. Nothing in
+today's P1/P2A/probe/P3 work wrote a new permanent value; `min_start_force`
+was only ever changed live, in EEPROM, for the duration of each trial
+block, and restored to 40 on every exit.
+
+**Operator's own live hypotheses, recorded verbatim in spirit, not
+evaluated here:** the software verify-and-correct fix (P3's mechanism)
+might be the real answer generally, possibly not confined only to
+`_fine_approach`'s final leg; +90°'s droop looks "highly possible to
+tweak" by commanding a target slightly short of 90° so the true resting
+position lands at or near actual 90°.
+
+**Explicitly not closed.** Per the operator's own instruction: this is a
+factual record for a fresh-eyes analysis next session, not a conclusion.
+No recommendation, no floor chosen, no code change beyond what is already
+listed above.
+
+**Source of record:** `archive/d48_decisive_findings.json` (all trials,
+verdicts, the P1 recovery and this session's P2A/probe/P3 data together —
+note the `reconstructed_from_csv` flag on P1's rows, recovered mid-session,
+see above); `archive/jitter_trial_d48_decisive.csv` /
+`jitter_trace_d48_decisive.csv` (raw per-trial and per-sample data);
+`archive/d48_s26_findings.json` (yesterday's B7/B8/B9, recovered this
+session); `tools/d48_decisive.py` (the tool itself, including
+`--probe-floor` and `--p3-floor`/`--p3-angles` for continuing this
+directly); `python/tests/unit/test_d48_decisive.py` (33 tests covering the
+geometry, statistics and every fix above).
+
+---
+
+---
+

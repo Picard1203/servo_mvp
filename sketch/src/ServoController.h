@@ -82,21 +82,23 @@ class ServoController {
   /// @return The raw register value (0 or 1), or -1 on failure.
   int ReadTorqueRegister();
 
-  /// Reads the position-loop tuning registers directly (0x15-0x1B).
+  /// Reads the control-loop tuning registers directly (0x15-0x1B, 0x25, 0x27).
   /// @return The snapshot; valid is false when any read failed.
   TuningSnapshot ReadTuningRegisters();
 
-  /// Writes any subset of the position-loop tuning registers (0x15-0x1B).
+  /// Writes any subset of the control-loop tuning registers.
   /// @param p CW/CCW-shared P gain, or -1 to leave it alone.
   /// @param d CW/CCW-shared D gain, or -1 to leave it alone.
   /// @param i CW/CCW-shared I gain, or -1 to leave it alone.
   /// @param min_start_force Minimum start force, or -1 to leave it alone.
   /// @param cw CW dead zone, or -1 to leave it alone.
   /// @param ccw CCW dead zone, or -1 to leave it alone.
+  /// @param speed_p Velocity-loop P gain, or -1 to leave it alone.
+  /// @param speed_i Velocity-loop I gain, or -1 to leave it alone.
   /// @return True when every requested write succeeded.
   bool WriteTuningRegisters(int16_t p, int16_t d, int16_t i,
                             int16_t min_start_force, int16_t cw,
-                            int16_t ccw);
+                            int16_t ccw, int16_t speed_p, int16_t speed_i);
 
   /// Reads register 0x3A directly.
   /// @return Signed counts per second, or 0 on failure.

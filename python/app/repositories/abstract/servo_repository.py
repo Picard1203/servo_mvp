@@ -79,7 +79,7 @@ class ServoRepository(ABC):
 
     @abstractmethod
     def read_tuning_registers(self) -> Optional[TuningRegisters]:
-        """Reads the position-loop tuning registers directly.
+        """Reads the control-loop tuning registers directly.
 
         Returns:
             Optional[TuningRegisters]: The registers, or None if read failed.
@@ -92,8 +92,10 @@ class ServoRepository(ABC):
             position_i: Optional[int] = None,
             min_start_force: Optional[int] = None,
             cw_dead_zone: Optional[int] = None,
-            ccw_dead_zone: Optional[int] = None) -> bool:
-        """Writes any subset of the position-loop tuning registers directly.
+            ccw_dead_zone: Optional[int] = None,
+            speed_p: Optional[int] = None,
+            speed_i: Optional[int] = None) -> bool:
+        """Writes any subset of the control-loop tuning registers directly.
 
         Args:
             position_p (Optional[int]): P gain, or None to leave it alone.
@@ -102,6 +104,8 @@ class ServoRepository(ABC):
             min_start_force (Optional[int]): Minimum start force, or None.
             cw_dead_zone (Optional[int]): CW dead zone, or None.
             ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+            speed_p (Optional[int]): Velocity-loop P gain, or None.
+            speed_i (Optional[int]): Velocity-loop I gain, or None.
 
         Returns:
             bool: True when every requested write was acknowledged.

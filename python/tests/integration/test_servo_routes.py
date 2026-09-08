@@ -160,6 +160,8 @@ class TestIsolate:
         assert body["min_start_force"] == 0
         assert body["cw_dead_zone"] == 1
         assert body["ccw_dead_zone"] == 1
+        assert body["speed_p"] == 10
+        assert body["speed_i"] == 200
 
     def test_present_speed_is_zero_when_settled(self, client):
         """GET /api/v1/servo/diagnostics/present_speed - grounds D40c's
@@ -181,6 +183,23 @@ class TestIsolate:
         assert body["position_p"] == 16
         assert body["min_start_force"] == 50
         assert body["position_d"] == 32
+
+    def test_write_velocity_loop_registers_is_reflected_in_the_next_read(
+            self, client):
+        """The velocity loop is reachable over the same diagnostic route.
+
+        speed_i is the only integrator the servo ships with, so a hunting
+        investigation needs to reach it without a reflash.
+        """
+        write_response = client.post(
+            "/api/v1/servo/diagnostics/tuning_registers",
+            json={"speed_p": 20, "speed_i": 0})
+        assert write_response.json()["written"] is True
+        body = client.get(
+            "/api/v1/servo/diagnostics/tuning_registers").json()
+        assert body["speed_p"] == 20
+        assert body["speed_i"] == 0
+        assert body["position_p"] == 32
 
 
 class TestCalibrate:

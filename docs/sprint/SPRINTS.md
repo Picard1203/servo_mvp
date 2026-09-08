@@ -87,6 +87,7 @@ knowingly over the 85% discipline, the operator's explicit call)
 | R11 — snap to nearest + delta | 2 | 3.0h | | | | 22 | To Do — did not start, see note |
 | Rig protocols 1/2/3/5, hand-held | 1 | 1.5h | | | | 22 | To Do — did not start, see note |
 | T20 — doc-truth sweep (Antigravity, parallel — not counted against the 13.25h above) | 1 | 1.5h | | | | — | To Do |
+| D48 — characterise the settling jitter properly, then fix it (Steps 1-5, see plan file) | 5 | ~4h | 12:47 | 16:45 | 3h58m | 24 | In Progress — Steps 1-2 done, Steps 3-5 remain, see D48 entry |
 
 **D40d actual, ~4h against a 1.0h estimate — an unexplained-mismatch case,
 stated plainly.** The estimate assumed a single confirmation pass
@@ -212,6 +213,144 @@ D41 — Firmware commands real moves off failed reads                [2]
   - ReadRawCounts failure signal, guard the 3 callers that use it as "hold"
   - ReadSnapshot per-field validity
   - Malformed servo_move payload refused, not defaulted to 0
+
+T20 — Doc-truth sweep from the whole-app review                    [1]
+  (Antigravity handoff — exact paths, no judgment; see T.md entry)
+```
+
+### Retro (sprint closed 6 Sept 2026, on starting the next one)
+
+- **Planned capacity vs. actual:** 19.5h raw / 13.5h at 0.7 focus (Tue–Thu)
+  committed to ~13.25h of stories. Actual hours, where marked: CR
+  triage+sprint board+D39 combined ~40m (est. 3.75h — the one clean,
+  human-clock-free case); D40a 57m (est. 45m); D40b 1h35m (est. 1.25h);
+  D40c 4h27m (est. 2h); D40d ~4h (est. 1h); D48 3h58m (est. ~4h, on time but
+  only 2 of 5 steps done — a scope miss, not a rate miss).
+- **Committed vs. completed:** D39, D40(a–d) done, D40 closed. D48 in
+  progress, checkpointed not closed (Steps 1–2 of 5). R11 and the rig
+  protocols did not start — carried forward, not dropped (R11 is
+  re-committed below). R12 and D41 were pulled from carry-over into stretch
+  mid-sprint and also did not start — same disposition, carried forward. T17
+  (separately, operator-run outside a Claude session) closed 6 Sept, just
+  ahead of the next sprint being set up.
+- **Estimate misses worth remembering:** confirmed pattern, not a one-off —
+  pure code/analysis work (D39) ran 5–6x under estimate; anything gated on
+  the operator's own physical clock (D40b, D40d: holding the rig,
+  positioning, watching a settle) ran 2–4x *over* estimate, and D48's Session
+  24 miss was different again — the *hour* estimate held, the *step-count*
+  estimate for what fits in that time did not (board-connectivity friction
+  ate wall time that had nothing to do with the actual measurement work).
+  Going forward: estimate board/rig-gated work on its own clock, not the
+  code-work multiplier, and budget board-connectivity setup as its own line
+  rather than folding it into the first story that happens to need the
+  board.
+
+---
+
+## Sprint: 6–10 Sept 2026 (Sun–Thu, work week)
+
+**Deliberately five items, no stretch tier** — the operator's own call,
+after two sprints running near or over capacity on point-scale surprises:
+"less this time so it actually gets done." All five already exist in the
+backlog; this sprint pulls them in and breaks them into subtasks per the
+convention above.
+
+**Capacity.** Lunch 11:30–13:00 (1.5h) and dinner 17:45–18:45 (1h) deducted
+wherever a day's window crosses them, same windows as last sprint. Start
+times are approximate (operator's own: "more or less 9:00, sometimes 30
+minutes late").
+
+| Day | Window | Raw | Deductions | Net |
+|---|---|---|---|---|
+| Sun 6 Sept (today) | 14:00–17:30 | 3.5h | none (before lunch window, ends before dinner window) | 3.5h |
+| Mon 7 Sept | ~09:00–17:45 | 8.75h | lunch 1.5h | 7.25h |
+| Tue 8 Sept | ~09:00–17:45 | 8.75h | lunch 1.5h | 7.25h |
+| Wed 9 Sept | ~09:00–17:45 | 8.75h | lunch 1.5h | 7.25h |
+| Thu 10 Sept | ~09:00–17:45 | 8.75h | lunch 1.5h | 7.25h |
+
+Baseline raw: **32.5h**. Minus **~2h** floating military-duty deduction
+across the week (day not yet known — subtract from whichever day it lands
+on once real) → **30.5h**. At the 0.7 focus factor → **~21.35h effective
+capacity**. **One evening will likely extend to 20:00 or 22:00** (dinner
+deduction would then apply too) — not counted in the baseline above since
+which day and how late is still open; treat it as buffer, not committed
+capacity.
+
+**Tooling:** Claude, per the standing rule (assigned per whole item, never
+mid-item).
+
+### Committed (~17.5h est. / ~21.35h effective capacity — ~82%)
+
+| Story | Pts | Est. | Start | End | Actual | Session | Status |
+|---|---|---|---|---|---|---|---|
+| D48 — finish the resonance experiment: mechanism read at ±30° (Step 3), noise-floor calibration (Step 4, still unrun — `R_max`/`C_max` unset), statistically-powered lever test and permanent fix (Step 5) | 5 (carried — Steps 1–2 already spent ~4h in Session 24) | ~4h for the remainder | 13:06 | 19:23 | 6h17m (includes ~1h lost to an unrelated Ethernet-shield hardware failure/replacement mid-session, not investigation time) | 25 | Still open — mechanism confirmed (M1), no fix found today reliably passes; see D48 entry for the full trail and tomorrow's resume point |
+| D48 (cont.) — finer sweep, multi-angle validation, dead-zone factorial; the campaign tool built and its selector bug found | — (same 5 pts, carried) | — | not captured | ~18:43 | not captured | 26 | Done that day — reconstructed from artifact timestamps, see note below |
+| D48 (cont.) — B9 confirmatory, floor 40 baked in, then reopened the same day by the operator's manual sweep; P1/P2A/P3 decisive run built and run | — (same 5 pts, carried) | — | 08:48 | ~17:30 | ~8h40m | 27 | Done that day — Start from the run's own `started_at`, End from the next session's start |
+| D48 (cont.) — decide the floor from the archive, validate it on the board, build the three fixes, close | — (same 5 pts, carried) | — | 17:36 | 19:42 | 2h06m | 28 | **Done — D48 closed.** Floor 55 baked in; arrival direction and verify-and-correct shipped; live on hardware |
+| D41 — firmware refuses a real move commanded off a failed sensor read or a malformed payload | 2 | 3.5h | | | | 25 | To Do |
+| R11 — accept any typed angle, snap to the nearest reachable step, show the delta | 2 | 3.0h | | | | 25 | To Do — carried from last sprint, did not start there |
+| R12 — soft limit ±90° / hard limit ±95°, confirmed in between | 3 | 4.0h | | | | 25 | To Do — needs R11 actually done first (ordering, not risk) |
+| D38 — let an operator dismiss a saved position's "may be outdated" tag | 2 | 3.0h | | | | 25 | To Do |
+| T20 — doc-truth sweep, ~25 verified stale citations (Antigravity, parallel — not counted against the 13.25h/17.5h Claude estimate above) | 1 | 1.5h | | | | — | To Do |
+
+**Two sessions of D48 work (26 and 27) were never booked here at the time,
+and were reconstructed on 8 Sept from what they left on disk** — findings
+files' own `started_at`, per-trial timestamps and archive file times. Their
+figures are marked accordingly and are weaker evidence than a clock time
+written down as the work happened. Session 26's start was not recoverable
+at all. The rule this breaks is already written down (mark Start before the
+branch exists, End when it closes); what made it break was a multi-session
+item that never reached a closing ceremony, so nobody ever wrote a row.
+**An item spanning sessions needs its row per session, not per item.**
+
+**Order, as given, not re-prioritized:** D48 continuation first (already
+in flight, checkpoint says exactly where to resume), then D41 (highest
+severity of the five — a physical-safety item once real load is on the
+mechanism), then R11, then R12 (blocked on R11 landing), then D38. T20 runs
+in parallel via Antigravity, not session-bound, so it has no place in that
+ordering. Nothing above is a hard sequencing requirement except
+R11-before-R12.
+
+**T17 closed 6 Sept, ahead of this sprint being set up** — the operator ran
+the real-rig hand-turn test directly: matched expectations both ways
+(freely hand-turnable while isolated including multi-turn, resists/corrects
+when un-isolated, position tracking correct afterward). Full record:
+`docs/history/CLOSED.md` T17.
+
+**Explicitly deferred, not dropped:** the remaining rig protocols (R1's
+final loaded-capacity sign-off) and D47 (real-arm verification of the
+anti-backlash fix) — neither is touched by the six items above, and neither
+was pushed out to make room for them.
+
+### Jira-pasteable blocks
+
+```
+D48 — Diagnose and fix the load-induced settling oscillation (resuming from a prior session's characterisation work)          [5]
+  - Log position and current together fast enough to tell a resonance signature from a stick-slip signature, at the confirmed worst test angle
+  - Establish a noise-floor pass/fail threshold before testing any fix
+  - Test the mechanism-appropriate fix candidates at real statistical power (not a small, inconclusive sample)
+  - Write the kept configuration permanently once it passes its own pre-declared bar
+
+D41 — Firmware commands real moves off failed reads and malformed payloads          [2]
+  - Add a failure signal to the raw-position-read function, and update the places that currently treat a failed read as "hold here"
+  - Make the full-status read report which individual fields actually succeeded, instead of one blanket valid/invalid flag
+  - Reject a malformed incoming move command outright instead of silently treating it as a move to position zero
+
+R11 — Accept any typed angle; snap to nearest, show the delta          [2]
+  - Backend: _validate_step becomes a snap, response carries the delta
+  - Frontend: remove ANGLE_STEP/COUNTS_PER_OUTPUT_DEG local copies
+  - Tests + check_client_behaviour.js: delta display
+
+R12 — Soft limit ±90°, hard limit ±95°          [3]
+  - ADR-0012: soft/hard model, amends ADR-0003
+  - Backend: live Pydantic bounds, three-state _validate_reachable
+  - Frontend: confirm modal reuse, remove hardcoded ANGLE_MIN/MAX
+  - docs/CONTEXT.md: soft limit / hard limit glossary entries
+
+D38 — Let an operator dismiss a saved position's "may be outdated" tag          [2]
+  - Add a dismiss action (single position, and a batch dismiss for one recalibration's worth of newly-stale positions)
+  - Dismissal clears the tag without touching name/description/angle
+  - Tests: dismiss clears the flag; a later recalibration can re-raise it
 
 T20 — Doc-truth sweep from the whole-app review                    [1]
   (Antigravity handoff — exact paths, no judgment; see T.md entry)

@@ -730,6 +730,7 @@ function escapeHtml(text) {
 const EVENT_LABELS = {
   "servo.move.accepted": "move accepted",
   "servo.move.fine_approach": "fine approach",
+  "servo.move.arrived": "arrived",
   "servo.stop": "stopped",
   "servo.lock.engaged": "locked",
   "servo.lock.released": "unlocked",

@@ -166,7 +166,7 @@ Anything that touches the board **stops and hands you the commands**. Claude doe
 not drive the servo, and does not claim a hardware result it did not watch.
 
 ```bash
-adb shell arduino-app-cli app start user:servo_mvp   # ~16s warm, ~7min cold
+adb shell arduino-app-cli app start user:servo_mvp   # ~22s cold, measured 6 Sept 2026 — see CLAUDE.md §6 and D6
 adb shell arduino-app-cli app logs  user:servo_mvp
 ```
 

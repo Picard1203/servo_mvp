@@ -33,24 +33,22 @@ sessions actually spent, not the ones originally planned.
 | **21** | **DONE, 1 Sept 2026.** **D40c** — fine approach activated (was built, never switched on), hardened (re-opened and re-closed D40a's ack-surfacing gap on the fine-approach path), register readback and a live tuning campaign added: `MinStartForce` swept 0→150, closing at every one of 55 real moves within 0.00-0.03°, including a real oscillation found and fixed at the travel extremes. **D35 closed as a side effect** (`PRESENT_SPEED` sampling resolved the commanded-vs-actual speed question). Full findings: `docs/backlog/D.md` D40, `docs/history/CLOSED.md` D35. All numbers unloaded. | yes |
 | **22** | **DONE, 2 Sept 2026.** **D40d** — set out to verify `MinStartForce=150` under hand-held load; instead found it does not hold reliably (worst at −60°, not the ±90° extremes expected), root-caused (evidence-based) to likely mechanical resonance rather than stiction, fixed the settle-detection instrumentation gap that was masking it, landed one real permanent improvement (`P` 32→24, matches published community guidance for this servo family), tried and deliberately reverted a dead-zone tradeoff (operator's own call: accept residual jitter risk over an accuracy cost). **D40 closed** on that honest, non-clean basis; **D47** opened for real-rig verification. Two independent deep-research passes (Claude, Gemini) run the same evening converged on the same diagnosis and surfaced three untried levers (D gain, a softened fine-approach final leg, deeper P reduction) plus the instrumentation gap in D40d's own method (no fast current logging, inadequate repeat counts against a ~40-60% intermittent failure) — captured as **D48**, a properly designed experiment, explicitly slotted for the next session rather than run tonight. R11 and the rig protocols did not run this session — the D40d investigation used the full session. | yes |
 | **23** | **DONE, 3 Sept 2026.** Tooling session ahead of D48, not D48 itself — no register was touched, no trial was run. Vendored the SCServo library into `libraries/SCServo/` (was documented, never actually present; confirmed via its own source that D48's gain registers are not in Feetech's/Waveshare's own library). Installed 8 skills from cold storage into `~/.claude/skills/`, woven into `skills/deliver/SKILL.md` by phase (experiment-design rigor for D48-shaped items, debugging, verification, skill-writing discipline), with 2 explicitly excluded for conflicting with standing rules. Built and live-fire-tested 3 `PostToolUse` hooks (`docs/WORKFLOWS.md` W9) that surface `docs/CONVENTIONS.md`'s Python/C++ rules and the glossary/no-backlog-ID rules on every edit, since they were previously advisory-only and unenforced. Full account: `docs/PROJECT_STATE.md`. | no |
+| **24** | **IN PROGRESS, 3 Sept 2026, 12:47–16:45.** D48 itself, Steps 1–2 of 5 (plan revised twice with the operator first — characterisation before any fix, not the original straight-to-three-levers version). Instrument hardened and committed (period-based scoring, settle-short as its own outcome, CSV persistence, a real anchor parameter). Characterisation sweep done, fine approach on, rig attached: **±30° is a validated worst point** (3/3 reproduction both directions), asymmetric and patchy rather than tied to the travel extremes. A third pre-registered FAIL condition (current elevation) added mid-session on live evidence — position-only scoring missed a real case. Real finding: fine approach **off** measurably worsens jitter (43%→71% reproduction), the opposite of the plan's original hypothesis — restored to on. Most wall time went to board connectivity (mount, adb, a dropped wired-NIC link, a Docker container not publishing its port), documented in `docs/backlog/D.md` D48 so it isn't rediscovered. Resume point: Step 3 (mechanism read) at ±30°. Full account: `docs/backlog/D.md` D48, plan file `/home/egrisaru/.claude/plans/peaceful-whistling-candy.md`. | yes |
+| **25** | **IN PROGRESS, 6 Sept 2026 — new sprint (Sun 6–Thu 10 Sept), six items.** Sprint set up in `docs/sprint/SPRINTS.md` with the previous sprint's retro filled in. **T17 closed** the same session (operator ran the real-rig hand-turn test directly: matched expectations) — see `docs/history/CLOSED.md`. Caught and fixed a stale `T22` ID collision (open one renumbered **T23**). **D48 resumed and ran Steps 3–5**: mechanism confirmed (quantisation-boundary limit cycle, not resonance); registers, fine-approach tuning, move-staging and dead-zone all tried, none reliably passed — full trail in `docs/backlog/D.md` D48, a second deep-research prompt prepared but not yet run. A real hardware incident mid-session (Ethernet shield short, minor burn, unrelated to the servo code, resolved by replacement) moved all further hardware work to attended-only. **D41**, **R11**, **R12**, **D38**, **T20** in this sprint's committed scope have not started yet. | tbd |
+| **26** | **DONE, 7 Sept 2026.** D48 continued. A re-analysis of Session 25's own archive invalidated part of its basis — every campaign trial had run at ~10Hz, not the fast path, so poll rate and time-of-day were perfectly confounded and its between-configuration comparisons were uninterpretable as they stood. New pre-registered regimen and a randomised-block campaign tool built (`docs/sprint/D48_S26_REGIMEN.md`, `tools/d48_s26_campaign.py`). B7 dose-response found the bifurcation between `min_start_force` 85 and 100; B8 crossed dead zone with the floor; multi-angle and bracket sweeps followed. Both deep-research answers came in and disagreed on cause while agreeing on the next experiment. | yes |
+| **27** | **DONE, 8 Sept 2026, 08:48–~17:30.** B9 confirmatory (N=16, two angles) passed and `min_start_force=40` was baked into `Config.h` — then the operator's own manual sweep reopened it the same day: commanding −75° three times landed in three different places, exposing that the fine approach never had a fixed arrival side. `tools/d48_decisive.py` built and run: P1 proved arrival direction decides the miss and flips with the angle's sign; P2A found no floor passes alone; P3 showed a host-side verify-and-correct converges. Left deliberately unclosed for a fresh-eyes analysis. | yes |
+| **28** | **DONE, 8 Sept 2026, 17:36–close. D48 CLOSED.** Analysis of the whole archive showed the two failure modes move in opposite directions with the floor, so no single value can pass — the fix had to be software. Floor **55** (highest never-oscillating value) baked into `Config.h`; arrival direction anchored to the target's sign; verify-and-correct loop added with three guards. Found and fixed a divergence in the correction rule itself (it re-derived its aim from the target each round and ping-ponged; now cumulative). Live on hardware: the same target from opposite sides lands identically, 0.00° spread. Four diagnostic-tool defects fixed, one filed as **T24**. | yes |
 
-**R11 pulled into committed scope 1 Sept**, alongside T20 and the rig
-protocols — real capacity slack opened up once D39 and D40 were retuned
-against the operator's own actuals. **R12 and D41 moved from carry-over to
-stretch the same day** — attempted this sprint if committed scope finishes
-with room, R12 only once R11 is actually done (the ordering constraint is
-unchanged, only the tier moved). Neither is dropped either way: what doesn't
-land this sprint carries to Sun 6 Sept exactly as before. **T20** runs via
-Antigravity, not session-bound. See `docs/sprint/SPRINTS.md` for the capacity math.
-
-**Decided 2 September 2026, same evening as D40's close:** next session
-runs **D48** (the properly designed resonance experiment), not R11 or the
-rig protocols — those push to the sprint starting 6 Sept regardless of
-whether Thursday's remaining capacity would technically fit them, the
-operator's own call rather than a capacity accident. **Session 23 (3 Sept)
-was a tooling detour, not that session** — D48 is still next, genuinely
-ready to run: the experiment-rigor skills and the SCServo library grounding
-it needed are in place now.
+**R11 was pulled into committed scope 1 Sept, alongside T20 and the rig
+protocols, then did not start** (D48/D40d's investigation used the full
+remaining time) — carried forward rather than dropped. **R12 and D41**
+similarly moved to stretch and also did not start. All three, plus **D38**,
+**T20**, and the still-in-flight **D48**, are now the **6–10 Sept sprint's
+committed scope** — see `docs/sprint/SPRINTS.md` for the capacity math and
+per-story estimates. **T17 closed 6 Sept**, separately, ahead of this
+sprint (see its own row above and `docs/history/CLOSED.md`). The remaining
+rig protocols (R1's loaded sign-off) and D47 stay deferred past this sprint
+too, unchanged.
 
 **Still deferred from the original session-15 triage** — narrower now that
 Session 19 pulled out everything the rig findings needed: **T10**, **T11**
@@ -83,10 +81,9 @@ detail entries above (filed and ranked, not started).
 | D7 | UI not verified on small operator screens | open · medium |
 | D28 | MCU boot-time `mcu_log` notify lost to a startup race | open · low |
 | D36 | Several tests construct their own `Database` and never close it | open · low |
-| D38 | A saved position's "earlier reference" tag has no way to dismiss it | open · low · R10 |
-| D48 | Diagnose the load-induced settling oscillation properly: fast instrumentation, then a structured experiment | open · high · **slotted for the next session** |
+| D38 | A saved position's "earlier reference" tag has no way to dismiss it | open · low · R10 · **sprint committed, 6–10 Sept** |
 | D47 | Verify the anti-backlash fix holds once the servo carries its real load | open · medium |
-| D41 | Firmware commands real moves off failed reads and malformed payloads | open · high · before real loaded rig day |
+| D41 | Firmware commands real moves off failed reads and malformed payloads | open · high · before real loaded rig day · **sprint committed, 6–10 Sept** |
 | D42 | Errors that vanish: SSE stream, migration, sqlite writes | open · medium |
 | D43 | Guards that fail open on an invalid read | open · medium |
 | D44 | Operator-facing UI gaps found by the whole-app review | open · medium |
@@ -105,11 +102,11 @@ detail entries above (filed and ranked, not started).
 | T10 | Write the recovery runbook, in two halves | open · high |
 | T11 | Write the operations manual | open · high |
 | T13 | Distil the remaining documents | open · opportunistic |
-| T17 | Get a mechanical rig on the bench for R2's hand-turn scenario | open · rig assembled 31 Aug · closing what hand-held load proves, Session 22 |
 | T18 | Front-end conventions, and split `app.js` by feature | open · after the demo |
 | T20 | Doc-truth sweep from the whole-app review (~25 verified fixes) | open · low · **sprint, Antigravity** |
 | T21 | Constants and dead code with no shared source | open · low |
-| T22 | Run graphify's semantic pass on the doc backlog it's never had | open · low |
+| T23 | Run graphify's semantic pass on the doc backlog it's never had | open · low |
+| T24 | A screening filter judges only its first six trials, tainting the "futile" verdicts on the PID gains | open · low |
 
 **R-items** (full entries: `docs/backlog/R.md`)
 
@@ -119,8 +116,8 @@ detail entries above (filed and ranked, not started).
 | R4 | Post-MVP: mechanical restraint servos, unified under Lock | post-MVP |
 | R7 | Handover logistics depend on adapter delivery | delivery-shaping constraint |
 | R8 | Emergency stop | post-MVP · can wait |
-| R11 | Accept any typed angle; snap to nearest, show the delta | open · **sprint committed, Session 22** |
-| R12 | Extended travel: soft limit ±90°, hard limit ±95°, confirmed between | open · **sprint stretch, after R11 lands** · needs ADR-0012 |
+| R11 | Accept any typed angle; snap to nearest, show the delta | open · **sprint committed, 6–10 Sept** |
+| R12 | Extended travel: soft limit ±90°, hard limit ±95°, confirmed between | open · **sprint committed, 6–10 Sept, after R11 lands** · needs ADR-0012 |
 
 ---
 
@@ -128,6 +125,8 @@ detail entries above (filed and ranked, not started).
 
 | | | closed |
 |---|---|---|
+| **D48** | Diagnose the settling oscillation properly rather than sweep registers again | 8 September 2026 · Sessions 24–28 · the register could never fix it — the two failure modes move in opposite directions with it. Closed by two software fixes (fixed arrival side, verify-and-correct) plus floor 55; live spread 0.00° from opposite sides — see `docs/history/CLOSED.md`; real-arm verification is D47 |
+| **T17** | Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested | 6 September 2026 · operator-run on the real rig: matched expectations both ways, position tracking read correctly afterward — see `docs/history/CLOSED.md` |
 | **D40** | A move settles short under load; re-commanding does not correct it | 2 September 2026 · Session 22 · closed with `P=24` kept permanently and an honest, unresolved loaded-jitter risk accepted — see `docs/history/CLOSED.md`; real-rig verification is D47 |
 | **D35** | Commanded vs. actual servo speed disagree ~1.5–2x | 1 September 2026 · not a register bug — resolved by measuring `PRESENT_SPEED` correctly, see `docs/history/CLOSED.md` |
 | **T22** | Reorganize docs: `CONTEXT.md`/`CONVENTIONS.md` into `docs/`, `CLOSED.md`/`AUDIT.md` into `docs/history/`, sprint docs into `docs/sprint/` | 1 September 2026 · `CLAUDE.md` stays at root |
@@ -164,7 +163,7 @@ detail entries above (filed and ranked, not started).
 | **D23** | `moving`/fault flags reported as measured on a failed read | 25 August 2026 · Session 8 |
 | **D25** | An overload alarm disappeared once the reading went unknown | 25 August 2026 · Session 8 |
 | **D26** | Suite failed once in ten runs — cause found (sampler thread leak), closed on evidence not proof; reopen fresh if it recurs | 25 August 2026 · Session 8 |
-| **R2** | Motor isolation — board verification found the isolate/un-isolate write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level; UI/refusal gaps closed alongside | 26 August 2026 · hand-turn scenario left open, see T17 |
+| **R2** | Motor isolation — board verification found the isolate/un-isolate write was inverted and its ack check used the wrong sentinel, both fixed and confirmed at the register level; UI/refusal gaps closed alongside | 26 August 2026 · hand-turn scenario closed separately, see T17 |
 | **T1** | `docs/CONVENTIONS.md` gap in `python/app/` (types, control-flow style) closed via T15a | 26 August 2026 · Antigravity, hand-verified against the diff |
 | **T15** | Code-level documentation strip, both halves (T15a Python, T15b firmware) — Antigravity, hand-verified against the diff both times | 26 August 2026 · T15a needed real correction, T15b held up well |
 | **T16** | `twin-review` restructured for a whole-app pass: fifth lens, scope modes, tool-narrowed dispatch, `REVIEW_FINDINGS.md` output | 26 August 2026 · running it (session 14) still open |

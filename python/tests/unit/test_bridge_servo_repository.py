@@ -213,12 +213,12 @@ class TestCommands:
         assert repo.read_torque_register() is None
 
     def test_read_tuning_registers_payload(self, bridge, repo):
-        bridge.reply = "1,32,32,0,0,1,1"
+        bridge.reply = "1,32,32,0,0,1,1,10,200"
         repo.read_tuning_registers()
         assert bridge.calls[-1] == ("servo_read_tuning", "")
 
     def test_read_tuning_registers_parses_all_fields(self, bridge, repo):
-        bridge.reply = "1,16,32,8,50,0,0"
+        bridge.reply = "1,16,32,8,50,0,0,20,100"
         registers = repo.read_tuning_registers()
         assert registers.position_p == 16
         assert registers.position_d == 32
@@ -226,10 +226,12 @@ class TestCommands:
         assert registers.min_start_force == 50
         assert registers.cw_dead_zone == 0
         assert registers.ccw_dead_zone == 0
+        assert registers.speed_p == 20
+        assert registers.speed_i == 100
 
     def test_read_tuning_registers_none_when_not_acknowledged(self, bridge,
                                                                repo):
-        bridge.reply = "0,32,32,0,0,1,1"
+        bridge.reply = "0,32,32,0,0,1,1,10,200"
         assert repo.read_tuning_registers() is None
 
     def test_read_tuning_registers_none_on_malformed_payload(self, bridge,
@@ -237,9 +239,20 @@ class TestCommands:
         bridge.reply = "1,32,32"
         assert repo.read_tuning_registers() is None
 
+    def test_read_tuning_registers_none_on_short_payload_from_old_firmware(
+            self, bridge, repo):
+        """A sketch without the velocity-loop fields must read as failure.
+
+        The payload is positional, so a stale sketch answering with the old
+        seven fields would otherwise parse as a valid read with the velocity
+        registers silently missing.
+        """
+        bridge.reply = "1,32,32,0,0,1,1"
+        assert repo.read_tuning_registers() is None
+
     def test_read_tuning_registers_none_on_unparsable_payload(self, bridge,
                                                                repo):
-        bridge.reply = "1,x,32,0,0,1,1"
+        bridge.reply = "1,x,32,0,0,1,1,10,200"
         assert repo.read_tuning_registers() is None
 
     def test_read_tuning_registers_none_on_bridge_exception(self, bridge,
@@ -251,14 +264,22 @@ class TestCommands:
             self, bridge, repo):
         bridge.reply = "ok"
         repo.write_tuning_registers()
-        assert bridge.calls[-1] == ("servo_write_tuning", "-1,-1,-1,-1,-1,-1")
+        assert bridge.calls[-1] == (
+            "servo_write_tuning", "-1,-1,-1,-1,-1,-1,-1,-1")
 
     def test_write_tuning_registers_payload_leaves_unset_fields_at_sentinel(
             self, bridge, repo):
         bridge.reply = "ok"
         repo.write_tuning_registers(position_p=16, min_start_force=50)
         assert bridge.calls[-1] == (
-            "servo_write_tuning", "16,-1,-1,50,-1,-1")
+            "servo_write_tuning", "16,-1,-1,50,-1,-1,-1,-1")
+
+    def test_write_tuning_registers_sends_velocity_loop_fields(
+            self, bridge, repo):
+        bridge.reply = "ok"
+        repo.write_tuning_registers(speed_p=20, speed_i=0)
+        assert bridge.calls[-1] == (
+            "servo_write_tuning", "-1,-1,-1,-1,-1,-1,20,0")
 
     def test_write_tuning_registers_returns_true_on_ack(self, bridge, repo):
         bridge.reply = "ok"

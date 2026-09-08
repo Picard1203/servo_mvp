@@ -120,6 +120,69 @@ one mechanical configuration (a bench proxy, a different arm) has no
 particular reason to transfer to another. Verify under the real load,
 mounted as it will actually be used, not a hand-held stand-in.
 
+### The minimum-start-force register cannot fix a settling problem — it chooses which failure you get
+
+Resolved 8 September 2026 after ten sessions of sweeping it and every gain
+around it. `Minimum Startup Force` (0x18/24) sets the smallest drive applied
+when the shaft is off target, and it trades two opposite failures:
+
+| set it | what happens | can software fix it? |
+|---|---|---|
+| high | the shaft hunts around the target and never stops | **no** — you cannot correct a servo that will not hold still |
+| low | it goes quiet and stops a few counts short | **yes** — read the position back and re-command |
+
+Measured across 176 trials at four values on one servo: oscillation rises
+with the setting and stopping-short falls, each at p ≈ 10⁻⁵. **No value
+minimises both**, so "which value" is the wrong question. Pick the highest
+value that never oscillates, and close the residual error in software.
+This matches the published trade-off for hobby-servo minimum-PWM/"punch"
+settings generally — too high hunts, too low leaves a dead band.
+
+Two traps found while measuring it, both of which produced confident wrong
+answers first: judging an arm by the *median* of its repeats hides a
+50/50 coin flip, and a value 3x above the working range (500) drove a
+**divergent** oscillation that saturated the serial bus, defeated
+read-based safety guards, and survived a power cut in EEPROM. Cap what any
+tool is allowed to write.
+
+### An anti-backlash approach must fix the arrival side, and then verify it
+
+Two software defects that a register sweep will never find, and both look
+exactly like a servo tuning problem:
+
+1. **Placing the overshoot along the direction of travel** lets the starting
+   position decide which side the shaft arrives from, so one commanded angle
+   has several resting places — measured: the same target landing at
+   −74.55°, −75.09° and −75.15°. Arriving from the wrong side cost
+   0.45–0.67° against 0.03–0.16° from the right one. Anchor the overshoot to
+   the **target's own sign** so the final leg always travels the same way.
+   Which side is "right" can flip with the sign of the angle; a pooled test
+   across both signs reads as *no effect* because two real opposite-signed
+   effects average to zero.
+2. **Treating the command acknowledgement as arrival.** The servo answering
+   "received" says nothing about where the shaft stopped. Read it back.
+
+When you add the read-back correction, correct the **aim**, not the target:
+`aim = aim - residual`. Re-deriving `target - residual` each round discards
+where you last aimed, and against a servo that lands where it is aimed that
+flips the error's sign forever (45.18, 44.82, 45.18, 44.82…). Damping the
+gain is not the remedy and makes a *fixed* offset permanently uncorrectable —
+half of a constant offset is still there next round. Also clamp it: a
+residual far larger than the approach distance is a bad reading, and driving
+one turned a mid-travel sample into a commanded 61° swing.
+
+### Settling is decided by movement, never by current
+
+An arm holding a position against gravity draws a current that never goes
+quiet, so any settle detector that waits for current to stop changing will
+never fire — it will run to its timeout on every move and return whatever it
+last read. Measured cost: 25s per correction, versus 5s once the same check
+watched position alone. Record current as a diagnostic; never gate on it.
+
+A safe quiet window is a few times the observed limit-cycle period (0.277s
+here → 1.5s used). Across 245 traces, the median gap between movements while
+hunting was 0.27s, and 98% of shafts still for 2s never moved again.
+
 ### The firmware's own settle-completion event can miss this entirely
 
 `servo.move.fine_approach`'s `wait_elapsed_s` field (this project's Python
@@ -131,6 +194,18 @@ throughout) showed 19 direction reversals still ongoing 14+ seconds later.
 **Never judge settle quality from an elapsed-time or "moving" flag alone —
 poll raw position continuously through the whole window and look for
 reversals, or watch the shaft directly.**
+
+**Position polling alone can still miss it — check current too.** The servo
+can correct an error smaller than its own encoder resolution (one count,
+0.06° at 4096 counts/turn on this project's belt ratio) without the
+reported position ever crossing a count boundary, so a reversal counter
+built on position alone can score zero reversals while the servo is
+genuinely still working. Measured directly: one configuration held
+`reversals=0` across three repeats at a target angle while mean current sat
+at 0.08A against 0.00A for the same angle and target under a different
+configuration — current was the only signal that showed anything was
+happening. **A quiet position trace is not sufficient evidence of a quiet
+servo — check current in the same window before calling a settle clean.**
 
 ### Status register 0x41 — six faults
 

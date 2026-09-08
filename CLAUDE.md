@@ -212,7 +212,7 @@ Python side runs in a container where `HOME` is `/home/app`, so an absolute
 `adb` is still how you **start and stop** the app without App Lab:
 
 ```bash
-adb shell arduino-app-cli app start user:servo_mvp     # ~16s warm, ~7min cold
+adb shell arduino-app-cli app start user:servo_mvp     # ~22s cold (explicit stop first, empty .cache/uv, sketch recompiled), measured 6 Sept 2026 — the old "~7min cold" figure here was never re-checked and is wrong, see D6
 adb shell arduino-app-cli app restart user:servo_mvp   # required after modifying python code via the mount
 adb shell arduino-app-cli app logs  user:servo_mvp
 ```

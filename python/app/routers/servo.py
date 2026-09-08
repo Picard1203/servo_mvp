@@ -153,7 +153,7 @@ def get_torque_register(servo: ServoDep) -> TorqueRegisterResponse:
 @router.get("/diagnostics/tuning_registers",
             response_model=TuningRegistersResponse)
 def get_tuning_registers(servo: ServoDep) -> TuningRegistersResponse:
-    """Reads the servo's position-loop tuning registers directly.
+    """Reads the servo's control-loop tuning registers directly.
 
     Args:
         servo (ServoRepository): Injected servo repository.
@@ -165,14 +165,17 @@ def get_tuning_registers(servo: ServoDep) -> TuningRegistersResponse:
     if registers is None:
         return TuningRegistersResponse(
             position_p=None, position_d=None, position_i=None,
-            min_start_force=None, cw_dead_zone=None, ccw_dead_zone=None)
+            min_start_force=None, cw_dead_zone=None, ccw_dead_zone=None,
+            speed_p=None, speed_i=None)
     return TuningRegistersResponse(
         position_p=registers.position_p,
         position_d=registers.position_d,
         position_i=registers.position_i,
         min_start_force=registers.min_start_force,
         cw_dead_zone=registers.cw_dead_zone,
-        ccw_dead_zone=registers.ccw_dead_zone)
+        ccw_dead_zone=registers.ccw_dead_zone,
+        speed_p=registers.speed_p,
+        speed_i=registers.speed_i)
 
 
 @router.get("/diagnostics/present_speed", response_model=PresentSpeedResponse)
@@ -194,7 +197,7 @@ def get_present_speed(servo: ServoDep) -> PresentSpeedResponse:
 def post_tuning_registers(
         request: TuningRegistersWriteRequest,
         servo: ServoDep) -> TuningRegistersWriteResponse:
-    """Writes any subset of the servo's position-loop tuning registers.
+    """Writes any subset of the servo's control-loop tuning registers.
 
     Args:
         request (TuningRegistersWriteRequest): Fields to write; unset
@@ -209,7 +212,9 @@ def post_tuning_registers(
         position_i=request.position_i,
         min_start_force=request.min_start_force,
         cw_dead_zone=request.cw_dead_zone,
-        ccw_dead_zone=request.ccw_dead_zone)
+        ccw_dead_zone=request.ccw_dead_zone,
+        speed_p=request.speed_p,
+        speed_i=request.speed_i)
     return TuningRegistersWriteResponse(written=written)
 
 

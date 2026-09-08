@@ -108,7 +108,7 @@ class PresentSpeedResponse(BaseModel):
 
 
 class TuningRegistersResponse(BaseModel):
-    """Diagnostic read of the servo's position-loop tuning registers.
+    """Diagnostic read of the servo's control-loop tuning registers.
 
     Attributes:
         position_p (Optional[int]): Proportional gain register, or None.
@@ -117,6 +117,8 @@ class TuningRegistersResponse(BaseModel):
         min_start_force (Optional[int]): Minimum start-force register.
         cw_dead_zone (Optional[int]): Clockwise dead-zone register.
         ccw_dead_zone (Optional[int]): Counter-clockwise dead-zone register.
+        speed_p (Optional[int]): Velocity-loop P gain register, or None.
+        speed_i (Optional[int]): Velocity-loop I gain register, or None.
     """
 
     position_p: Optional[int]
@@ -125,10 +127,12 @@ class TuningRegistersResponse(BaseModel):
     min_start_force: Optional[int]
     cw_dead_zone: Optional[int]
     ccw_dead_zone: Optional[int]
+    speed_p: Optional[int]
+    speed_i: Optional[int]
 
 
 class TuningRegistersWriteRequest(BaseModel):
-    """Diagnostic write of any subset of the position-loop tuning registers.
+    """Diagnostic write of any subset of the control-loop tuning registers.
 
     Attributes:
         position_p (Optional[int]): P gain, or None to leave it alone.
@@ -137,6 +141,8 @@ class TuningRegistersWriteRequest(BaseModel):
         min_start_force (Optional[int]): Minimum start force, or None.
         cw_dead_zone (Optional[int]): CW dead zone, or None.
         ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+        speed_p (Optional[int]): Velocity-loop P gain, or None.
+        speed_i (Optional[int]): Velocity-loop I gain, or None.
     """
 
     position_p: Optional[int] = None
@@ -145,6 +151,8 @@ class TuningRegistersWriteRequest(BaseModel):
     min_start_force: Optional[int] = None
     cw_dead_zone: Optional[int] = None
     ccw_dead_zone: Optional[int] = None
+    speed_p: Optional[int] = None
+    speed_i: Optional[int] = None
 
 
 class TuningRegistersWriteResponse(BaseModel):

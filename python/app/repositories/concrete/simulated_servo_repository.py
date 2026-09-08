@@ -19,6 +19,8 @@ _FACTORY_POSITION_I = 0
 _FACTORY_MIN_START_FORCE = 0
 _FACTORY_CW_DEAD_ZONE = 1
 _FACTORY_CCW_DEAD_ZONE = 1
+_FACTORY_SPEED_P = 10
+_FACTORY_SPEED_I = 200
 
 
 class SimulatedServoRepository:
@@ -42,6 +44,8 @@ class SimulatedServoRepository:
         _min_start_force (int): Simulated minimum start force register.
         _cw_dead_zone (int): Simulated CW dead-zone register.
         _ccw_dead_zone (int): Simulated CCW dead-zone register.
+        _speed_p (int): Simulated velocity-loop P gain register.
+        _speed_i (int): Simulated velocity-loop I gain register.
     """
 
     def __init__(self) -> None:
@@ -62,6 +66,8 @@ class SimulatedServoRepository:
         self._min_start_force: int = _FACTORY_MIN_START_FORCE
         self._cw_dead_zone: int = _FACTORY_CW_DEAD_ZONE
         self._ccw_dead_zone: int = _FACTORY_CCW_DEAD_ZONE
+        self._speed_p: int = _FACTORY_SPEED_P
+        self._speed_i: int = _FACTORY_SPEED_I
         Thread(target=self._run, daemon=True).start()
 
     # Test-only affordance, not part of ServoRepository - see docs/DESIGN_NOTES.md.
@@ -181,7 +187,7 @@ class SimulatedServoRepository:
         """Returns the tuning registers as last written, or factory default.
 
         Returns:
-            TuningRegisters: Simulated position-loop tuning registers.
+            TuningRegisters: Simulated control-loop tuning registers.
         """
         with self._lock:
             return TuningRegisters(
@@ -190,13 +196,15 @@ class SimulatedServoRepository:
                 position_i=self._position_i,
                 min_start_force=self._min_start_force,
                 cw_dead_zone=self._cw_dead_zone,
-                ccw_dead_zone=self._ccw_dead_zone)
+                ccw_dead_zone=self._ccw_dead_zone,
+                speed_p=self._speed_p,
+                speed_i=self._speed_i)
 
     def write_tuning_registers(
             self, position_p=None, position_d=None, position_i=None,
             min_start_force=None, cw_dead_zone=None,
-            ccw_dead_zone=None) -> bool:
-        """Records any subset of the position-loop tuning registers.
+            ccw_dead_zone=None, speed_p=None, speed_i=None) -> bool:
+        """Records any subset of the control-loop tuning registers.
 
         Args:
             position_p (Optional[int]): P gain, or None to leave it alone.
@@ -205,6 +213,8 @@ class SimulatedServoRepository:
             min_start_force (Optional[int]): Minimum start force, or None.
             cw_dead_zone (Optional[int]): CW dead zone, or None.
             ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+            speed_p (Optional[int]): Velocity-loop P gain, or None.
+            speed_i (Optional[int]): Velocity-loop I gain, or None.
 
         Returns:
             bool: Always True on simulated hardware.
@@ -222,6 +232,10 @@ class SimulatedServoRepository:
                 self._cw_dead_zone = cw_dead_zone
             if ccw_dead_zone is not None:
                 self._ccw_dead_zone = ccw_dead_zone
+            if speed_p is not None:
+                self._speed_p = speed_p
+            if speed_i is not None:
+                self._speed_i = speed_i
         return True
 
     def read_present_speed_counts_s(self) -> int:

@@ -9,7 +9,7 @@ from Logger461 import logger
 from app.models.entities import TelemetrySnapshot, TuningRegisters
 from app.repositories.abstract.servo_repository import ServoRepository
 
-_TUNING_FIELDS = 7
+_TUNING_FIELDS = 9
 
 _SIGN_BIT = 15
 
@@ -213,7 +213,9 @@ class BridgeServoRepository(ServoRepository):
                 position_i=int(parts[3]),
                 min_start_force=int(parts[4]),
                 cw_dead_zone=int(parts[5]),
-                ccw_dead_zone=int(parts[6]))
+                ccw_dead_zone=int(parts[6]),
+                speed_p=int(parts[7]),
+                speed_i=int(parts[8]))
         except ValueError:
             return None
 
@@ -223,8 +225,10 @@ class BridgeServoRepository(ServoRepository):
             position_i: Optional[int] = None,
             min_start_force: Optional[int] = None,
             cw_dead_zone: Optional[int] = None,
-            ccw_dead_zone: Optional[int] = None) -> bool:
-        """Writes any subset of the position-loop tuning registers directly.
+            ccw_dead_zone: Optional[int] = None,
+            speed_p: Optional[int] = None,
+            speed_i: Optional[int] = None) -> bool:
+        """Writes any subset of the control-loop tuning registers directly.
 
         Args:
             position_p (Optional[int]): P gain, or None to leave it alone.
@@ -233,12 +237,14 @@ class BridgeServoRepository(ServoRepository):
             min_start_force (Optional[int]): Minimum start force, or None.
             cw_dead_zone (Optional[int]): CW dead zone, or None.
             ccw_dead_zone (Optional[int]): CCW dead zone, or None.
+            speed_p (Optional[int]): Velocity-loop P gain, or None.
+            speed_i (Optional[int]): Velocity-loop I gain, or None.
 
         Returns:
             bool: True when every requested write was acknowledged.
         """
         fields = (position_p, position_d, position_i, min_start_force,
-                 cw_dead_zone, ccw_dead_zone)
+                 cw_dead_zone, ccw_dead_zone, speed_p, speed_i)
         payload = ",".join(str(-1 if field is None else field)
                            for field in fields)
         return self._command("servo_write_tuning", payload)

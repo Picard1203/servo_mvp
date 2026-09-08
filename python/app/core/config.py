@@ -44,6 +44,15 @@ class Settings(BaseSettings):
         fine_approach_timeout_seconds (float): Timeout for overshoot approach.
         fine_approach_final_speed_dps (Optional[float]): Final-leg speed
             override; None uses the move's own speed.
+        fine_approach_gate_deg (float): Accuracy the arm must reach before
+            a move is treated as arrived.
+        fine_approach_max_corrections (int): How many corrective
+            re-approaches to attempt before reporting the miss.
+        fine_approach_max_correction_deg (float): Largest residual that is
+            treated as a real miss; anything past it is a bad reading and
+            is reported, never driven.
+        fine_approach_settle_quiet_seconds (float): How long the position
+            must hold still before a reading counts as a landing.
         fine_approach_final_acceleration (Optional[int]): Final-leg
             acceleration override; None uses the move's own acceleration.
         sampler_interval_seconds (float): Telemetry sampling interval.
@@ -88,6 +97,10 @@ class Settings(BaseSettings):
     fine_approach_timeout_seconds: float = 30.0
     fine_approach_final_speed_dps: Optional[float] = None
     fine_approach_final_acceleration: Optional[int] = None
+    fine_approach_gate_deg: float = 0.12
+    fine_approach_max_corrections: int = 3
+    fine_approach_max_correction_deg: float = 2.0
+    fine_approach_settle_quiet_seconds: float = 1.5
     sampler_interval_seconds: float = 0.5
     telemetry_retention_days: int = 30
     telemetry_purge_interval_seconds: float = 3600.0

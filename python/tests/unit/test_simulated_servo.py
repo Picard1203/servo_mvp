@@ -131,6 +131,8 @@ class TestTorque:
         assert registers.min_start_force == 0
         assert registers.cw_dead_zone == 1
         assert registers.ccw_dead_zone == 1
+        assert registers.speed_p == 10
+        assert registers.speed_i == 200
 
     def test_write_tuning_registers_updates_the_written_fields(self, sim):
         assert sim.write_tuning_registers(position_p=16, min_start_force=50) \
@@ -139,6 +141,17 @@ class TestTorque:
         assert registers.position_p == 16
         assert registers.min_start_force == 50
 
+    def test_write_tuning_registers_updates_the_velocity_loop_fields(self, sim):
+        """Velocity-loop gains must round-trip like the position-loop ones.
+
+        speed_i is the only integrator in the stock configuration, so it is
+        the register a hunting-oscillation investigation reaches for first.
+        """
+        assert sim.write_tuning_registers(speed_p=20, speed_i=0) is True
+        registers = sim.read_tuning_registers()
+        assert registers.speed_p == 20
+        assert registers.speed_i == 0
+
     def test_write_tuning_registers_leaves_unset_fields_alone(self, sim):
         sim.write_tuning_registers(position_p=16)
         registers = sim.read_tuning_registers()
@@ -146,6 +159,8 @@ class TestTorque:
         assert registers.position_i == 0
         assert registers.cw_dead_zone == 1
         assert registers.ccw_dead_zone == 1
+        assert registers.speed_p == 10
+        assert registers.speed_i == 200
 
     def test_read_present_speed_is_zero_when_settled(self, sim):
         assert sim.read_present_speed_counts_s() == 0

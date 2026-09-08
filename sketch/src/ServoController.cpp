@@ -200,7 +200,10 @@ TuningSnapshot ServoController::ReadTuningRegisters() {
   const int min_start_force = bus_.ReadWord(reg::kMinStartForce);
   const int cw = bus_.ReadByte(reg::kCwDeadZone);
   const int ccw = bus_.ReadByte(reg::kCcwDeadZone);
-  if (p < 0 || d < 0 || i < 0 || min_start_force < 0 || cw < 0 || ccw < 0) {
+  const int speed_p = bus_.ReadByte(reg::kSpeedP);
+  const int speed_i = bus_.ReadByte(reg::kSpeedI);
+  if (p < 0 || d < 0 || i < 0 || min_start_force < 0 || cw < 0 || ccw < 0 ||
+      speed_p < 0 || speed_i < 0) {
     return snapshot;
   }
   snapshot.position_p = static_cast<uint8_t>(p);
@@ -209,13 +212,16 @@ TuningSnapshot ServoController::ReadTuningRegisters() {
   snapshot.min_start_force = static_cast<uint16_t>(min_start_force);
   snapshot.cw_dead_zone = static_cast<uint8_t>(cw);
   snapshot.ccw_dead_zone = static_cast<uint8_t>(ccw);
+  snapshot.speed_p = static_cast<uint8_t>(speed_p);
+  snapshot.speed_i = static_cast<uint8_t>(speed_i);
   snapshot.valid = true;
   return snapshot;
 }
 
 bool ServoController::WriteTuningRegisters(int16_t p, int16_t d, int16_t i,
                                            int16_t min_start_force,
-                                           int16_t cw, int16_t ccw) {
+                                           int16_t cw, int16_t ccw,
+                                           int16_t speed_p, int16_t speed_i) {
   bool ok = true;
   if (p >= 0) {
     ok = bus_.WriteEepromByte(reg::kPositionP, ClampByteRegister(p)) && ok;
@@ -239,6 +245,12 @@ bool ServoController::WriteTuningRegisters(int16_t p, int16_t d, int16_t i,
   if (ccw >= 0) {
     ok = bus_.WriteEepromByte(reg::kCcwDeadZone, ClampDeadband(
         static_cast<uint8_t>(ClampByteRegister(ccw)))) && ok;
+  }
+  if (speed_p >= 0) {
+    ok = bus_.WriteEepromByte(reg::kSpeedP, ClampByteRegister(speed_p)) && ok;
+  }
+  if (speed_i >= 0) {
+    ok = bus_.WriteEepromByte(reg::kSpeedI, ClampByteRegister(speed_i)) && ok;
   }
   return ok;
 }

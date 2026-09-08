@@ -100,7 +100,11 @@ class TelemetrySnapshot:
 
 @dataclass(slots=True, frozen=True)
 class TuningRegisters:
-    """Diagnostic read of the servo's position-loop tuning registers.
+    """Diagnostic read of the servo's control-loop tuning registers.
+
+    speed_p and speed_i tune the servo's inner velocity loop, cascaded
+    beneath the position loop the other fields tune. Since position_i ships
+    as 0, speed_i is the only integrator in the stock configuration.
 
     Attributes:
         position_p (int): Proportional gain register (0x15).
@@ -109,6 +113,8 @@ class TuningRegisters:
         min_start_force (int): Minimum start-force register (0x18).
         cw_dead_zone (int): Clockwise dead-zone register (0x1A).
         ccw_dead_zone (int): Counter-clockwise dead-zone register (0x1B).
+        speed_p (int): Velocity-loop proportional gain register (0x25).
+        speed_i (int): Velocity-loop integral gain register (0x27).
     """
 
     position_p: int
@@ -117,6 +123,8 @@ class TuningRegisters:
     min_start_force: int
     cw_dead_zone: int
     ccw_dead_zone: int
+    speed_p: int
+    speed_i: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -129,7 +137,9 @@ class ServoStateView:
         reading_valid (bool): False when servo did not answer read.
         moving (Optional[bool]): True if moving or None if read failed.
         locked (bool): Digital lock engagement state.
-        settling (bool): True during post-lock settle delay window.
+        settling (bool): True during the post-lock settle delay window,
+            and for the whole of a multi-leg positioning sequence, so the
+            arm is never presented as finished between its own legs.
         position_verified (bool): True once datum calibration confirmed.
         temperature_c (Optional[float]): Temperature or None if read failed.
         voltage_v (Optional[float]): Voltage or None if read failed.

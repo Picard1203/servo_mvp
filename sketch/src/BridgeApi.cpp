@@ -100,18 +100,20 @@ String HandleReadTorque(String /*unused*/) {
 
 String HandleReadTuning(String /*unused*/) {
   BridgeApi* api = BridgeApi::instance();
-  if (api == nullptr) return String("0,0,0,0,0,0,0");
+  if (api == nullptr) return String("0,0,0,0,0,0,0,0,0");
   const servo::TuningSnapshot snapshot =
       api->controller().ReadTuningRegisters();
-  char buffer[64];
-  snprintf(buffer, sizeof(buffer), "%d,%u,%u,%u,%u,%u,%u",
+  char buffer[96];
+  snprintf(buffer, sizeof(buffer), "%d,%u,%u,%u,%u,%u,%u,%u,%u",
           snapshot.valid ? 1 : 0,
           static_cast<unsigned>(snapshot.position_p),
           static_cast<unsigned>(snapshot.position_d),
           static_cast<unsigned>(snapshot.position_i),
           static_cast<unsigned>(snapshot.min_start_force),
           static_cast<unsigned>(snapshot.cw_dead_zone),
-          static_cast<unsigned>(snapshot.ccw_dead_zone));
+          static_cast<unsigned>(snapshot.ccw_dead_zone),
+          static_cast<unsigned>(snapshot.speed_p),
+          static_cast<unsigned>(snapshot.speed_i));
   return String(buffer);
 }
 
@@ -125,8 +127,10 @@ String HandleWriteTuning(String payload) {
       static_cast<int16_t>(FieldAt(payload, 3, -1));
   const int16_t cw = static_cast<int16_t>(FieldAt(payload, 4, -1));
   const int16_t ccw = static_cast<int16_t>(FieldAt(payload, 5, -1));
+  const int16_t speed_p = static_cast<int16_t>(FieldAt(payload, 6, -1));
+  const int16_t speed_i = static_cast<int16_t>(FieldAt(payload, 7, -1));
   return String(Ack(api->controller().WriteTuningRegisters(
-      p, d, i, min_start_force, cw, ccw)));
+      p, d, i, min_start_force, cw, ccw, speed_p, speed_i)));
 }
 
 String HandleReadSpeed(String /*unused*/) {

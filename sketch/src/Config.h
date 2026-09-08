@@ -19,7 +19,15 @@ constexpr uint8_t kAngleResolution  = 1;
 constexpr uint8_t  kDeadbandCounts     = 0;
 constexpr uint8_t  kDefaultAcceleration = 50;
 constexpr uint16_t kTorqueLimit        = 1000;
-constexpr uint16_t kMinStartForce      = 150;
+// The minimum drive applied when the arm is off target. It trades two
+// opposite failures against each other: too high and the arm hunts around
+// the target and never stops, too low and it stops short and stays there.
+// Measured across 176 trials at four values, oscillation rises with this
+// number and stopping short falls, so no value avoids both - 55 is the
+// highest that never once oscillated (0 of 44 trials), leaving the short
+// landing to be corrected in software, which it can be. Verified on the
+// bench proxy only; a real arm carries more friction, so expect to revisit.
+constexpr uint16_t kMinStartForce      = 55;
 constexpr uint8_t  kPositionGainP      = 24;
 
 constexpr uint32_t kConsoleBaud = 115200UL;

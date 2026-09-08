@@ -58,6 +58,25 @@ class ServoStateStore:
         self._target_stale: bool = False
         self._isolated_intent: bool = (app_state.get(_ISOLATED_INTENT_KEY) == "1")
         self._isolated_known: bool = False
+        self._positioning: bool = False
+
+    def set_positioning(self, positioning: bool) -> None:
+        """Marks a multi-leg positioning sequence as in progress.
+
+        The anti-backlash approach is several commanded moves - an
+        overshoot leg, a final leg, and any corrective re-approach - with
+        the servo briefly still between them. Reported straight from the
+        servo, those pauses read as HOLDING, so the arm appears to finish
+        and then move again on its own. Several operators watch the same
+        arm, and unexplained motion nobody commanded is the worst thing
+        this system can show them. Holding this flag for the whole
+        sequence keeps it presented as SETTLING throughout.
+
+        Args:
+            positioning (bool): True while a sequence is in progress.
+        """
+        with self._lock:
+            self._positioning = positioning
 
     def set_locked(self, locked: bool) -> bool:
         """Sets the lock state and starts a settle window on change.
@@ -245,7 +264,8 @@ class ServoStateStore:
         datum = self._datum_counts()
         with self._lock:
             locked = self._locked
-            settling = (self._settle_deadline > monotonic())
+            settling = ((self._settle_deadline > monotonic())
+                        or self._positioning)
             verified = self._position_verified
             target_deg = self._target_deg
             target_stale = self._target_stale

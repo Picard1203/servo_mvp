@@ -21,6 +21,10 @@ from app.core.exceptions import (
 from app.repositories.abstract.servo_repository import ServoRepository
 from app.services.servo_state import ServoStateStore
 
+# One encoder count in output degrees. Two readings closer together than
+# this are the same position as far as the servo can express it.
+_COUNT_EPSILON_DEG = 0.061
+
 
 class MotionService:
     """Validates and executes movement commands in output-degree space.
@@ -141,7 +145,21 @@ class MotionService:
         generation = self._move_generation
 
         if self._needs_fine_approach(start_deg, target_deg) is True:
-            direction = 1 if target_deg > start_deg else -1
+            # The side the arm arrives from decides where it lands: the
+            # wrong side misses by 0.45-0.67 deg, the right side by
+            # 0.03-0.16 (60 trials, p<=0.005 for each sign). Deriving it
+            # from the direction of travel - which is what this did - let
+            # the starting position decide the arrival side, so the same
+            # commanded angle landed somewhere different depending on
+            # where the move began. Anchoring it to the target's own sign
+            # instead means the overshoot always sits away from the datum
+            # and the final leg always travels toward it, whatever the
+            # move's own direction was.
+            direction = 1 if target_deg > 0 else -1
+            # Marked here, not inside the thread: between accepting the
+            # move and the thread starting there would otherwise be a
+            # window where the arm still reads as finished.
+            self._state.set_positioning(True)
             self._fine_approach_thread = Thread(
                 target=self._fine_approach,
                 args=(generation, target_deg, target_counts, speed_counts,
@@ -285,7 +303,14 @@ class MotionService:
                        target_counts: int, speed_counts: int,
                        acceleration: int, direction: int,
                        from_deg: Optional[float]) -> None:
-        """Runs the two-leg consistent-direction approach.
+        """Runs the consistent-direction approach, then verifies it arrived.
+
+        The approach itself is two legs - overshoot away from the datum,
+        then a final leg back toward it. What follows is the part that was
+        missing: reading the position back and correcting it. Without that,
+        this reported a move as done once the servo acknowledged the
+        command, whether or not the arm ever got there, and it routinely
+        stops three counts short.
 
         Args:
             generation (int): Move generation this thread was started for.
@@ -293,86 +318,214 @@ class MotionService:
             target_counts (int): Final absolute counts target.
             speed_counts (int): Speed in counts per second.
             acceleration (int): Servo acceleration parameter.
-            direction (int): +1 if the move is upward, -1 if downward.
+            direction (int): +1 when the target is above the datum, -1 below.
             from_deg (Optional[float]): Output angle the move started from.
         """
         try:
-            requested_overshoot_deg = (
-                target_deg
-                + direction * self._settings.fine_approach_overshoot_deg)
-            low_deg, high_deg = self._state.reachable_output_range_deg()
-            overshoot_deg = min(max(requested_overshoot_deg, low_deg),
-                                high_deg)
-            overshoot_clamped = overshoot_deg != requested_overshoot_deg
-            overshoot_counts = self._state.counts_from_output_deg(
-                overshoot_deg)
-            overshoot_acked = self._servo.command_move(
-                overshoot_counts, speed_counts, acceleration)
-            if overshoot_acked is False:
-                self._record_failure(
-                    "servo.move.failed",
-                    f"fine approach overshoot leg to {overshoot_deg:.2f} deg "
-                    "was not acknowledged",
-                    {"target_deg": target_deg, "leg": "overshoot"})
-                return
-            self._record_accepted(target_deg, from_deg, acceleration)
-            start_snapshot = self._servo.read_snapshot()
-            wait_start = monotonic()
-            deadline = (wait_start
-                        + self._settings.fine_approach_timeout_seconds)
-            is_moving = True
-            while (monotonic() < deadline) and (is_moving is True):
-                sleep(0.05)
-                is_moving = (self._servo.read_snapshot().moving is True)
-            wait_elapsed_s = monotonic() - wait_start
-            if generation != self._move_generation:
-                logger.debug("fine approach: superseded, final leg skipped",
-                             metadata={"event": "servo.move.fine_approach"})
-                return
-            if self._state.is_isolated_intent() is True:
-                logger.debug("fine approach: isolated, final leg skipped",
-                             metadata={"event": "servo.move.fine_approach"})
-                return
-            position_at_final_leg_deg = self._state.current_output_deg()
-            final_speed_counts = speed_counts
-            if self._settings.fine_approach_final_speed_dps is not None:
-                final_speed_counts = (
-                    self._state.counts_speed_from_output_speed(
-                        self._settings.fine_approach_final_speed_dps))
-            final_acceleration = acceleration
-            if self._settings.fine_approach_final_acceleration is not None:
-                final_acceleration = (
-                    self._settings.fine_approach_final_acceleration)
-            final_acked = self._servo.command_move(
-                target_counts, final_speed_counts, final_acceleration)
-            if final_acked is False:
-                self._record_failure(
-                    "servo.move.failed",
-                    f"fine approach final leg to {target_deg:.2f} deg was "
-                    "not acknowledged",
-                    {"target_deg": target_deg, "leg": "final"})
-                return
-            end_snapshot = self._servo.read_snapshot()
-            logger.debug("fine approach: final leg commanded",
-                         metadata={"event": "servo.move.fine_approach"},
-                         extra={"target_deg": target_deg})
-            self._events.record(
-                "servo.move.fine_approach",
-                f"fine approach to {target_deg:.2f} deg",
-                {"overshoot_deg": round(overshoot_deg, 2),
-                 "overshoot_clamped": overshoot_clamped,
-                 "wait_elapsed_s": round(wait_elapsed_s, 3),
-                 "position_at_final_leg_deg": (
-                     round(position_at_final_leg_deg, 2)
-                     if position_at_final_leg_deg is not None else None),
-                 "current_a_at_overshoot": start_snapshot.current_a,
-                 "torque_kgcm_at_overshoot": start_snapshot.torque_kgcm,
-                 "current_a_at_final": end_snapshot.current_a,
-                 "torque_kgcm_at_final": end_snapshot.torque_kgcm})
+            aim_deg = target_deg
+            aim_counts = target_counts
+            corrections = 0
+            while True:
+                arrived = self._approach_once(
+                    generation, target_deg, aim_deg, aim_counts,
+                    speed_counts, acceleration, direction, from_deg,
+                    is_first_leg=(corrections == 0))
+                if arrived is False:
+                    return
+                landed_deg = self._wait_until_landed()
+                if landed_deg is None:
+                    # ADR-0008: a failed read is unknown, never a number.
+                    # Correcting against an invented position is how a bad
+                    # read becomes a real, commanded 61 deg swing.
+                    self._record_failure(
+                        "servo.move.failed",
+                        f"could not confirm arrival at {target_deg:.2f} deg: "
+                        "the servo did not answer a position read",
+                        {"target_deg": target_deg, "leg": "verify"})
+                    return
+                residual = landed_deg - target_deg
+                if abs(residual) <= self._settings.fine_approach_gate_deg:
+                    self._events.record(
+                        "servo.move.arrived",
+                        f"arrived at {target_deg:.2f} deg",
+                        {"landed_deg": round(landed_deg, 2),
+                         "residual_deg": round(residual, 2),
+                         "corrections": corrections})
+                    return
+                if abs(residual) > (
+                        self._settings.fine_approach_max_correction_deg):
+                    # Too far out to be a miss. Report it; never drive it.
+                    self._record_failure(
+                        "servo.move.failed",
+                        f"stopped {abs(residual):.2f} deg from "
+                        f"{target_deg:.2f} deg, too far to correct safely",
+                        {"target_deg": target_deg,
+                         "landed_deg": round(landed_deg, 2),
+                         "residual_deg": round(residual, 2),
+                         "leg": "verify"})
+                    return
+                if corrections >= self._settings.fine_approach_max_corrections:
+                    self._record_failure(
+                        "servo.move.failed",
+                        f"stopped {abs(residual):.2f} deg short of "
+                        f"{target_deg:.2f} deg after {corrections} "
+                        "corrections",
+                        {"target_deg": target_deg,
+                         "landed_deg": round(landed_deg, 2),
+                         "residual_deg": round(residual, 2),
+                         "corrections": corrections, "leg": "verify"})
+                    return
+                # Correct the aim, not the target. Re-deriving the aim from
+                # the target each round discards where it last aimed, and
+                # against a servo that lands where it is aimed that just
+                # flips the error's sign forever (measured: 45.18, 44.82,
+                # 45.18, 44.82). Carrying the aim forward converges against
+                # that and against a fixed offset alike.
+                aim_deg = aim_deg - residual
+                aim_counts = self._state.counts_from_output_deg(aim_deg)
+                corrections += 1
         except (sqlite3.OperationalError, ValueError):
             logger.exception(
                 "fine approach failed",
                 metadata={"event": "servo.move.fine_approach_error"})
+        finally:
+            self._state.set_positioning(False)
+
+    def _approach_once(self, generation: int, target_deg: float,
+                       aim_deg: float, aim_counts: int, speed_counts: int,
+                       acceleration: int, direction: int,
+                       from_deg: Optional[float],
+                       is_first_leg: bool) -> bool:
+        """Runs one overshoot-then-final-leg approach at a given aim.
+
+        Args:
+            generation (int): Move generation this thread was started for.
+            target_deg (float): The angle the operator asked for, for events.
+            aim_deg (float): Angle to aim at, which is the target on the
+                first pass and a corrected value afterwards.
+            aim_counts (int): `aim_deg` in absolute counts.
+            speed_counts (int): Speed in counts per second.
+            acceleration (int): Servo acceleration parameter.
+            direction (int): +1 when the target is above the datum, -1 below.
+            from_deg (Optional[float]): Angle the move started from.
+            is_first_leg (bool): True on the operator's own move, False on a
+                correction - only the first one is recorded as accepted.
+
+        Returns:
+            bool: True when both legs were acknowledged and the approach was
+                neither superseded nor aborted.
+        """
+        requested_overshoot_deg = (
+            aim_deg + direction * self._settings.fine_approach_overshoot_deg)
+        low_deg, high_deg = self._state.reachable_output_range_deg()
+        overshoot_deg = min(max(requested_overshoot_deg, low_deg), high_deg)
+        overshoot_clamped = overshoot_deg != requested_overshoot_deg
+        overshoot_counts = self._state.counts_from_output_deg(overshoot_deg)
+        overshoot_acked = self._servo.command_move(
+            overshoot_counts, speed_counts, acceleration)
+        if overshoot_acked is False:
+            self._record_failure(
+                "servo.move.failed",
+                f"fine approach overshoot leg to {overshoot_deg:.2f} deg "
+                "was not acknowledged",
+                {"target_deg": target_deg, "leg": "overshoot"})
+            return False
+        if is_first_leg is True:
+            self._record_accepted(target_deg, from_deg, acceleration)
+        start_snapshot = self._servo.read_snapshot()
+        wait_start = monotonic()
+        deadline = wait_start + self._settings.fine_approach_timeout_seconds
+        is_moving = True
+        while (monotonic() < deadline) and (is_moving is True):
+            sleep(0.05)
+            is_moving = (self._servo.read_snapshot().moving is True)
+        wait_elapsed_s = monotonic() - wait_start
+        if generation != self._move_generation:
+            logger.debug("fine approach: superseded, final leg skipped",
+                         metadata={"event": "servo.move.fine_approach"})
+            return False
+        if self._state.is_isolated_intent() is True:
+            logger.debug("fine approach: isolated, final leg skipped",
+                         metadata={"event": "servo.move.fine_approach"})
+            return False
+        position_at_final_leg_deg = self._state.current_output_deg()
+        final_speed_counts = speed_counts
+        if self._settings.fine_approach_final_speed_dps is not None:
+            final_speed_counts = (
+                self._state.counts_speed_from_output_speed(
+                    self._settings.fine_approach_final_speed_dps))
+        final_acceleration = acceleration
+        if self._settings.fine_approach_final_acceleration is not None:
+            final_acceleration = (
+                self._settings.fine_approach_final_acceleration)
+        final_acked = self._servo.command_move(
+            aim_counts, final_speed_counts, final_acceleration)
+        if final_acked is False:
+            self._record_failure(
+                "servo.move.failed",
+                f"fine approach final leg to {aim_deg:.2f} deg was "
+                "not acknowledged",
+                {"target_deg": target_deg, "leg": "final"})
+            return False
+        end_snapshot = self._servo.read_snapshot()
+        logger.debug("fine approach: final leg commanded",
+                     metadata={"event": "servo.move.fine_approach"},
+                     extra={"target_deg": target_deg, "aim_deg": aim_deg})
+        self._events.record(
+            "servo.move.fine_approach",
+            f"fine approach to {aim_deg:.2f} deg",
+            {"overshoot_deg": round(overshoot_deg, 2),
+             "overshoot_clamped": overshoot_clamped,
+             "aim_deg": round(aim_deg, 2),
+             "wait_elapsed_s": round(wait_elapsed_s, 3),
+             "position_at_final_leg_deg": (
+                 round(position_at_final_leg_deg, 2)
+                 if position_at_final_leg_deg is not None else None),
+             "current_a_at_overshoot": start_snapshot.current_a,
+             "torque_kgcm_at_overshoot": start_snapshot.torque_kgcm,
+             "current_a_at_final": end_snapshot.current_a,
+             "torque_kgcm_at_final": end_snapshot.torque_kgcm})
+        return True
+
+    def _wait_until_landed(self) -> Optional[float]:
+        """Waits for the position to hold still, then returns it.
+
+        Movement decides this, and current does not gate it at any level:
+        an arm holding a position against gravity draws a current that
+        never goes quiet, so requiring it to would mean never detecting a
+        landing at all. Measured on the diagnostic tool, that mistake cost
+        a full 25s timeout on every correction; on movement alone the same
+        correction takes 5s.
+
+        The window is five times the 0.277s limit-cycle period this servo
+        shows, so an arm still hunting cannot pass as landed: across 245
+        archived traces the median gap between movements while hunting is
+        0.27s, and 98% of arms still for 2s never moved again.
+
+        Returns:
+            Optional[float]: The settled output angle, or None if the servo
+                never answered a read - which means unknown, not a number.
+        """
+        required = self._settings.fine_approach_settle_quiet_seconds
+        deadline = (monotonic()
+                    + self._settings.fine_approach_timeout_seconds)
+        last: Optional[float] = None
+        quiet_since: Optional[float] = None
+        while monotonic() < deadline:
+            current_deg = self._state.current_output_deg()
+            now = monotonic()
+            if current_deg is not None:
+                if (last is not None
+                        and abs(current_deg - last) < _COUNT_EPSILON_DEG):
+                    if quiet_since is None:
+                        quiet_since = now
+                    elif (now - quiet_since) >= required:
+                        return current_deg
+                else:
+                    quiet_since = None
+                last = current_deg
+            sleep(0.05)
+        return last
 
     def _validate_reachable(self, target_deg: float) -> None:
         """Refuses targets the servo would silently clamp.

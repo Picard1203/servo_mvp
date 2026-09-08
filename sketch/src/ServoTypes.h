@@ -28,6 +28,12 @@ struct MoveCommand {
 };
 
 /// One coherent reading of the servo's control-loop tuning registers.
+///
+/// speed_p and speed_i belong to the servo's inner velocity loop, which is
+/// cascaded beneath the position loop the other fields tune. They matter
+/// because position_i ships as 0, leaving speed_i the only integrator in the
+/// stock configuration - and an integrator winding up against stiction is a
+/// textbook source of slow hunting oscillation near a target.
 struct TuningSnapshot {
   uint8_t position_p = 0;
   uint8_t position_d = 0;
@@ -35,6 +41,8 @@ struct TuningSnapshot {
   uint16_t min_start_force = 0;
   uint8_t cw_dead_zone = 0;
   uint8_t ccw_dead_zone = 0;
+  uint8_t speed_p = 0;
+  uint8_t speed_i = 0;
   bool valid = false;
 };
 

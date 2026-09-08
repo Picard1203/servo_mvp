@@ -400,8 +400,10 @@ class TestFineApproach:
         store = get_state_store()
         monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
         target_deg = 12.0
+        # Above the target: the overshoot leg is placed by the target's own
+        # sign now, not by the direction of travel.
         overshoot_deg = (target_deg
-                        - backend.settings.fine_approach_overshoot_deg)
+                        + backend.settings.fine_approach_overshoot_deg)
         real_counts_from_output_deg = store.counts_from_output_deg
 
         def _flaky(output_deg):
@@ -414,7 +416,7 @@ class TestFineApproach:
         monkeypatch.setattr("app.services.motion_service.logger.exception",
                             lambda *a, **k: logged.append(a))
         motion = get_motion_service()
-        motion.move_to(target_deg)   # downward: spawns the thread
+        motion.move_to(target_deg)   # spawns the thread
         assert wait_until(lambda: len(logged) > 0, timeout=4)
 
     def test_overshoot_is_clamped_to_the_reachable_range(
@@ -427,10 +429,10 @@ class TestFineApproach:
         store = get_state_store()
         monkeypatch.setattr(store, "current_output_deg", lambda: 30.0)
         requested_overshoot_deg = (
-            6.0 - backend.settings.fine_approach_overshoot_deg)
-        clamp_low = requested_overshoot_deg + 0.5   # forces clamping
+            6.0 + backend.settings.fine_approach_overshoot_deg)
+        clamp_high = requested_overshoot_deg - 0.5   # forces clamping
         monkeypatch.setattr(store, "reachable_output_range_deg",
-                            lambda: (clamp_low, 100.0))
+                            lambda: (-100.0, clamp_high))
         motion = get_motion_service()
 
         calls = []
@@ -441,15 +443,15 @@ class TestFineApproach:
                                           real_command_move(counts, speed,
                                                             accel))[1])
 
-        motion.move_to(6.0)   # downward: overshoot wants below clamp_low
+        motion.move_to(6.0)   # overshoot wants above clamp_high
         assert wait_until(
             lambda: "servo.move.fine_approach" in
             [e.event for e in _events(backend)], timeout=8)
         [event] = [e for e in _events(backend)
                   if e.event == "servo.move.fine_approach"]
-        assert event.data["overshoot_deg"] == clamp_low
+        assert event.data["overshoot_deg"] == clamp_high
         assert event.data["overshoot_clamped"] is True
-        assert calls[0] == store.counts_from_output_deg(clamp_low)
+        assert calls[0] == store.counts_from_output_deg(clamp_high)
 
     def test_overshoot_within_range_is_not_reported_as_clamped(
             self, monkeypatch, backend, sim):
@@ -467,7 +469,7 @@ class TestFineApproach:
                   if e.event == "servo.move.fine_approach"]
         assert event.data["overshoot_clamped"] is False
         assert event.data["overshoot_deg"] == (
-            12.0 - backend.settings.fine_approach_overshoot_deg)
+            12.0 + backend.settings.fine_approach_overshoot_deg)
 
     def test_event_carries_diagnostic_metadata_for_the_board_run(
             self, monkeypatch, backend, sim):
@@ -691,3 +693,281 @@ class TestTravelLimits:
                                                          backend):
         motion.move_to(backend.settings.output_min_deg)
         motion.move_to(backend.settings.output_max_deg)
+
+
+class _ScriptedArm:
+    """Reproduces how this servo actually lands, so the correction loop can
+    be tested without hardware.
+
+    Two behaviours were measured on the rig and the loop has to converge
+    against both. With a *bias*, the arm lands a fixed distance past
+    whatever it is aimed at - at -90 deg it overshot by 0.43 deg on every
+    single attempt. With `lands_at_aim`, it instead stops exactly where it
+    was told, after one initial miss; that is the case that made the
+    original loop ping-pong forever between 45.18 and 44.82.
+    """
+
+    def __init__(self, store, bias_deg: float = 0.0,
+                 first_miss_deg: float = 0.0):
+        self._store = store
+        self._bias_deg = bias_deg
+        self._first_miss_deg = first_miss_deg
+        self.aims_deg: list[float] = []
+        self._landed: float = 0.0
+        self._moves = 0
+
+    def command_move(self, counts: int, speed: int, accel: int) -> bool:
+        """Records the commanded angle and lands the arm.
+
+        Args:
+            counts (int): Absolute encoder counts commanded.
+            speed (int): Speed in counts per second.
+            accel (int): Acceleration parameter.
+
+        Returns:
+            bool: Always True; refusal is covered by its own tests.
+        """
+        aim_deg = self._store.output_deg_from_counts(counts)
+        self.aims_deg.append(round(aim_deg, 3))
+        self._moves += 1
+        if self._moves == 1 and self._first_miss_deg:
+            self._landed = aim_deg + self._first_miss_deg
+        else:
+            self._landed = aim_deg + self._bias_deg
+        return True
+
+    def current_output_deg(self):
+        """Returns where the arm came to rest.
+
+        Returns:
+            float: The landed output angle.
+        """
+        return round(self._landed, 2)
+
+
+def _fast_settle(monkeypatch, backend):
+    """Shrinks the landing-quiet window so tests do not wait on real time.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+        backend: The backend fixture carrying settings.
+    """
+    monkeypatch.setattr(backend.settings, "fine_approach_enabled", True)
+    monkeypatch.setattr(backend.settings,
+                        "fine_approach_settle_quiet_seconds", 0.05)
+    monkeypatch.setattr(backend.settings,
+                        "fine_approach_timeout_seconds", 3.0)
+
+
+class TestArrivalDirection:
+    """The overshoot is placed by the target's sign, not by where the move
+    started.
+
+    Arriving from the wrong side missed by 0.45-0.67 deg against 0.03-0.16
+    from the right side (60 trials). Deriving the side from the direction
+    of travel let the starting position decide it, so one commanded angle
+    had two different resting places.
+    """
+
+    def _overshoot_of(self, monkeypatch, backend, sim, start_deg, target_deg):
+        """Runs one move and returns the angle of its overshoot leg.
+
+        Args:
+            monkeypatch: Pytest monkeypatch fixture.
+            backend: Backend fixture.
+            sim: Simulated servo fixture.
+            start_deg (float): Angle the move starts from.
+            target_deg (float): Angle to command.
+
+        Returns:
+            float: The overshoot leg's output angle.
+        """
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        monkeypatch.setattr(store, "current_output_deg", lambda: start_deg)
+        arm = _ScriptedArm(store)
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        get_motion_service().move_to(target_deg)
+        assert wait_until(lambda: len(arm.aims_deg) >= 1, timeout=8)
+        return arm.aims_deg[0]
+
+    def test_negative_target_overshoots_below_from_either_side(
+            self, monkeypatch, backend, sim):
+        overshoot = backend.settings.fine_approach_overshoot_deg
+        from_above = self._overshoot_of(monkeypatch, backend, sim, 30.0, -30.0)
+        assert from_above == pytest.approx(-30.0 - overshoot, abs=0.06)
+
+    def test_positive_target_overshoots_above_from_either_side(
+            self, monkeypatch, backend, sim):
+        overshoot = backend.settings.fine_approach_overshoot_deg
+        from_below = self._overshoot_of(monkeypatch, backend, sim, -30.0, 30.0)
+        assert from_below == pytest.approx(30.0 + overshoot, abs=0.06)
+
+    def test_the_same_target_gets_the_same_overshoot_from_both_sides(
+            self, monkeypatch, backend, sim):
+        # The defect in one line: this pair used to differ, which is why
+        # the same command landed in two different places.
+        below = self._overshoot_of(monkeypatch, backend, sim, -80.0, -30.0)
+        above = self._overshoot_of(monkeypatch, backend, sim, 30.0, -30.0)
+        assert below == above
+
+
+class TestVerifyAndCorrect:
+    """The move is not done when the servo acknowledges it, but when the
+    arm is measured to have arrived."""
+
+    def test_a_fixed_bias_is_corrected_away(self, monkeypatch, backend, sim):
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        arm = _ScriptedArm(store, bias_deg=-0.43)   # the measured -90 case
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        monkeypatch.setattr(store, "current_output_deg",
+                            arm.current_output_deg)
+        get_motion_service().move_to(-90.0)
+        assert wait_until(
+            lambda: "servo.move.arrived" in
+            [e.event for e in _events(backend)], timeout=8)
+        [arrived] = [e for e in _events(backend)
+                     if e.event == "servo.move.arrived"]
+        assert abs(arrived.data["residual_deg"]) <= (
+            backend.settings.fine_approach_gate_deg)
+        assert arrived.data["corrections"] >= 1
+
+    def test_an_arm_that_lands_on_its_aim_does_not_ping_pong(
+            self, monkeypatch, backend, sim):
+        # Measured at +45: 45.18, 44.82, 45.18, 44.82 - forever, because
+        # the aim was re-derived from the target every round.
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        arm = _ScriptedArm(store, bias_deg=0.0, first_miss_deg=0.18)
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        monkeypatch.setattr(store, "current_output_deg",
+                            arm.current_output_deg)
+        get_motion_service().move_to(45.0)
+        assert wait_until(
+            lambda: "servo.move.arrived" in
+            [e.event for e in _events(backend)], timeout=8)
+        [arrived] = [e for e in _events(backend)
+                     if e.event == "servo.move.arrived"]
+        assert abs(arrived.data["residual_deg"]) <= (
+            backend.settings.fine_approach_gate_deg)
+
+    def test_an_unreadable_position_is_reported_and_never_corrected(
+            self, monkeypatch, backend, sim):
+        # ADR-0008: a failed read is unknown, never a number. Correcting
+        # against an invented position is how a bad read becomes a real,
+        # commanded 61 deg swing - which happened on the rig.
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        arm = _ScriptedArm(store)
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        reads = {"n": 0}
+
+        def _first_read_then_silence():
+            # The move itself needs a starting position; the readback that
+            # follows is the one the servo fails to answer.
+            reads["n"] += 1
+            return 0.0 if reads["n"] == 1 else None
+
+        monkeypatch.setattr(store, "current_output_deg",
+                            _first_read_then_silence)
+        get_motion_service().move_to(30.0)
+        assert wait_until(
+            lambda: "servo.move.failed" in
+            [e.event for e in _events(backend)], timeout=8)
+        assert len(arm.aims_deg) == 2   # overshoot and final leg only
+
+    def test_an_implausible_residual_is_reported_never_driven(
+            self, monkeypatch, backend, sim):
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        arm = _ScriptedArm(store, bias_deg=-61.0)   # a mid-travel reading
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        monkeypatch.setattr(store, "current_output_deg",
+                            arm.current_output_deg)
+        get_motion_service().move_to(30.0)
+        assert wait_until(
+            lambda: "servo.move.failed" in
+            [e.event for e in _events(backend)], timeout=8)
+        [failure] = [e for e in _events(backend)
+                     if e.event == "servo.move.failed"]
+        assert "too far to correct safely" in failure.message
+        assert len(arm.aims_deg) == 2   # nothing was driven at 61 deg
+
+    def test_a_miss_it_cannot_close_is_reported_not_called_success(
+            self, monkeypatch, backend, sim):
+        _fast_settle(monkeypatch, backend)
+        monkeypatch.setattr(backend.settings,
+                            "fine_approach_max_corrections", 2)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        # Lands 0.5 deg out wherever it aims: inside the clamp, so it is a
+        # real miss, but no correction can remove it.
+        arm = _ScriptedArm(store, bias_deg=-0.5)
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        monkeypatch.setattr(store, "current_output_deg",
+                            lambda: round(-30.0 - 0.5, 2))
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        get_motion_service().move_to(-30.0)
+        assert wait_until(
+            lambda: "servo.move.failed" in
+            [e.event for e in _events(backend)], timeout=8)
+        [failure] = [e for e in _events(backend)
+                     if e.event == "servo.move.failed"]
+        assert "short of" in failure.message
+        assert failure.data["corrections"] == 2
+        assert "servo.move.arrived" not in [e.event for e in _events(backend)]
+
+
+class TestPositioningIsVisibleAsSettling:
+    """Several operators watch the same arm. If it reads HOLDING between
+    its own legs it appears finished and then moves again with nobody
+    having commanded it."""
+
+    def test_settling_stays_true_across_the_whole_sequence(
+            self, monkeypatch, backend, sim):
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        arm = _ScriptedArm(store, bias_deg=-0.43)
+        seen = []
+
+        def _record_then_move(counts, speed, accel):
+            # Sampled from inside the sequence, at each leg it commands, so
+            # this cannot race the sequence ending the way sampling from
+            # outside does.
+            seen.append(store.snapshot().settling)
+            return arm.command_move(counts, speed, accel)
+
+        monkeypatch.setattr(sim, "command_move", _record_then_move)
+        monkeypatch.setattr(store, "current_output_deg",
+                            arm.current_output_deg)
+        motion = get_motion_service()
+        motion.move_to(-90.0)
+        motion.join_fine_approach(timeout=8.0)
+        assert wait_until(
+            lambda: "servo.move.arrived" in
+            [e.event for e in _events(backend)], timeout=8)
+        # overshoot, final leg, and at least one corrective re-approach
+        assert len(seen) >= 3
+        assert all(seen), "the arm read as finished between its own legs"
+
+    def test_settling_clears_once_the_sequence_ends(
+            self, monkeypatch, backend, sim):
+        _fast_settle(monkeypatch, backend)
+        from app.deps import get_motion_service, get_state_store
+        store = get_state_store()
+        arm = _ScriptedArm(store, bias_deg=-0.43)
+        monkeypatch.setattr(sim, "command_move", arm.command_move)
+        monkeypatch.setattr(store, "current_output_deg",
+                            arm.current_output_deg)
+        motion = get_motion_service()
+        motion.move_to(-90.0)
+        motion.join_fine_approach(timeout=8.0)
+        assert wait_until(lambda: store.snapshot().settling is False,
+                          timeout=8)

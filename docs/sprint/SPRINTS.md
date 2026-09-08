@@ -290,7 +290,7 @@ mid-item).
 | D41 — firmware refuses a real move commanded off a failed sensor read or a malformed payload | 2 | 3.5h | | | | 25 | To Do |
 | R11 — accept any typed angle, snap to the nearest reachable step, show the delta | 2 | 3.0h | | | | 25 | To Do — carried from last sprint, did not start there |
 | R12 — soft limit ±90° / hard limit ±95°, confirmed in between | 3 | 4.0h | | | | 25 | To Do — needs R11 actually done first (ordering, not risk) |
-| D38 — let an operator dismiss a saved position's "may be outdated" tag | 2 | 3.0h | | | | 25 | To Do |
+| D38 — let an operator dismiss a saved position's "may be outdated" tag | 2 | 3.0h | 20:30 | 21:17 | 47m | 29 | **Done — D38 closed.** Neither the 3.0h estimate nor the operator's own ~10-minute guess held; see the note below |
 | T20 — doc-truth sweep, ~25 verified stale citations (Antigravity, parallel — not counted against the 13.25h/17.5h Claude estimate above) | 1 | 1.5h | | | | — | To Do |
 
 **Two sessions of D48 work (26 and 27) were never booked here at the time,
@@ -326,6 +326,16 @@ minutes. Record whichever the actual turns out to be — if it lands near
 10 minutes, the 3.0h estimate was wrong and worth understanding why for
 future estimates of similarly-worded items; if it lands near 3.0h, say so
 plainly rather than let a strained "quick win" framing stand uncorrected.
+**Actual: 47 minutes — neither estimate held.** Closer to the operator's
+order of magnitude than the sheet's, but for a reason neither guess
+priced in: three design iterations against real visual mockups (the
+first two shown and rejected for costing too much visual weight) before
+any code, then a genuine cross-cutting bug the work itself surfaced (the
+SSE stream built its own copy of the response the router already had a
+helper for, missing the new field entirely — caught by the existing
+stream test, not invented for this item). The lesson for next time: a
+UI-facing item's estimate should price in a design pass, not just the
+code.
 
 **T17 closed 6 Sept, ahead of this sprint being set up** — the operator ran
 the real-rig hand-turn test directly: matched expectations both ways

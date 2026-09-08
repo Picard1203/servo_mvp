@@ -156,6 +156,76 @@ class SavedPositionService:
                     metadata={"event": "position.deleted"},
                     extra={"position_id": position_id})
 
+    def dismiss_reference(self, position_id: int,
+                         expected_updated_at: str) -> SavedPositionView:
+        """Acknowledges a stale earlier-reference tag on one position.
+
+        Touches only dismissed_at - the name, description, angle and
+        updated_at the caller compares its edits against are untouched.
+
+        Args:
+            position_id (int): Database identifier.
+            expected_updated_at (str): The updated_at the caller last saw.
+
+        Returns:
+            SavedPositionView: The position, enriched for display.
+
+        Raises:
+            NotFoundError: If no position has this id.
+            StalePositionError: If the position changed since it was read.
+        """
+        current = self._positions.get(position_id)
+        if current is None:
+            raise NotFoundError(f"position {position_id} does not exist")
+        if current.updated_at != expected_updated_at:
+            raise StalePositionError(
+                "this position changed since it was last read")
+        updated = self._clear_reference(current)
+        self._events.record(
+            "position.reference_dismissed",
+            f"position '{current.name}' earlier reference cleared",
+            {"position_id": position_id})
+        logger.info("position reference dismissed",
+                    metadata={"event": "position.reference_dismissed"},
+                    extra={"position_id": position_id})
+        return self._to_view(updated)
+
+    def dismiss_all_stale_references(self) -> int:
+        """Acknowledges every currently-tagged position in one call.
+
+        Returns:
+            int: How many positions were cleared.
+        """
+        cleared_names: list[str] = []
+        for position in self._positions.list_all():
+            if self._to_view(position).stale_reference is True:
+                self._clear_reference(position)
+                cleared_names.append(position.name)
+        if cleared_names:
+            self._events.record(
+                "position.reference_dismissed",
+                f"{len(cleared_names)} earlier-reference tag(s) cleared: "
+                + ", ".join(cleared_names),
+                {"count": len(cleared_names)})
+            logger.info("positions reference dismissed",
+                        metadata={"event": "position.reference_dismissed"},
+                        extra={"count": len(cleared_names)})
+        return len(cleared_names)
+
+    def _clear_reference(self, position: SavedPosition) -> SavedPosition:
+        """Writes the acknowledgement and bumps the revision.
+
+        Args:
+            position (SavedPosition): The entity to acknowledge.
+
+        Returns:
+            SavedPosition: The updated entity.
+        """
+        now = datetime.now().isoformat(timespec="seconds")
+        updated = self._positions.mark_dismissed(position.id, now)
+        self._revision += 1
+        return updated
+
     def go(self, position_id: int) -> None:
         """Moves the mechanism to a saved position.
 
@@ -203,12 +273,17 @@ class SavedPositionService:
             SavedPositionView: The position enriched for display.
         """
         datum_captured_at = self._state.datum_captured_at()
-        stale = ((datum_captured_at is not None)
-                 and (position.updated_at < datum_captured_at))
+        predates_datum = ((datum_captured_at is not None)
+                          and (position.updated_at < datum_captured_at))
+        actively_dismissed = ((position.dismissed_at is not None)
+                              and (datum_captured_at is not None)
+                              and (position.dismissed_at
+                                  >= datum_captured_at))
         return SavedPositionView(
             id=position.id, name=position.name,
             description=position.description, raw_counts=position.raw_counts,
             output_deg=round(
                 self._state.output_deg_from_counts(position.raw_counts), 2),
-            stale_reference=stale, created_at=position.created_at,
-            updated_at=position.updated_at)
+            stale_reference=predates_datum and not actively_dismissed,
+            reference_dismissed=predates_datum and actively_dismissed,
+            created_at=position.created_at, updated_at=position.updated_at)

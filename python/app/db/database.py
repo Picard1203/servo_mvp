@@ -42,7 +42,8 @@ class Database:
                     description TEXT NOT NULL DEFAULT '',
                     raw_counts INTEGER NOT NULL,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    dismissed_at TEXT
                 );
                 CREATE TABLE IF NOT EXISTS telemetry (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,6 +97,7 @@ class Database:
             "ALTER TABLE telemetry ADD COLUMN target_deg REAL",
             "ALTER TABLE telemetry ADD COLUMN isolated INTEGER NOT NULL"
             " DEFAULT 0",
+            "ALTER TABLE saved_positions ADD COLUMN dismissed_at TEXT",
         )
         for statement in migrations:
             try:

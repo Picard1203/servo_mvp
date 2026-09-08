@@ -257,7 +257,13 @@ function askPosition(title, okLabel, initial) {
     nameInput.value = initial.name || "";
     descInput.value = initial.description || "";
     angleInput.value = initial.targetDeg.toFixed(2);
-    $("positionDlgHint").hidden = !initial.staleReference;
+    const hint = $("positionDlgHint");
+    hint.hidden = !(initial.staleReference || initial.referenceDismissed);
+    hint.textContent = initial.referenceDismissed
+      ? "Saved against an earlier reference, already acknowledged. Still "
+        + "the same physical position."
+      : "Saved against an earlier reference. Still the same physical "
+        + "position.";
     let settled = false;
     const finish = (value) => {
       if (settled) return;
@@ -684,13 +690,19 @@ function decodedFaultNames(s) {
 function renderPositions() {
   const list = $("positionList");
   list.innerHTML = "";
+  const clearAllBtn = $("clearAllRefsBtn");
   if (state.positions.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-hint";
     empty.textContent = "No saved positions yet. Press New to add one.";
     list.appendChild(empty);
+    clearAllBtn.hidden = true;
     return;
   }
+  const staleCount = state.positions.filter((p) => p.stale_reference).length;
+  clearAllBtn.hidden = staleCount === 0;
+  clearAllBtn.textContent = staleCount > 0
+    ? "clear " + staleCount + (staleCount === 1 ? " tag" : " tags") : "";
   state.positions.forEach((p) => {
     const row = document.createElement("div");
     row.className = "saved-position" +
@@ -703,12 +715,25 @@ function renderPositions() {
     const sub = document.createElement("div");
     sub.className = "pos-sub";
     sub.innerHTML =
-      '<span class="pos-desc">' + escapeHtml(p.description) + "</span>" +
-      (p.stale_reference
-        ? '<span class="pos-tag" title="Saved against an earlier '
-          + 'reference. Still the same physical position.">earlier '
-          + "reference</span>"
-        : "");
+      '<span class="pos-desc">' + escapeHtml(p.description) + "</span>";
+    if (p.stale_reference) {
+      const tag = document.createElement("span");
+      tag.className = "pos-tag";
+      tag.title = "Saved against an earlier reference. Still the same "
+        + "physical position.";
+      tag.textContent = "earlier reference";
+      const x = document.createElement("button");
+      x.className = "tag-clear";
+      x.setAttribute("aria-label",
+        "Clear the earlier-reference tag on " + p.name);
+      x.innerHTML = '<svg width="8" height="8" viewBox="0 0 8 8" '
+        + 'aria-hidden="true"><path d="M1 1L7 7M7 1L1 7" '
+        + 'stroke="currentColor" stroke-width="1.4" '
+        + 'stroke-linecap="round"/></svg>';
+      x.onclick = (e) => { e.stopPropagation(); dismissReference(p); };
+      tag.appendChild(x);
+      sub.appendChild(tag);
+    }
     row.appendChild(main);
     row.appendChild(sub);
     row.onclick = () => {
@@ -717,6 +742,30 @@ function renderPositions() {
     };
     list.appendChild(row);
   });
+}
+
+async function dismissReference(position) {
+  clearNotice();
+  try {
+    await apiPost("/positions/" + position.id + "/dismiss-reference",
+      { updated_at: position.updated_at });
+    /* success: no notice - the tag's own disappearance is confirmation */
+    fetchPositions();
+  } catch (err) {
+    sayError(err);
+    if (err.reason === "stale_position") fetchPositions();
+  }
+}
+
+async function dismissAllReferences() {
+  clearNotice();
+  try {
+    const result = await apiPost("/positions/dismiss-references");
+    if (result.dismissed_count === 0) {
+      say("no positions are marked stale");
+    }
+    fetchPositions();
+  } catch (err) { sayError(err); }
 }
 
 function escapeHtml(text) {
@@ -740,6 +789,7 @@ const EVENT_LABELS = {
   "position.updated": "position updated",
   "position.deleted": "position removed",
   "position.moved": "moved to position",
+  "position.reference_dismissed": "reference cleared",
   "app.boot": "started",
   "telemetry.exported": "export delivered",
 };
@@ -873,6 +923,7 @@ async function editPosition() {
     name: position.name, description: position.description,
     targetDeg: position.output_deg,
     staleReference: position.stale_reference,
+    referenceDismissed: position.reference_dismissed,
   });
   if (!result) return;
   try {
@@ -2189,6 +2240,7 @@ function initUi() {
   bind("newPositionBtn", newPosition);
   bind("editPositionBtn", editPosition);
   bind("deletePositionBtn", deletePosition);
+  bind("clearAllRefsBtn", dismissAllReferences);
   bind("exportBtn", doExport);
 
   setExportPreset("24h");

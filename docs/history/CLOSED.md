@@ -12,6 +12,51 @@ file every session has to read.
 
 ---
 
+### D38 — A saved position's "earlier reference" tag has no way to dismiss it
+**Status:** CLOSED · 8 September 2026 · Session 29 · **Severity:** low ·
+**Found by:** operator, session 16 (R10's build)
+
+A new `dismissed_at` column, not a re-stamped `updated_at` — the existing
+edit-conflict check compares `updated_at`, so reusing it would have ejected
+another operator's open Edit dialog and made an acknowledgement look like an
+edit that never happened. `stale_reference` now also checks whether a
+dismissal covers the *current* datum, so a later recalibration correctly
+re-raises the tag. UI is a small drawn ✕ inside the tag (single) and a quiet
+header link (batch), both absent from the DOM whenever nothing is tagged —
+three heavier variants (a colour band, extra toolbar buttons, the whole tag
+as a button) were mocked up first and rejected by the operator for costing
+too much visual weight. Caught and fixed along the way: `routers/stream.py`
+built its own copy of `SavedPositionResponse` instead of reusing the
+router's own helper, so the SSE push silently broke on the new field — an
+existing stream test caught it, not new coverage. `tools/verify.py`:
+444→465 Python tests, 106→111 client-behaviour checks, native/Bridge/brace
+unchanged.
+
+**Related:** R10.
+
+**Original report follows.**
+
+`SavedPositionService._to_view()` flags a position `stale_reference` whenever
+its `updated_at` predates the datum's `datum_captured_at` — the UI shows this
+as an "earlier reference" pill (`app.js:renderPositions()`,
+`style.css:.pos-tag`). The only way to clear it today is to re-save the
+position (any edit sets a new `updated_at`), which is not why an operator
+would open the edit dialog.
+
+**The concern, not yet observed but easy to predict:** after one
+recalibration, every position saved before it carries the tag permanently,
+whether or not the drift is meaningful to the operator (0.06° is not the
+same concern as 6°) — a list-wide badge with no way to say "seen, fine"
+reads as a persistent low-grade alarm rather than useful information the
+first time it is noticed.
+
+**Acceptance:** an operator can dismiss the tag on a position (or a
+recalibration's whole batch of newly-stale positions) without editing its
+name, description or angle — dismissal should not silently change what the
+position stores.
+
+---
+
 ### T17 — Get a mechanical rig on the bench so R2's hand-turn scenario can actually be tested
 **Status:** done · 6 September 2026 · raised by the operator, 26 August 2026,
 closing out R2

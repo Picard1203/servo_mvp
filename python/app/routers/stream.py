@@ -71,6 +71,7 @@ async def _stream_generator(
                             raw_counts=v.raw_counts,
                             output_deg=v.output_deg,
                             stale_reference=v.stale_reference,
+                            reference_dismissed=v.reference_dismissed,
                             created_at=v.created_at,
                             updated_at=v.updated_at,
                         ).model_dump(mode="json")

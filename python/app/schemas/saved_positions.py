@@ -49,6 +49,16 @@ class SavedPositionDeleteRequest(BaseModel):
     updated_at: str
 
 
+class SavedPositionDismissRequest(BaseModel):
+    """Request to acknowledge one position's earlier-reference tag.
+
+    Attributes:
+        updated_at (str): The updated_at the caller last saw.
+    """
+
+    updated_at: str
+
+
 class SavedPositionResponse(BaseModel):
     """One saved position, enriched with its live angle.
 
@@ -59,6 +69,8 @@ class SavedPositionResponse(BaseModel):
         raw_counts (int): Absolute encoder position in raw counts.
         output_deg (float): Live output angle against the current datum.
         stale_reference (bool): True if saved before the current datum.
+        reference_dismissed (bool): True if a dismissal is covering the
+            current datum.
         created_at (str): ISO timestamp of creation.
         updated_at (str): ISO timestamp of the last edit.
     """
@@ -69,8 +81,19 @@ class SavedPositionResponse(BaseModel):
     raw_counts: int
     output_deg: float
     stale_reference: bool
+    reference_dismissed: bool
     created_at: str
     updated_at: str
+
+
+class DismissedCountResponse(BaseModel):
+    """Acknowledgement of a batch dismissal.
+
+    Attributes:
+        dismissed_count (int): How many positions were cleared.
+    """
+
+    dismissed_count: int
 
 
 class GoResponse(BaseModel):

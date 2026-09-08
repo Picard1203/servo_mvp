@@ -38,6 +38,21 @@ sessions actually spent, not the ones originally planned.
 | **26** | **DONE, 7 Sept 2026.** D48 continued. A re-analysis of Session 25's own archive invalidated part of its basis — every campaign trial had run at ~10Hz, not the fast path, so poll rate and time-of-day were perfectly confounded and its between-configuration comparisons were uninterpretable as they stood. New pre-registered regimen and a randomised-block campaign tool built (`docs/sprint/D48_S26_REGIMEN.md`, `tools/d48_s26_campaign.py`). B7 dose-response found the bifurcation between `min_start_force` 85 and 100; B8 crossed dead zone with the floor; multi-angle and bracket sweeps followed. Both deep-research answers came in and disagreed on cause while agreeing on the next experiment. | yes |
 | **27** | **DONE, 8 Sept 2026, 08:48–~17:30.** B9 confirmatory (N=16, two angles) passed and `min_start_force=40` was baked into `Config.h` — then the operator's own manual sweep reopened it the same day: commanding −75° three times landed in three different places, exposing that the fine approach never had a fixed arrival side. `tools/d48_decisive.py` built and run: P1 proved arrival direction decides the miss and flips with the angle's sign; P2A found no floor passes alone; P3 showed a host-side verify-and-correct converges. Left deliberately unclosed for a fresh-eyes analysis. | yes |
 | **28** | **DONE, 8 Sept 2026, 17:36–close. D48 CLOSED.** Analysis of the whole archive showed the two failure modes move in opposite directions with the floor, so no single value can pass — the fix had to be software. Floor **55** (highest never-oscillating value) baked into `Config.h`; arrival direction anchored to the target's sign; verify-and-correct loop added with three guards. Found and fixed a divergence in the correction rule itself (it re-derived its aim from the target each round and ping-ponged; now cumulative). Live on hardware: the same target from opposite sides lands identically, 0.00° spread. Four diagnostic-tool defects fixed, one filed as **T24**. | yes |
+| **29** | **NOT STARTED — resume here.** Pick up **D38** next: run `/deliver` with
+"D38 — let an operator dismiss a saved position's earlier-reference tag,
+single position and batch, without editing name/description/angle."
+Re-prioritized ahead of D41/R11/R12 by the operator at the end of Session
+28 (banking a completable win with two shorter working days ahead, 9–10
+Sept) — full reasoning and the original committed order are both in
+`docs/sprint/SPRINTS.md`'s ordering note; D41 stays the higher-severity
+item on merit and follows D38, not the other way round. `docs/backlog/D.md`
+D38 already has its acceptance criteria written — read that entry, not this
+row, before planning. If D38 finishes with session time left, **T20** (the
+doc-truth sweep) is the fallback — it is an Antigravity handoff per
+`docs/backlog/T.md`, not Claude session work, so treat "time left" as
+"hand T20 off", not "start it here." **Sizing flagged going in:** the
+sprint sheet estimates D38 at 3.0h; the operator's own estimate was closer
+to 10 minutes. State plainly which one the actual turns out to be. | tbd |
 
 **R11 was pulled into committed scope 1 Sept, alongside T20 and the rig
 protocols, then did not start** (D48/D40d's investigation used the full

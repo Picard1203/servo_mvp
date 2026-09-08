@@ -421,6 +421,11 @@ positions panel specifically.
 **Status:** open · **Severity:** low · **Found by:** operator, session 16
 (R10's build)
 
+**Next up, per the operator's own re-prioritization at the end of Session
+28** (8 Sept, ~19:50) — see `docs/sprint/SPRINTS.md`'s ordering note for the
+reasoning. `graphify query` before reading source, as always; not
+pre-orienting here so that discipline is not skipped.
+
 `SavedPositionService._to_view()` flags a position `stale_reference` whenever
 its `updated_at` predates the datum's `datum_captured_at` — the UI shows this
 as an "earlier reference" pill (`app.js:renderPositions()`,

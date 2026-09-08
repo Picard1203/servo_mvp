@@ -303,13 +303,29 @@ branch exists, End when it closes); what made it break was a multi-session
 item that never reached a closing ceremony, so nobody ever wrote a row.
 **An item spanning sessions needs its row per session, not per item.**
 
-**Order, as given, not re-prioritized:** D48 continuation first (already
-in flight, checkpoint says exactly where to resume), then D41 (highest
-severity of the five — a physical-safety item once real load is on the
-mechanism), then R11, then R12 (blocked on R11 landing), then D38. T20 runs
-in parallel via Antigravity, not session-bound, so it has no place in that
-ordering. Nothing above is a hard sequencing requirement except
-R11-before-R12.
+**Order, as originally given:** D48 continuation first (done, closed
+Session 28), then D41 (highest severity of the five — a physical-safety
+item once real load is on the mechanism), then R11, then R12 (blocked on
+R11 landing), then D38. T20 runs in parallel via Antigravity, not
+session-bound, so it has no place in that ordering.
+
+**Re-prioritized by the operator, end of Session 28 (8 Sept, ~19:50):
+D38 moves ahead of D41, R11 and R12.** Stated reason: banking a small,
+completable win tonight, with two shorter working days ahead (Mon 9 Sept
+until ~17:45, Tue 10 Sept until ~17:15/17:30) and wanting to finish the
+sprint's committed scope on time regardless. **D41 stays the higher
+severity item and is not deprioritized on merit** — this is a sequencing
+call for the time remaining, not a re-ranking of what matters most.
+D41 is next after D38, then R11, then R12 (still blocked on R11 landing).
+
+**Sizing note the operator flagged before this ran:** D38 is estimated at
+3.0h in this sheet, set the same session that wrote its acceptance
+criteria (single dismiss, batch dismiss, no edit to name/description/angle,
+tests for both). The operator's own estimate going in was closer to 10
+minutes. Record whichever the actual turns out to be — if it lands near
+10 minutes, the 3.0h estimate was wrong and worth understanding why for
+future estimates of similarly-worded items; if it lands near 3.0h, say so
+plainly rather than let a strained "quick win" framing stand uncorrected.
 
 **T17 closed 6 Sept, ahead of this sprint being set up** — the operator ran
 the real-rig hand-turn test directly: matched expectations both ways
